@@ -1,0 +1,31 @@
+Package: eggSim
+Title: Simulating datasets representing egg reduction rate data
+Version: 0.1.0-1
+Date: 2020-03-03
+Authors@R: 
+    c(person(given = "Matt",
+           family = "Denwood",
+           role = c("aut", "cre"),
+           email = "md@sund.ku.dk"),
+    person(given = c("Luc", "E"),
+           family = "Coffeng",
+           role = c("aut"),
+           email = "l.coffeng@erasmusmc.nl"))
+Description: A collection of utilities to simulate data from different
+    compound over-dispersed count distributions representing egg reduction
+    rate (ERR; aka faecal egg count reduction) datasets.
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+Depends: 
+    dplyr,
+    ggplot2
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.0.2
+Suggests: 
+    testthat (>= 2.1.0),
+    knitr,
+    rmarkdown,
+    spelling
+VignetteBuilder: knitr
+Language: en-GB
