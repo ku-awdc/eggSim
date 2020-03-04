@@ -1,0 +1,104 @@
+---
+title: "Fun with ERR"
+author: "Matt Denwood"
+date: '2020-02-05'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Arithmetic vs geometric mean
+
+We can generate pre- and post-treatment data with varying within-individual correlation empirically (rather than mechanistically) using correlated gamma variates to underly the Poisson observations.  Parameters we need to use are the pre- and post-treatment arithmetic means (m1, m2), pre- and post-treatment total over-dispersion (k1, k2), and the correlated over-dispersion (kc).  For example, leaving out the Poisson part for now:
+
+```{r bvg}
+N <- 10^6
+m1 <- 100
+m2 <- 5
+k1 <- 1
+k2 <- 1.5
+cc <- 0.6
+
+stopifnot(cc > 0)
+stopifnot(cc < 1)
+
+kc <- sqrt(k1*k2) / cc
+corrcomp <- rgamma(N, kc, 1.0)
+pre <- rbeta(N, k1, kc-k1) * corrcomp * m1/k1
+post <- rbeta(N, k2, kc-k2) * corrcomp * m2/k2
+gdata <- cbind(pre=pre, post=post)
+
+mean(pre)
+mean(post)
+mean(pre)^2 / var(pre)
+mean(post)^2 / var(post)
+cor(pre, post)
+```
+
+As expected the arithmetic mean reduction of the sample gives us a good (or at least unbiased) estimate of the population arithmetic mean reduction:
+
+```{r}
+m2/m1
+mean(post)/mean(pre)
+```
+
+But the geometric mean reduction  of the sample is biased compared to the arithmetic mean reduction of the population, with bias depending on the value of k1 relative to k2:
+
+```{r}
+m2/m1
+exp(mean(log(post)) - mean(log(pre)))
+```
+
+I don't think there is a standard formula for the geometric mean of a gamma distribution, but this could be calculated either via Monte Carlo integration or a delta method approximation.  But if the variates were log-normal rather than gamma then we could use the following:
+
+```{r}
+tau <- 1/c(k1,k2)^0.5
+lsd <- sqrt(log(tau^2 +1))
+lmu <- log(c(m1,m2)) - ((lsd^2) / 2)
+
+exp(lmu[2] - lmu[1])
+exp(mean(log(post)) - mean(log(pre)))
+```
+
+This is better but still not great, as there is a difference between log-normal and gamma distributions with equivalent arithmetic mean and variance. We can do a better job by actually using a log-normal:
+
+```{r}
+covar <- cc * lsd[1] * lsd[2]
+sig <- matrix(c(lsd[1]^2, covar, covar, lsd[2]^2),2,2)
+lndata <- exp(MASS::mvrnorm(N, lmu, sig))
+
+# Geometric mean reduction:
+exp(lmu[2] - lmu[1])
+exp(mean(log(lndata[,2])) - mean(log(lndata[,1])))
+
+# Arithmetic mean reduction:
+m2 / m1
+mean(lndata[,2]) / mean(lndata[,1])
+
+# Means and variances are equivalent to the gamma data:
+mean(lndata[,1])
+mean(lndata[,2])
+mean(lndata[,1])^2 / var(lndata[,1])
+mean(lndata[,2])^2 / var(lndata[,2])
+
+# But the correlation is only correct on the log scale:
+cc
+cor(log(lndata[,1]), log(lndata[,2]))
+cor(lndata[,1], lndata[,2])
+
+# NB opposite for correlated gammas:
+cc
+cor(log(gdata[,1]), log(gdata[,2]))
+cor(gdata[,1], gdata[,2])
+```
+
+Now we can calculate both arithmetic and geometric mean reductions in the population, and approximate these from the sample. Crucially, they are not the same quantity! Adding Poisson noise to the top of this will obviously add complication (and reduce the accuracy of both approximations) but should not introduce bias.
+
+
+## Estimating the bivariate gamma parameters
+
+We can do this via maximum likelihood
