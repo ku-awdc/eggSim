@@ -1,0 +1,200 @@
+---
+title: "Data Simulation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library('tidyverse')
+theme_set(theme_light())
+library('eggSim')
+```
+
+## Parameters
+
+```{r}
+# Number of individuals:
+N <- 100
+# Number of bootstrap simulations:
+R <- 10^4
+
+# Arithmetic mean eggs per gram in the pre- and post-treatment data:
+mus <- c(1000, 100)
+# Extra-Poisson coefficient of variation (ratio of standard deviation to the mean):
+cvs <- c(1.5, 2)
+# Extra-Poisson correlation:
+cor <- 0.33
+
+# Equivalent arithmetic and geometric mean efficacies for reference:
+efficacies <- ERRparameters(mus[1], mus[2], cvs[1], cvs[2], cor, TRUE)$efficacies
+efficacies
+```
+
+
+## Simulating gamma-Poisson data
+
+For efficiency simulate a single big dataset with N * R observations, then do a count using a standard McMaster:
+
+```{r}
+simdata <- gpDataSim(N*R, mus[1], mus[2], cvs[1], cvs[2], cor) %>%
+  mutate(Replicate = rep(1:R, each=N)) %>%
+  mutate(preCount = rpois(n(), preLambda/50), postCount = rpois(n(), postLambda/50))
+```
+
+Verify that we can recover the simulation parameters:
+
+```{r}
+mean(simdata$preLambda)
+mus[1]
+```
+
+```{r}
+mean(simdata$postLambda)
+mus[2]
+```
+
+```{r}
+sd(simdata$preLambda)/mean(simdata$preLambda)
+sd(simdata$postLambda)/mean(simdata$postLambda)
+cvs
+```
+
+```{r}
+cor(simdata$preLambda, simdata$postLambda)
+cor
+```
+
+```{r}
+gammadata <- simdata
+```
+
+
+## Simulating lognormal-Poisson data
+
+For efficiency simulate a single big dataset with N * R observations:
+
+```{r}
+simdata <- lpDataSim(N*R, mus[1], mus[2], cvs[1], cvs[2], cor) %>%
+  mutate(Replicate = rep(1:R, each=N)) %>%
+  mutate(preCount = rpois(n(), preLambda/50), postCount = rpois(n(), postLambda/50))
+```
+
+Verify that we can recover the simulation parameters:
+
+```{r}
+mean(simdata$preLambda)
+mus[1]
+```
+
+```{r}
+mean(simdata$postLambda)
+mus[2]
+```
+
+```{r}
+sd(simdata$preLambda)/mean(simdata$preLambda)
+sd(simdata$postLambda)/mean(simdata$postLambda)
+cvs
+```
+
+This is different to the gamma Poisson data as the correlation is on the log scale:
+
+```{r}
+cor(log(simdata$preLambda), log(simdata$postLambda))
+cor
+# cf:
+cor(simdata$preLambda, simdata$postLambda)
+```
+
+```{r}
+lnormdata <- simdata
+```
+
+
+## Analysing the gamma data
+
+Basic analysis based on underlying lambda values for simplicity:
+
+```{r}
+summaries <- gammadata %>%
+  group_by(Replicate) %>%
+  summarise(arithmetic = 100*(1-mean(postLambda)/mean(preLambda)), geometric = 100*(1-exp(mean(log(postLambda))-mean(log(preLambda))))) %>%
+  gather(type, value, -Replicate)
+```
+
+```{r}
+ggplot(summaries, aes(x=type, y=value)) +
+  geom_hline(yintercept = efficacies['gamma',], lty='dashed') +
+  geom_boxplot()
+```
+
+
+Same looking at counts (arithmetic mean only - we could add an arbitrary constant for the geometric mean):
+
+```{r}
+summaries <- gammadata %>%
+  group_by(Replicate) %>%
+  summarise(type='arithmetic', value = 100*(1-mean(postCount)/mean(preCount)))
+ggplot(summaries, aes(x=type, y=value)) +
+  geom_hline(yintercept = efficacies['gamma','arithmetic'], lty='dashed') +
+  geom_boxplot()
+```
+
+
+And showing the bias in arithmetic mean if we only take pre-treatment positives:
+
+```{r}
+summaries <- gammadata %>%
+  filter(preCount > 0) %>%
+  group_by(Replicate) %>%
+  summarise(type='arithmetic', value = 100*(1-mean(postCount)/mean(preCount)))
+ggplot(summaries, aes(x=type, y=value)) +
+  geom_hline(yintercept = efficacies['gamma','arithmetic'], lty='dashed') +
+  geom_boxplot()
+```
+
+
+## Analysing the lognormal data
+
+Basic analysis based on underlying lambda values for simplicity:
+
+```{r}
+summaries <- lnormdata %>%
+  group_by(Replicate) %>%
+  summarise(arithmetic = 100*(1-mean(postLambda)/mean(preLambda)), geometric = 100*(1-exp(mean(log(postLambda))-mean(log(preLambda))))) %>%
+  gather(type, value, -Replicate)
+ggplot(summaries, aes(x=type, y=value)) +
+  geom_hline(yintercept = efficacies['lognormal',], lty='dashed') +
+  geom_boxplot()
+```
+
+Same looking at counts (arithmetic mean only - we could add an arbitrary constant for the geometric mean):
+
+```{r}
+summaries <- lnormdata %>%
+  group_by(Replicate) %>%
+  summarise(type='arithmetic', value = 100*(1-mean(postCount)/mean(preCount)))
+ggplot(summaries, aes(x=type, y=value)) +
+  geom_hline(yintercept = efficacies['lognormal','arithmetic'], lty='dashed') +
+  geom_boxplot()
+```
+
+
+And showing the bias in arithmetic mean if we only take pre-treatment positives:
+
+```{r}
+summaries <- lnormdata %>%
+  filter(preCount > 0) %>%
+  group_by(Replicate) %>%
+  summarise(type='arithmetic', value = 100*(1-mean(postCount)/mean(preCount)))
+ggplot(summaries, aes(x=type, y=value)) +
+  geom_hline(yintercept = efficacies['lognormal','arithmetic'], lty='dashed') +
+  geom_boxplot()
+```
+
+## TODO
+
+We want to look at the bias vs mean, cv, correlation and egg detection thresholds...

@@ -22,7 +22,8 @@ Depends:
     ggplot2
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.0.2
-Suggests: 
+Suggests:
+    tidyverse,
     testthat (>= 2.1.0),
     knitr,
     rmarkdown,
