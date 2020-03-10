@@ -1,0 +1,141 @@
+---
+title: "Compound data simulation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+set.seed(2020-03-10)
+```
+
+```{r}
+library('tidyverse')
+theme_set(theme_light())
+library('eggSim')
+```
+
+## Basic data simulation
+
+Generate some data under either lp or gp distribution (1000 replicates of 1000 individuals).  Note that the cv parameters are complete guesses!
+
+```{r}
+arguments <- list(R=10^3, N=10^3, reduction=0.05, community_mean=c(800,1000,1200), cv_between=c(0.6,0.8,1), cv_within=0.4, cv_slide=0.75, cv_reduction=0.25, edt=24)
+simdatagp <- do.call("cgpDataSim", arguments) %>% mutate(Data='Gamma')
+simdatalp <- do.call("clpDataSim", arguments) %>% mutate(Data='Lognormal')
+```
+
+But we can examine the overall parameter estimates for over-dispersion (based on a single pre- and post-treatment egg count) and within-individual extra-Poisson correlation:
+
+```{r}
+bind_rows(simdatagp, simdatalp) %>%
+  group_by(Data) %>%
+  summarise(cvPre = sd(PreSlide)/mean(PreSlide), 
+            cvPost = sd(PostSlide1a)/mean(PostSlide1a),
+            trueKpre = 1/cvPre^2,
+            trueKpost = 1/cvPost^2,
+            kPre = MASS::theta.ml(PreCount, mean(PreCount)), 
+            kPost = MASS::theta.ml(PostCount1a, mean(PostCount1a)), 
+            Correlation = cor(PreSlide, PostSlide1a))
+```
+
+The lognormal data seems to have (on average) very slightly higher overall cv than the gamma data - to be honest I'm not entirely sure why, as I'd hoped they would be the same.  I might try and dig into what is driving the slight divergence at some point...  But note that the kPre and kPost as estimated by ML are absolute garbage as neither of these distributions are negative binomial:  the compound lognormal-Poisson is still lognormal-Poisson (as the sum of normals is normal), but the compound gamma-Poisson is something else (the product of gammas is not gamma).
+
+```{r}
+plot(ecdf(simdatagp$PreSlide), col='red', main='ECDF plot of compound gamma (red) and\ncompound lognormal (blue) data')
+plot(ecdf(simdatalp$PreSlide), add=TRUE, col='blue')
+```
+
+In theory the overall cv should also be calculable directly from the cv partitions ... if I can remember how to do that.  Note that the reduction value affects the cv_reduction, and therefore kPost.  Otherwise these estimates should be unaffected by the other parameters (although I haven't checked that).
+
+We could use this data to look at boxplots of design type at a specific arithmetic mean efficacy:
+ 
+```{r}
+gpmeans <- design_means(simdatagp, count=TRUE)
+ggplot(gpmeans, aes(x=Design, y=ArithmeticEfficacy)) +
+  geom_hline(yintercept=100*(1-arguments$reduction)) +
+  geom_boxplot()
+```
+
+Or a specific geometric mean efficacy (no the line is not in the wrong place!!!!):
+
+```{r}
+ggplot(gpmeans, aes(x=Design, y=GeometricEfficacy)) +
+  geom_hline(yintercept=gpmeans$BestGeometric[1]) +
+  geom_boxplot()
+```
+
+Or geometric mean efficacy on the underlying lambda (i.e. without the need for adding a constant):
+
+```{r}
+gpmeans <- design_means(simdatagp, count=FALSE)
+ggplot(gpmeans, aes(x=Design, y=GeometricEfficacy)) +
+  geom_hline(yintercept=gpmeans$BestGeometric[1]) +
+  geom_boxplot()
+```
+
+Or any of these plots but with the lognormal-Poisson data, etc...
+
+
+## Full simulation
+
+I have written a wrapper function that allows us to generate the figure 1 we planned.  Here are some reasonable parameter estimates (assuming 3 communities - this can be changed):
+
+```{r}
+# Number of replicates:
+R <- 250
+# Max number of individuals in total:
+N <- 10^3
+# Reduction (either geometric or arithmetic mean, depending on LP vs GP) - can be vectorised:
+reduction <- seq(0,1,by=0.05)
+# Community means (either geometric or arithmetic mean, depending on LP vs GP):
+community_mean <- c(800, 1000, 1200)
+```
+
+But these are currently a complete guess!!!
+
+```{r}
+# CV between individuals (vectorised to correspond to community means above):
+cv_between <- c(0.6,0.8,1)
+# CV within individuals (day-to-day variation):
+cv_within <- 0.4
+# CV within individual and day (slide-to-slide variation):
+cv_slide <- 0.75
+# Variation in efficacy between individuals:
+cv_reduction <- 0.25
+
+# The lengths of these must match:
+stopifnot(length(cv_between)==length(community_mean))
+
+# The number of individuals used for each design type:
+N = c(NS=600, SS=109, SSR1=100, SSR2=92, SSR3=95)
+```
+
+To produce the output (takes a while):
+
+```{r}
+t <- Sys.time()
+results <- eggSim(reduction, N, community_mean, cv_between, cv_within, cv_slide, cv_reduction, count=FALSE, log_constant=if(count) 1 else 0, screen_threshold = 0, edt=24)
+difftime(Sys.time(), t)
+
+ggplot(results %>% filter(!is.na(Bias)), aes(x=Target, y=Bias, ymin=LCI, ymax=UCI, col=Design)) +
+  geom_hline(yintercept=0) +
+  geom_errorbar(position='dodge') +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ Set, scales='free_y') +
+  xlab('True efficacy (arithmetic or geometric mean as indicated)')
+```
+
+Note that the NS estimates are removed from the top right and bottom left plots because I am using this method to estimate the true values (the assumption is that the bias would be zero though).
+
+Or to look at variance of the estimator:
+
+```{r}
+ggplot(results, aes(x=Target, y=Variance, col=Design)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ Set, scales='free_y') +
+  xlab('True efficacy (arithmetic or geometric mean as indicated)')
+```
+
+Worth noting that the variance of the geometric mean estimator is much smaller than the arithmetic (which I think is Jan's point!)

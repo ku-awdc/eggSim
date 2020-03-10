@@ -35,6 +35,6 @@ lpDataSim <- function(N, mu_pre, mu_post, cv_pre, cv_post, correlation, paramete
   pre <- exp(lrates[,1])
   post <- exp(lrates[,2])
 
-  return(data.frame(ID = 1:N, preLambda = pre, postLambda = post, preCount = rpois(N, pre), postCount = rpois(N, post)))
+  return(data.frame(ID = 1:N, preLambda = pre, postLambda = post))
 
 }

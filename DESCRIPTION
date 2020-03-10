@@ -17,6 +17,10 @@ Description: A collection of utilities to simulate data from different
 License: GPL-3
 Encoding: UTF-8
 LazyData: true
+Imports:
+    tidyr,
+    MASS,
+    magrittr
 Depends: 
     dplyr,
     ggplot2
