@@ -16,7 +16,7 @@
 #' @examples
 #' cgpDataSim(10, 10, c(0.05, 0.1, 0.15), c(800,1000), c(1.5, 1), 1, 1, 1)
 #'
-#' @importFrom tidyr expand_grid
+#' @importFrom tidyr expand_grid gather spread
 #' @importFrom magrittr %>%
 #'
 #' @export
@@ -44,7 +44,8 @@ cgpDataSim <- function(R, N, reduction, community_mean, cv_between, cv_within, c
   # Helper function:
   rgamcv <- function(n, mu, cv){
     rv <- rgamma(n, 1/cv^2, scale=mu*cv^2)
-    rv[cv==0] <- mu
+	## Allow cv of zero to remove this distribution:
+    rv[cv<=0] <- mu
     return(rv)
   }
 

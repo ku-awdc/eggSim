@@ -4,9 +4,18 @@
 \alias{clpDataSim}
 \title{Simulate ERR data from a compound lognormal Poisson distribution}
 \usage{
-clpDataSim(R, N, reduction, community_mean, cv_between, cv_within,
-  cv_slide, cv_reduction, overall_mean = exp(mean(log(community_mean))),
-  edt = 24)
+clpDataSim(
+  R,
+  N,
+  reduction,
+  community_mean,
+  cv_between,
+  cv_within,
+  cv_slide,
+  cv_reduction,
+  overall_mean = exp(mean(log(community_mean))),
+  edt = 24
+)
 }
 \arguments{
 \item{R}{The number of replicate datasets}

@@ -4,8 +4,7 @@
 \alias{lpDataSim}
 \title{Simulate ERR data from a correlated lognormal distribution}
 \usage{
-lpDataSim(N, mu_pre, mu_post, cv_pre, cv_post, correlation,
-  parameters = NULL)
+lpDataSim(N, mu_pre, mu_post, cv_pre, cv_post, correlation, parameters = NULL)
 }
 \arguments{
 \item{N}{The number of (paired) observations to simulate}

@@ -4,9 +4,13 @@
 \alias{design_means}
 \title{Calculate the mean egg counts/rates according to various design types}
 \usage{
-design_means(simdata, N = c(NS = 600, SS = 109, SSR1 = 100, SSR2 = 92,
-  SSR3 = 95), count = TRUE, log_constant = if (count) 1 else 0,
-  screen_threshold = 0)
+design_means(
+  simdata,
+  N = c(NS = 600, SS = 109, SSR1 = 100, SSR2 = 92, SSR3 = 95),
+  count = TRUE,
+  log_constant = if (count) 1 else 0,
+  screen_threshold = 0
+)
 }
 \arguments{
 \item{simdata}{The data as simulated by cgpDataSim or clpDataSim}

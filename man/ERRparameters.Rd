@@ -4,8 +4,7 @@
 \alias{ERRparameters}
 \title{Calculate simulation parameters for a given set of (artithmetic) mean counts, coefficients of variation and correlation}
 \usage{
-ERRparameters(mu_pre, mu_post, cv_pre, cv_post, correlation,
-  geomgamma = FALSE)
+ERRparameters(mu_pre, mu_post, cv_pre, cv_post, correlation, geomgamma = FALSE)
 }
 \arguments{
 \item{mu_pre}{The pre-treatment arithmetic mean count}

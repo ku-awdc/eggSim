@@ -4,16 +4,26 @@
 \alias{eggSim}
 \title{Simulate and summarise egg reduction rate data}
 \usage{
-eggSim(reduction, N = c(NS = 600, SS = 109, SSR1 = 100, SSR2 = 92, SSR3 =
-  95), community_mean = c(800, 1000, 1200), cv_between = c(0.8, 1,
-  1.2), cv_within = 1, cv_slide = 1, cv_reduction = 1,
-  count = TRUE, log_constant = if (count) 1 else 0,
-  screen_threshold = 0, edt = 24, R = 10^3, maxN = 10^3)
+eggSim(
+  reduction,
+  N = c(NS = 600, SS = 109, SSR1 = 100, SSR2 = 92, SSR3 = 95),
+  community_mean = c(800, 1000, 1200),
+  cv_between = c(0.8, 1, 1.2),
+  cv_within = 1,
+  cv_slide = 1,
+  cv_reduction = 1,
+  count = TRUE,
+  log_constant = if (count) 1 else 0,
+  screen_threshold = 0,
+  edt = 24,
+  R = 10^3,
+  maxN = 10^3
+)
 }
 \arguments{
 \item{reduction}{The arithmetic mean reduction (may be vectorised)}
 
-\item{N}{The maximum number of individuals in total}
+\item{N}{A named vector of number of included individuals depending on design type}
 
 \item{community_mean}{A vector of arithmetic mean pre-treatment EPG in each community}
 
@@ -36,8 +46,6 @@ eggSim(reduction, N = c(NS = 600, SS = 109, SSR1 = 100, SSR2 = 92, SSR3 =
 \item{R}{The number of replicate datasets}
 
 \item{maxN}{The maximum number of simulated individuals (on which subsampling occurs)}
-
-\item{N}{A named vector of number of included individuals depending on design type}
 }
 \value{
 A data frame containing the simulated data

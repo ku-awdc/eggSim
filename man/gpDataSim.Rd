@@ -4,8 +4,7 @@
 \alias{gpDataSim}
 \title{Simulate ERR data from a correlated gamma distribution}
 \usage{
-gpDataSim(N, mu_pre, mu_post, cv_pre, cv_post, correlation,
-  parameters = NULL)
+gpDataSim(N, mu_pre, mu_post, cv_pre, cv_post, correlation, parameters = NULL)
 }
 \arguments{
 \item{N}{The number of (paired) observations to simulate}
