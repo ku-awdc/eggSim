@@ -35,9 +35,9 @@ eggSim <- function(reduction, N = c(NS=600, SS=109, SSR1=100, SSR2=92, SSR3=95),
 
   # Then summarise:
   cat('Summarising gamma data...\n')
-  meansgp <- design_means(simdatagp, count=count) %>% mutate(ComparisonArithmetic = TrueArithmetic, ComparisonGeometric = BestGeometric, IncludeNS = "Arithmetic", Data = if(count) 'Gamma-Poisson' else 'Gamma')
+  meansgp <- design_means(simdatagp, N=N, count=count) %>% mutate(ComparisonArithmetic = TrueArithmetic, ComparisonGeometric = BestGeometric, IncludeNS = "Arithmetic", Data = if(count) 'Gamma-Poisson' else 'Gamma')
   cat('Summarising lognormal data...\n')
-  meanslp <- design_means(simdatalp, count=count) %>% mutate(ComparisonArithmetic = BestArithmetic, ComparisonGeometric = TrueGeometric, IncludeNS = "Geometric", Data = if(count) 'Lognormal-Poisson' else 'Lognormal')
+  meanslp <- design_means(simdatalp, N=N, count=count) %>% mutate(ComparisonArithmetic = BestArithmetic, ComparisonGeometric = TrueGeometric, IncludeNS = "Geometric", Data = if(count) 'Lognormal-Poisson' else 'Lognormal')
 
   # Then join and make plots:
   cat('Creating output...\n')
