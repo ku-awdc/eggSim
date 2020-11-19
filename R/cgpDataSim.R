@@ -9,7 +9,7 @@
 #' @param cv_slide Variation between faecal samples from the same individual and day
 #' @param cv_reduction Variation in efficacy between individuals
 #' @param overall_mean The overall mean (i.e. the mean of the distribution reflecting community means)
-#' @param edt The egg detection threshold (24 EPG is standard for Kato-Katz)
+#' @param grams The grams of faeces examined (0.0417g i.e. 1/24 EPG is standard for Kato-Katz)
 #'
 #' @return A data frame containing the simulated data
 #'
@@ -20,7 +20,7 @@
 #' @importFrom magrittr %>%
 #'
 #' @export
-cgpDataSim <- function(R, N, reduction, community_mean, cv_between, cv_within, cv_slide, cv_reduction, overall_mean = mean(community_mean), edt=24){
+cgpDataSim <- function(R, N, reduction, community_mean, cv_between, cv_within, cv_slide, cv_reduction, overall_mean = mean(community_mean), grams=1/24){
 
   stopifnot(length(N) == 1 && N > 0)
 
@@ -58,8 +58,8 @@ cgpDataSim <- function(R, N, reduction, community_mean, cv_between, cv_within, c
     mutate(PostDay1Mean = rgamcv(n(), PostMean, CVwithin), PostDay2Mean = rgamcv(n(), PostMean, CVwithin)) %>%
     mutate(ScreenSlide = rgamcv(n(), ScreenDayMean, CVslide), PreSlide = rgamcv(n(), PreDayMean, CVslide)) %>%
     mutate(PostSlide1a = rgamcv(n(), PostDay1Mean, CVslide), PostSlide1b = rgamcv(n(), PostDay1Mean, CVslide), PostSlide2 = rgamcv(n(), PostDay2Mean, CVslide)) %>%
-    mutate(ScreenCount = rpois(n(), ScreenSlide/edt), PreCount = rpois(n(), PreSlide/edt)) %>%
-    mutate(PostCount1a = rpois(n(), PostSlide1a/edt), PostCount1b = rpois(n(), PostSlide1b/edt), PostCount2 = rpois(n(), PostSlide2/edt))
+    mutate(ScreenCount = rpois(n(), ScreenSlide*grams), PreCount = rpois(n(), PreSlide*grams)) %>%
+    mutate(PostCount1a = rpois(n(), PostSlide1a*grams), PostCount1b = rpois(n(), PostSlide1b*grams), PostCount2 = rpois(n(), PostSlide2*grams))
 
   return(simdata)
 

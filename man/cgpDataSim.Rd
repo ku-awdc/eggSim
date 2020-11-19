@@ -14,7 +14,7 @@ cgpDataSim(
   cv_slide,
   cv_reduction,
   overall_mean = mean(community_mean),
-  edt = 24
+  grams = 1/24
 )
 }
 \arguments{
@@ -36,7 +36,7 @@ cgpDataSim(
 
 \item{overall_mean}{The overall mean (i.e. the mean of the distribution reflecting community means)}
 
-\item{edt}{The egg detection threshold (24 EPG is standard for Kato-Katz)}
+\item{grams}{The grams of faeces examined (0.0417g i.e. 1/24 EPG is standard for Kato-Katz)}
 }
 \value{
 A data frame containing the simulated data

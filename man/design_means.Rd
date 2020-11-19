@@ -6,7 +6,10 @@
 \usage{
 design_means(
   simdata,
-  N = c(NS = 600, SS = 109, SSR1 = 100, SSR2 = 92, SSR3 = 95),
+  design = c("NS", "SS", "SSR1", "SSR2", "SSR3"),
+  budget = 600,
+  second_slide_cost = 0.621,
+  max_screen = 0.75,
   count = TRUE,
   log_constant = if (count) 1 else 0,
   screen_threshold = 0
@@ -15,13 +18,13 @@ design_means(
 \arguments{
 \item{simdata}{The data as simulated by cgpDataSim or clpDataSim}
 
-\item{N}{A named vector of number of included individuals depending on design type}
-
 \item{count}{Logical flag to base means on count data or the underlying rates}
 
 \item{log_constant}{A constant to add to the count data before calculating geometric means (ignored if count==FALSE)}
 
 \item{screen_threshold}{The threshold count on which to screen individuals}
+
+\item{N}{A named vector of number of included individuals depending on design type}
 }
 \value{
 A data frame of summary statistics

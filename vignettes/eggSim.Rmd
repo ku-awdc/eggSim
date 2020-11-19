@@ -17,3 +17,32 @@ knitr::opts_chunk$set(
 ```{r setup}
 library(eggSim)
 ```
+
+```{r}
+
+budget <- 600
+reduction <- 0.05
+
+# Decide on variability partitions:
+cv_between <- 0.75
+cv_within <- 0.5
+cv_slide <- 0.25
+cv_reduction <- 0
+# Overall k is about 0.93 - seems sensible??
+combined_k(cv_between, cv_within, cv_slide, cv_reduction)
+
+# Simulate data:
+simdatagp <- cgpDataSim(R=10^3, N=budget, reduction=reduction, community_mean=1000, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction, grams=1/24)
+
+gpmeans <- design_means(simdatagp, budget=budget, count=TRUE)
+
+# TODO: fix screen budget for SS type
+ggplot(gpmeans, aes(x=Design, y=ScreenProp)) +
+  geom_boxplot()
+
+ggplot(gpmeans, aes(x=Design, y=ArithmeticEfficacy)) +
+  geom_hline(yintercept=100*(1-reduction)) +
+  geom_boxplot()
+
+```
+
