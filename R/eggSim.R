@@ -47,7 +47,8 @@ eggSim <- function(reduction, N = c(NS=600, SS=109, SSR1=100, SSR2=92, SSR3=95),
     mutate(Type = gsub('Efficacy','',Type), Target = ifelse(Type=='Arithmetic', ComparisonArithmetic, ComparisonGeometric)) %>%
     mutate(Set = paste0(Data, ' - ', Type), Cheating = Design=='NS' & IncludeNS!=Type) %>%
     group_by(Design, Set, Data, Type, Cheating, Target) %>%
-    summarise(Bias = mean(Efficacy - Target), LCI = Bias - 1.96*sd(Efficacy - Target)/sqrt(n()), UCI = Bias + 1.96*sd(Efficacy - Target)/sqrt(n()), Variance = var(Efficacy))
+    summarise(Bias = mean(Efficacy - Target), LCI = Bias - 1.96*sd(Efficacy - Target)/sqrt(n()), UCI = Bias + 1.96*sd(Efficacy - Target)/sqrt(n()), Variance = var(Efficacy)) %>%
+    ungroup()
 
   # Remove bias estimates where it is cheating:
   means$Bias[means$Cheating] <- NA

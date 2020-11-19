@@ -1,0 +1,116 @@
+---
+title: "SanityChecks"
+author: "Matt Denwood"
+date: "19/03/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library('tidyverse')
+theme_set(theme_light())
+library('eggSim')
+```
+
+## Test some special cases to ensure the code is correct
+
+Fixed parameters
+
+```{r}
+R <- 100
+```
+
+### Simplest case
+
+Start with 0% efficacy and a single community
+
+```{r}
+reduction <- 1
+community_mean <- 1000
+```
+
+And zero extra-Poisson variation:
+
+```{r}
+# CV between individuals (vectorised to correspond to community means above):
+cv_between <- 0
+# CV within individuals (day-to-day variation):
+cv_within <- 0
+# CV within individual and day (slide-to-slide variation):
+cv_slide <- 0
+# Variation in efficacy between individuals:
+cv_reduction <- 0
+
+# The lengths of these must match:
+stopifnot(length(cv_between)==length(community_mean))
+
+# The number of individuals used for each design type:
+N = c(NS=600, SS=109, SSR1=100, SSR2=92, SSR3=95)
+```
+
+Should all have zero bias and zero variance:
+
+```{r}
+results <- eggSim(reduction, N, community_mean, cv_between, cv_within, cv_slide, cv_reduction, count=FALSE, log_constant=if(count) 1 else 0, screen_threshold = 0, edt=24)
+results %>% select(Design, Set, Bias, Variance)
+```
+
+Should all have zero bias and the same (Poisson plus log_constant) variance within design and data:
+
+```{r}
+results <- eggSim(reduction, N, community_mean, cv_between, cv_within, cv_slide, cv_reduction, count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0, edt=24)
+results %>% select(Design, Set, Bias, Variance)
+```
+
+Now assume all CV is between individuals.  Bias and variance should still be zero without counts:
+
+```{r}
+cv_between <- 1
+cv_within <- 0
+cv_slide <- 0
+cv_reduction <- 0
+
+results <- eggSim(reduction, N, community_mean, cv_between, cv_within, cv_slide, cv_reduction, count=FALSE, log_constant=if(count) 1 else 0, screen_threshold = 0, edt=24)
+results %>% select(Design, Set, Bias, Variance)
+```
+
+Adding counts adds some bias for  the geometric means due to the log_constant:
+
+```{r}
+results <- eggSim(reduction, N, community_mean, cv_between, cv_within, cv_slide, cv_reduction, count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0, edt=24)
+results %>% select(Design, Set, Bias, Variance)
+```
+
+Now assume all variance is at the slide level.  Now we get bias for everything except the NS method:
+
+```{r}
+cv_between <- 0
+cv_within <- 0
+cv_slide <- 1
+cv_reduction <- 0
+
+results <- eggSim(reduction, N, community_mean, cv_between, cv_within, cv_slide, cv_reduction, count=FALSE, log_constant=if(count) 1 else 0, screen_threshold = 0, edt=24)
+results %>% select(Design, Set, Bias, Variance)
+```
+
+Now assume all variance is at the day-to-day level.  We should not get bias for the retest methods:
+
+```{r}
+cv_between <- 0
+cv_within <- 1
+cv_slide <- 0
+cv_reduction <- 0
+
+results <- eggSim(reduction, N, community_mean, cv_between, cv_within, cv_slide, cv_reduction, count=FALSE, log_constant=if(count) 1 else 0, screen_threshold = 0, edt=24)
+results %>% select(Design, Set, Bias, Variance)
+```
+
+```{r}
+maxN <- 10^3
+data <- cgpDataSim(R, maxN, reduction, community_mean, cv_between, cv_within, cv_slide, cv_reduction, overall_mean = mean(community_mean), edt=24)
+data %>% filter(Community==1, Individual==1, Replicate==1)
+```
+

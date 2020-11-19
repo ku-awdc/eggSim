@@ -83,8 +83,6 @@ I have written a wrapper function that allows us to generate the figure 1 we pla
 ```{r}
 # Number of replicates:
 R <- 250
-# Max number of individuals in total:
-N <- 10^3
 # Reduction (either geometric or arithmetic mean, depending on LP vs GP) - can be vectorised:
 reduction <- seq(0,1,by=0.05)
 # Community means (either geometric or arithmetic mean, depending on LP vs GP):
