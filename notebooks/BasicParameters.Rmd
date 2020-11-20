@@ -23,6 +23,13 @@ cv_reduction <- 0
 # Overall k is about 0.23 - seems sensible??
 combined_k(cv_between, cv_within, cv_slide, cv_reduction)
 
+#cv_between <- 1/0.4^0.5
+#cv_within <- 1/2^0.5
+#cv_slide <- 0
+#cv_reduction <- 0
+# Overall k is about 0.23 - seems sensible??
+#combined_k(cv_between, cv_within, cv_slide, cv_reduction)
+
 # Simulate data:
 simdatagp <- cgpDataSim(R=10^3, N=budget, reduction=reduction, community_mean=24, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction, grams=1/24)
 
