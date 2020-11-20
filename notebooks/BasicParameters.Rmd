@@ -50,3 +50,66 @@ gpmeans %>%
   summarise(ScreenProp = mean(ScreenProp), Mean = mean(ArithmeticEfficacy), Median = median(ArithmeticEfficacy), Variance = var(ArithmeticEfficacy), .groups='drop')
 ```
 
+
+
+## Full simulation
+
+I have written a wrapper function that allows us to generate the figure 1 we planned.  Here are some reasonable parameter estimates (assuming 3 communities - this can be changed):
+
+```{r}
+# Number of replicates:
+R <- 250
+# Reduction (either geometric or arithmetic mean, depending on LP vs GP) - can be vectorised:
+reduction <- seq(0,1,by=0.05)
+# Community means (either geometric or arithmetic mean, depending on LP vs GP):
+community_mean <- 24
+```
+
+But these are currently a complete guess!!!
+
+```{r}
+# CV between individuals (vectorised to correspond to community means above):
+cv_between <- 1.5
+# CV within individuals (day-to-day variation):
+cv_within <- 0.75
+# CV within individual and day (slide-to-slide variation):
+cv_slide <- 0.25
+# Variation in efficacy between individuals:
+cv_reduction <- 0
+
+# The lengths of these must match:
+stopifnot(length(cv_between)==length(community_mean))
+
+# The budget:
+budget <- 1200
+```
+
+To produce the output (takes a while):
+
+```{r}
+t <- Sys.time()
+results <- eggSim(reduction, N, community_mean, cv_between, cv_within, cv_slide, cv_reduction, count=FALSE, log_constant=if(count) 1 else 0, screen_threshold = 0, edt=24)
+difftime(Sys.time(), t)
+
+ggplot(results %>% filter(!is.na(Bias)), aes(x=Target, y=Bias, ymin=LCI, ymax=UCI, col=Design)) +
+  geom_hline(yintercept=0) +
+  geom_errorbar(position='dodge') +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ Set, scales='free_y') +
+  xlab('True efficacy (arithmetic or geometric mean as indicated)')
+```
+
+Note that the NS estimates are removed from the top right and bottom left plots because I am using this method to estimate the true values (the assumption is that the bias would be zero though).
+
+Or to look at variance of the estimator:
+
+```{r}
+ggplot(results, aes(x=Target, y=Variance, col=Design)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ Set, scales='free_y') +
+  xlab('True efficacy (arithmetic or geometric mean as indicated)')
+```
+
+Worth noting that the variance of the geometric mean estimator is much smaller than the arithmetic (which I think is Jan's point!)

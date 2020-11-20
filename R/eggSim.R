@@ -21,8 +21,10 @@
 #'
 #'
 #' @export
-eggSim <- function(reduction, N = c(NS=600, SS=109, SSR1=100, SSR2=92, SSR3=95), community_mean=c(800,1000,1200), cv_between=c(0.8,1,1.2), cv_within=1, cv_slide=1, cv_reduction=1, count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0, edt=24, R=10^3, maxN=10^3)
+eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen = 0.9, community_mean=c(800,1000,1200), cv_between=c(0.8,1,1.2), cv_within=1, cv_slide=1, cv_reduction=1, count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0, grams=1/24, R=10^3, type="gamma")
 {
+
+  stopifnot(length(type) == 1 && type %in% "gamma")
 
   # TODO: argument checks
   # TODO: allow community_mean and cv_between to be a matrix so we can alter the population mean values rather than reduction (i.e. make figure 2 as planned)
