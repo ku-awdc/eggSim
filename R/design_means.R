@@ -136,8 +136,9 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
     # We do new pre samples until we have exhausted the budget:
     subsampled <- simdata %>%
       group_by(Replicate, Reduction, Community) %>%
-      mutate(ScreenBudget = 1:n(), SampleBudget = cumsum(PreUsing > screen_threshold)) %>%
+      mutate(ScreenBudget = cumsum(PreUsing <= screen_threshold), SampleBudget = 2*cumsum(PreUsing > screen_threshold)) %>%
       filter((ScreenBudget + SampleBudget) <= community_budget) %>%
+      filter(PreUsing > screen_threshold) %>%
       ungroup() %>%
       mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = NA)
   }else if(design=='SSR1'){
@@ -146,6 +147,7 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
       group_by(Replicate, Reduction, Community) %>%
       mutate(ScreenBudget = 1:n(), SampleBudget = 2*cumsum(ScreenUsing > screen_threshold)) %>%
       filter((ScreenBudget + SampleBudget) <= community_budget) %>%
+      filter(ScreenUsing > screen_threshold) %>%
       ungroup() %>%
       mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = NA)
   }else if(design=='SSR2'){
@@ -154,6 +156,7 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
       group_by(Replicate, Reduction, Community) %>%
       mutate(ScreenBudget = 1:n(), SampleBudget = 3*cumsum(ScreenUsing > screen_threshold)) %>%
       filter((ScreenBudget + SampleBudget) <= community_budget) %>%
+      filter(ScreenUsing > screen_threshold) %>%
       ungroup() %>%
       mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = PostUsing2)
   }else if(design=='SSR3'){
@@ -162,6 +165,7 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
       group_by(Replicate, Reduction, Community) %>%
       mutate(ScreenBudget = 1:n(), SampleBudget = (2+second_slide_cost)*cumsum(ScreenUsing > screen_threshold)) %>%
       filter((ScreenBudget + SampleBudget) <= community_budget) %>%
+      filter(ScreenUsing > screen_threshold) %>%
       ungroup() %>%
       mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = PostUsing1b)
   }else{
@@ -182,14 +186,14 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
     select(-PreMean, -ScreenBudget, -SampleBudget) %>%
     inner_join(budgets, by = c("Replicate", "Community", "Reduction")) %>%
     group_by(Replicate, Reduction, TrueGeometric, TrueArithmetic, BestArithmetic, BestGeometric, OverallMean, ScreenBudget, SampleBudget, ScreenProp, Communities) %>%
-    summarise(Design = design, N = n(), Count = count, ArithmeticEfficacy = 100*(1-mean(c(Post1, Post2), na.rm=TRUE)/mean(Pre)), GeometricEfficacy = 100*(1-exp(mean(log(c(Post1, Post2)+lc), na.rm=TRUE)-mean(log(Pre+lc)))), .groups='drop')
+    summarise(N = n(), Count = count, ArithmeticEfficacy = 100*(1-mean(c(Post1, Post2), na.rm=TRUE)/mean(Pre)), GeometricEfficacy = 100*(1-exp(mean(log(c(Post1, Post2)+lc), na.rm=TRUE)-mean(log(Pre+lc)))), .groups='drop')
 
   ## If we have completely removed a replicate (all communities gone) then re-add it:
   sumstats <- subsampled %>%
     group_by(Replicate, Reduction, TrueGeometric, TrueArithmetic, BestArithmetic, BestGeometric, OverallMean) %>%
     summarise(.groups='drop') %>%
     full_join(sumstats, by=c("Replicate", "Reduction", "TrueGeometric", "TrueArithmetic", "BestArithmetic", "BestGeometric", "OverallMean")) %>%
-    mutate(Communities = replace_na(Communities, 0))
+    mutate(Design = design, Communities = replace_na(Communities, 0))
 
   if(any(sumstats$Communities == 0)) warning("One or more replicate found nobody to sample")
 

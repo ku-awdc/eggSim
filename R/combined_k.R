@@ -8,14 +8,16 @@
 #' @return a vector of pre_k and post_k
 #'
 #' @examples
-#' ERRparameters(100, 10, 2, 2.5, 0.4, TRUE)
+#' combined_k(1.5, 0.75, 0.25, 0)
+#' combined_k(1, 0.75, 0, 0)
+#' (1/1^2 * 1/0.75^2) / (1/1^2 + 1/0.75^2 + 1)
 #'
 #' @export
 combined_k <- function(cv_between, cv_within, cv_slide, cv_reduction){
-	
+
 	cveff <- sqrt(cv_between^2 + cv_within^2 + (cv_between^2*cv_within^2))
 	cvpre <- sqrt(cveff^2 + cv_slide^2 + (cveff^2*cv_slide^2))
 	cvpost <- sqrt(cvpre^2 + cv_reduction^2 + (cvpre^2*cv_reduction^2))
-	
+
 	return(c(pre_k=1/cvpre^2, post_k=1/cvpost^2))
 }
