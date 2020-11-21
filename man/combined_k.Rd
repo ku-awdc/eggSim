@@ -22,6 +22,8 @@ a vector of pre_k and post_k
 Calculate the effective overall k based on coefficients of variation
 }
 \examples{
-ERRparameters(100, 10, 2, 2.5, 0.4, TRUE)
+combined_k(1.5, 0.75, 0.25, 0)
+combined_k(1, 0.75, 0, 0)
+(1/1^2 * 1/0.75^2) / (1/1^2 + 1/0.75^2 + 1)
 
 }

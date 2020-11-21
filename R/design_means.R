@@ -27,7 +27,7 @@ design_means <- function(simdata, design = c('NS','SS','SSR1','SSR2','SSR3'), bu
 getmeans_fixedN <- function(simdata, N, design='NS', count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0)
 {
 
-  # TODO: ensure that cv stuff doesn't vary
+  # TODO: ensure that cv, mean and reduction doesn't vary
 
   # Select either count or lambda and add the constant:
   if(count){
@@ -41,6 +41,7 @@ getmeans_fixedN <- function(simdata, N, design='NS', count=TRUE, log_constant=if
   # Then add columns for the best estimated geometric and arithmetic mean reductions based on the NS type:
   simdata <- simdata %>%
     group_by(Reduction) %>%
+    mutate(Prevalence = sum(ScreenCount > screen_threshold) / n()) %>%
     mutate(BestArithmetic = 100*(1-mean(PostSlide1a)/mean(PreSlide))) %>%
     mutate(BestGeometric = 100*(1-exp(mean(log(PostSlide1a))-mean(log(PreSlide))))) %>%
     ungroup()
@@ -80,7 +81,7 @@ getmeans_fixedN <- function(simdata, N, design='NS', count=TRUE, log_constant=if
     slice(1:min(n(), NC)) %>%
     #sample_n(min(NC, n())) %>%
     ungroup() %>%
-    group_by(Replicate, Reduction, TrueGeometric, TrueArithmetic, BestArithmetic, BestGeometric, OverallMean) %>%
+    group_by(Replicate, Prevalence, Reduction, TrueGeometric, TrueArithmetic, BestArithmetic, BestGeometric, OverallMean) %>%
     summarise(Design = design, N = n(), Count = count, ArithmeticEfficacy = 100*(1-mean(c(Post1, Post2), na.rm=TRUE)/mean(Pre)), GeometricEfficacy = 100*(1-exp(mean(log(c(Post1, Post2)+lc), na.rm=TRUE)-mean(log(Pre+lc))))) %>%
     ungroup()
 
@@ -111,6 +112,7 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
   # Then add columns for the best estimated geometric and arithmetic mean reductions based on the NS type:
   simdata <- simdata %>%
     group_by(Reduction) %>%
+    mutate(Prevalence = sum(ScreenCount > screen_threshold) / n()) %>%
     mutate(BestArithmetic = 100*(1-mean(PostSlide1a)/mean(PreSlide))) %>%
     mutate(BestGeometric = 100*(1-exp(mean(log(PostSlide1a))-mean(log(PreSlide))))) %>%
     ungroup()
@@ -174,18 +176,18 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
 
   ## If all pre-tx samples are zero and/or we have used more than screen_max of the budget on screening then throw out the community:
   budgets <- subsampled %>%
-    group_by(Replicate, Reduction, Community) %>%
+    group_by(Replicate, Prevalence, Reduction, Community) %>%
     summarise(PreMean = mean(Pre), ScreenBudget = max(ScreenBudget), SampleBudget = max(SampleBudget), ScreenProp = ScreenBudget / (ScreenBudget+SampleBudget), .groups='drop') %>%
     filter(ScreenProp <= max_screen, PreMean > 0) %>%
-    group_by(Replicate, Reduction) %>%
+    group_by(Replicate, Prevalence, Reduction) %>%
     mutate(Communities = length(unique(Community))) %>%
     ungroup()
 
   ## Then calculate summary statistics:
   sumstats <- subsampled %>%
-    select(-PreMean, -ScreenBudget, -SampleBudget) %>%
+    select(-PreMean, -ScreenBudget, -SampleBudget, -Prevalence) %>%
     inner_join(budgets, by = c("Replicate", "Community", "Reduction")) %>%
-    group_by(Replicate, Reduction, TrueGeometric, TrueArithmetic, BestArithmetic, BestGeometric, OverallMean, ScreenBudget, SampleBudget, ScreenProp, Communities) %>%
+    group_by(Replicate, Prevalence, Reduction, TrueGeometric, TrueArithmetic, BestArithmetic, BestGeometric, OverallMean, ScreenBudget, SampleBudget, ScreenProp, Communities) %>%
     summarise(N = n(), Count = count, ArithmeticEfficacy = 100*(1-mean(c(Post1, Post2), na.rm=TRUE)/mean(Pre)), GeometricEfficacy = 100*(1-exp(mean(log(c(Post1, Post2)+lc), na.rm=TRUE)-mean(log(Pre+lc)))), .groups='drop')
 
   ## If we have completely removed a replicate (all communities gone) then re-add it:

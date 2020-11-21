@@ -6,24 +6,25 @@
 \usage{
 eggSim(
   reduction,
-  N = c(NS = 600, SS = 109, SSR1 = 100, SSR2 = 92, SSR3 = 95),
-  community_mean = c(800, 1000, 1200),
-  cv_between = c(0.8, 1, 1.2),
-  cv_within = 1,
-  cv_slide = 1,
-  cv_reduction = 1,
+  budget = 600,
+  second_slide_cost = 0.621,
+  max_screen = 0.9,
+  community_mean = c(24, 48),
+  cv_between = c(1.5),
+  cv_within = 0.75,
+  cv_slide = 0.25,
+  cv_reduction = 0,
   count = TRUE,
   log_constant = if (count) 1 else 0,
   screen_threshold = 0,
-  edt = 24,
+  grams = 1/24,
   R = 10^3,
-  maxN = 10^3
+  type = "gamma",
+  parallelise = TRUE
 )
 }
 \arguments{
 \item{reduction}{The arithmetic mean reduction (may be vectorised)}
-
-\item{N}{A named vector of number of included individuals depending on design type}
 
 \item{community_mean}{A vector of arithmetic mean pre-treatment EPG in each community}
 
@@ -41,9 +42,11 @@ eggSim(
 
 \item{screen_threshold}{The threshold count on which to screen individuals}
 
+\item{R}{The number of replicate datasets}
+
 \item{edt}{The egg detection threshold (24 EPG is standard for Kato-Katz)}
 
-\item{R}{The number of replicate datasets}
+\item{N}{A named vector of number of included individuals depending on design type}
 
 \item{maxN}{The maximum number of simulated individuals (on which subsampling occurs)}
 }
@@ -54,6 +57,6 @@ A data frame containing the simulated data
 Simulate and summarise egg reduction rate data
 }
 \examples{
-
+means <- eggSim(c(0.8,0.9,0.95), cv_reduction=0)
 
 }

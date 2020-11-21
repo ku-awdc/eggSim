@@ -9,7 +9,7 @@ design_means(
   design = c("NS", "SS", "SSR1", "SSR2", "SSR3"),
   budget = 600,
   second_slide_cost = 0.621,
-  max_screen = 0.75,
+  max_screen = 0.9,
   count = TRUE,
   log_constant = if (count) 1 else 0,
   screen_threshold = 0

@@ -13,7 +13,7 @@ library(eggSim)
 ```{r}
 
 budget <- 1200
-reduction <- 0.2
+reduction <- 0.05
 
 # Decide on variability partitions:
 cv_between <- 1.5
@@ -54,27 +54,23 @@ gpmeans %>%
   mutate(Success = 100 * sum(Communities > 0) / n()) %>%
   filter(Communities > 0) %>%
   group_by(Design, Success) %>%
-  summarise(ScreenProp = mean(ScreenProp), Mean = mean(ArithmeticEfficacy), Median = median(ArithmeticEfficacy), Variance = var(ArithmeticEfficacy), .groups='drop')
+  summarise(MeanN = mean(N), ScreenProp = mean(ScreenProp), Mean = mean(ArithmeticEfficacy), Median = median(ArithmeticEfficacy), Variance = var(ArithmeticEfficacy), .groups='drop')
 ```
 
 
 
 ## Full simulation
 
-I have written a wrapper function that allows us to generate the figure 1 we planned.  Here are some reasonable parameter estimates (assuming 3 communities - this can be changed):
+The wrapper function now allows vectorisation of mean and/or reduction.  Here are some reasonable parameter estimates as discussed:
 
 ```{r}
 # Number of replicates:
 R <- 250
 # Reduction (either geometric or arithmetic mean, depending on LP vs GP) - can be vectorised:
-reduction <- seq(0,1,by=0.05)
-# Community means (either geometric or arithmetic mean, depending on LP vs GP):
-community_mean <- 24
-```
+reduction <- seq(0.05,0.95,by=0.1)  #c(0.01, 0.025, seq(0.05,0.3,by=0.05), 0.4, 0.5)
+# Community mean EPG (either geometric or arithmetic mean, depending on LP vs GP):
+community_mean <- c(0.15, 0.25, 0.35, 0.5, 1)*24 #c(0.25, 0.5, 1:2, 5)*24
 
-But these are currently a complete guess!!!
-
-```{r}
 # CV between individuals (vectorised to correspond to community means above):
 cv_between <- 1.5
 # CV within individuals (day-to-day variation):
@@ -84,39 +80,79 @@ cv_slide <- 0.25
 # Variation in efficacy between individuals:
 cv_reduction <- 0
 
-# The lengths of these must match:
-stopifnot(length(cv_between)==length(community_mean))
-
-# The budget:
+# The budget (currently cannot be vectorised but I will add this):
 budget <- 1200
 ```
 
 To produce the output (takes a while):
 
 ```{r}
-t <- Sys.time()
-results <- eggSim(reduction, N, community_mean, cv_between, cv_within, cv_slide, cv_reduction, count=FALSE, log_constant=if(count) 1 else 0, screen_threshold = 0, edt=24)
-difftime(Sys.time(), t)
+results <- eggSim(reduction, budget=budget, community_mean=community_mean, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction)
 
-ggplot(results %>% filter(!is.na(Bias)), aes(x=Target, y=Bias, ymin=LCI, ymax=UCI, col=Design)) +
+## A couple of specific examples:
+results %>%
+  filter(Target == 95, OverallMean == 6) %>%
+  select(Design, ScreenProp, MeanN, Bias, MedianBias, Variance)
+
+results %>%
+  filter(Target == 95, OverallMean == 24) %>%
+  select(Design, ScreenProp, MeanN, Bias, MedianBias, Variance)
+
+results %>%
+  filter(Target == 85, OverallMean == 6) %>%
+  select(Design, ScreenProp, MeanN, Bias, MedianBias, Variance)
+
+results %>%
+  filter(Target == 85, OverallMean == 24) %>%
+  select(Design, ScreenProp, MeanN, Bias, MedianBias, Variance)
+
+ggplot(results %>% filter(!is.na(Bias)), aes(x=Target, y=Bias, ymin=LCI, ymax=UCI, col=Design, fill=Design)) +
   geom_hline(yintercept=0) +
-  geom_errorbar(position='dodge') +
+  geom_ribbon(alpha=0.25, lwd=0) +
   geom_line() +
   geom_point() +
-  facet_wrap(~ Set, scales='free_y') +
-  xlab('True efficacy (arithmetic or geometric mean as indicated)')
-```
+  facet_wrap(~ OverallMean, scales='free_y') +
+  xlab('True arithmetic mean efficacy') +
+  ylab("Mean bias")
 
-Note that the NS estimates are removed from the top right and bottom left plots because I am using this method to estimate the true values (the assumption is that the bias would be zero though).
+ggplot(results %>% filter(!is.na(Bias)), aes(x=Target, y=ReductionRatio, col=factor(OverallMean))) +
+  geom_hline(yintercept=1) +
+  stat_smooth(formula=y~x, method='lm', se=FALSE) +
+  geom_point() +
+  facet_wrap(~ Design, scales='free_y') +
+  xlab('True arithmetic mean efficacy') +
+  ylab("Mean ratio of the reduction to target")
+
+ggplot(results %>% filter(!is.na(Bias)), aes(x=Target, y=MedianBias, col=factor(OverallMean))) +
+  geom_hline(yintercept=0) +
+  stat_smooth(formula=y~x, method='lm', se=FALSE) +
+  geom_point() +
+  facet_wrap(~ Design, scales='free_y') +
+  xlab('True arithmetic mean efficacy') +
+  ylab("Median bias")
+```
 
 Or to look at variance of the estimator:
 
 ```{r}
-ggplot(results, aes(x=Target, y=Variance, col=Design)) +
+
+ggplot(results %>% filter(!is.na(Bias)), aes(x=OverallMean, y=VarianceMeanRatio, col=Design)) +
+  #stat_smooth(formula=y~x, method='loess', se=FALSE) +
   geom_line() +
   geom_point() +
-  facet_wrap(~ Set, scales='free_y') +
-  xlab('True efficacy (arithmetic or geometric mean as indicated)')
-```
+  facet_wrap(~ Target, scales='free_y') +
+  xlab('Pre-treatment mean') +
+  ylab("Variance of the ratio of the reduction to target") +
+  scale_y_continuous(trans='log10') +
+  scale_x_continuous(trans='log10')
 
-Worth noting that the variance of the geometric mean estimator is much smaller than the arithmetic (which I think is Jan's point!)
+ggplot(results %>% filter(!is.na(Bias)), aes(x=OverallMean, y=Variance, col=Design)) +
+  #stat_smooth(formula=y~x, method='loess', se=FALSE) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~ Target, scales='free_y') +
+  xlab('Pre-treatment mean') +
+  ylab("Variance of the efficacy estimate") +
+  scale_y_continuous(trans='log10') +
+  scale_x_continuous(trans='log10')
+```
