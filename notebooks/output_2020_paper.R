@@ -101,16 +101,29 @@ yintdat <- plotdata %>%
     Type == "Relative SD" ~ 1,
     TRUE ~ 0
   ))
-ggplot(plotdata, aes(x=Target, y=Estimate, col=Prevalence, group=Prevalence)) +
-  geom_hline(aes(yintercept=yint), yintdat, lty='dashed') +
-#  stat_smooth(method='lm', formula = y ~ poly(x,3), se=FALSE) +
-#  geom_point(size=0.1) +
+ggplot(plotdata %>% filter(!Design %in% c("NS2","NS3")), aes(x=Target, y=Estimate, col=Prevalence, group=Prevalence)) +
+  geom_hline(aes(yintercept=yint), yintdat %>% filter(!Design %in% c("NS2","NS3")), lty='dashed') +
+  #  stat_smooth(method='lm', formula = y ~ poly(x,3), se=FALSE) +
+  #  geom_point(size=0.1) +
   geom_line() +
   facet_grid(Type ~ Design, scales='free_y') +
   ylab(NULL) +
   xlab("\nTrue Efficacy (%)") +
   scale_x_continuous(limits=c(5,99), breaks=c(10,30,50,70,90)) +
   theme(legend.pos='bottom', legend.title=element_blank())
-ggsave("figure_2.pdf", width=8, height=6)
+ggsave("figure_2a.pdf", width=8, height=6)
+
+
+ggplot(plotdata %>% filter(!Design %in% "SS"), aes(x=Target, y=Estimate, col=Prevalence, group=Prevalence)) +
+  geom_hline(aes(yintercept=yint), yintdat %>% filter(!Design %in% "SS"), lty='dashed') +
+  #  stat_smooth(method='lm', formula = y ~ poly(x,3), se=FALSE) +
+  #  geom_point(size=0.1) +
+  geom_line() +
+  facet_grid(Type ~ Design, scales='free_y') +
+  ylab(NULL) +
+  xlab("\nTrue Efficacy (%)") +
+  scale_x_continuous(limits=c(5,99), breaks=c(10,30,50,70,90)) +
+  theme(legend.pos='bottom', legend.title=element_blank())
+ggsave("figure_2b.pdf", width=8, height=6)
 
 

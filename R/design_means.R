@@ -12,84 +12,17 @@
 #' @importFrom tidyr replace_na
 #'
 #' @export
-design_means <- function(simdata, design = c('NS','SS','SSR1','SSR2','SSR3'), budget=600, second_slide_cost = 0.621, max_screen = 0.9, count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0)
+design_means <- function(simdata, design = c('NS','NS2','NS3','SS','SSR1','SSR2','SSR3'), budget=600, second_slide_cost = 0.621, max_screen = 0.9, count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0)
 #design_means <- function(simdata, N = c(NS=600, SS=109, SSR1=100, SSR2=92, SSR3=95), count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0)
 {
   # TODO: check simdata is valid etc
 
-  stopifnot(all(design %in% c('NS','SS','SSR1','SSR2','SSR3')))
+  stopifnot(all(design %in% c('NS','NS1','NS2','NS3','SS','SSR1','SSR2','SSR3')))
   res <- bind_rows(lapply(1:length(design), function(i) getmeans_slideN(simdata, design[i], budget=budget, second_slide_cost = second_slide_cost, max_screen = max_screen, count=count, log_constant=log_constant, screen_threshold=screen_threshold)))
 
   return(res)
 }
 
-# Helper function:
-getmeans_fixedN <- function(simdata, N, design='NS', count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0)
-{
-
-  # TODO: ensure that cv, mean and reduction doesn't vary
-
-  # Select either count or lambda and add the constant:
-  if(count){
-    simdata <- simdata %>%
-      mutate(ScreenUsing = ScreenCount, PreUsing = PreCount, PostUsing1a = PostCount1a, PostUsing1b = PostCount1b, PostUsing2 = PostCount2)
-  }else{
-    simdata <- simdata %>%
-      mutate(ScreenUsing = ScreenSlide, PreUsing = PreSlide, PostUsing1a = PostSlide1a, PostUsing1b = PostSlide1b, PostUsing2 = PostSlide2)
-  }
-
-  # Then add columns for the best estimated geometric and arithmetic mean reductions based on the NS type:
-  simdata <- simdata %>%
-    group_by(Reduction) %>%
-    mutate(Prevalence = sum(ScreenCount > screen_threshold) / n()) %>%
-    mutate(BestArithmetic = 100*(1-mean(PostSlide1a)/mean(PreSlide))) %>%
-    mutate(BestGeometric = 100*(1-exp(mean(log(PostSlide1a))-mean(log(PreSlide))))) %>%
-    ungroup()
-
-  # Then subselect data according to design:
-  lc <- log_constant
-  if(design=='NS'){
-    subsampled <- simdata %>%
-      mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = NA)
-  }else if(design=='SS'){
-    subsampled <- simdata %>%
-      filter(PreCount > screen_threshold) %>%
-      mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = NA)
-  }else if(design=='SSR1'){
-    subsampled <- simdata %>%
-      filter(ScreenCount > screen_threshold) %>%
-      mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = NA)
-  }else if(design=='SSR2'){
-    subsampled <- simdata %>%
-      filter(ScreenCount > screen_threshold) %>%
-      mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = PostUsing2)
-  }else if(design=='SSR3'){
-    subsampled <- simdata %>%
-      filter(ScreenCount > screen_threshold) %>%
-      mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = PostUsing1b)
-  }else{
-    stop('Unrecognised design strategy')
-  }
-
-  # Ensure a balance between communities:
-  C <- length(unique(simdata$Community))
-  NC <- ceiling(N/C)
-
-  # Then calculate summary statistics:
-  sumstats <- subsampled %>%
-    group_by(Replicate, Reduction, Community) %>%
-    slice(1:min(n(), NC)) %>%
-    #sample_n(min(NC, n())) %>%
-    ungroup() %>%
-    group_by(Replicate, Prevalence, Reduction, TrueGeometric, TrueArithmetic, BestArithmetic, BestGeometric, OverallMean) %>%
-    summarise(Design = design, N = n(), Count = count, ArithmeticEfficacy = 100*(1-mean(c(Post1, Post2), na.rm=TRUE)/mean(Pre)), GeometricEfficacy = 100*(1-exp(mean(log(c(Post1, Post2)+lc), na.rm=TRUE)-mean(log(Pre+lc))))) %>%
-    ungroup()
-
-  if(any(sumstats$N < N))
-    warning('One or more maxN was insufficient to obtain the specified N')
-
-  return(sumstats)
-}
 
 
 # Helper function:
@@ -126,7 +59,7 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
 
   # Then subselect data according to design:
   lc <- log_constant
-  if(design=='NS'){
+  if(design%in%c('NS','NS1')){
     # We simply take the first community_budget/2 individuals per simulation:
     subsampled <- simdata %>%
       group_by(Replicate, Reduction, Community) %>%
@@ -134,6 +67,22 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
       filter((ScreenBudget + SampleBudget) <= community_budget) %>%
       ungroup() %>%
       mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = NA)
+  }else if(design=='NS2'){
+    # We simply take the first community_budget/3 individuals per simulation:
+    subsampled <- simdata %>%
+      group_by(Replicate, Reduction, Community) %>%
+      mutate(ScreenBudget = 0, SampleBudget = (1:n())*3) %>%
+      filter((ScreenBudget + SampleBudget) <= community_budget) %>%
+      ungroup() %>%
+      mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = PostUsing2)
+  }else if(design=='NS3'){
+    # We simply take the first community_budget/(2+ssc) individuals per simulation:
+    subsampled <- simdata %>%
+      group_by(Replicate, Reduction, Community) %>%
+      mutate(ScreenBudget = 0, SampleBudget = (1:n())*(2+second_slide_cost)) %>%
+      filter((ScreenBudget + SampleBudget) <= community_budget) %>%
+      ungroup() %>%
+      mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = PostUsing1b)
   }else if(design=='SS'){
     # We do new pre samples until we have exhausted the budget:
     subsampled <- simdata %>%
@@ -202,3 +151,74 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
   return(sumstats)
 }
 
+
+
+##### NOT USING:
+# Helper function:
+getmeans_fixedN <- function(simdata, N, design='NS', count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0)
+{
+
+  # TODO: ensure that cv, mean and reduction doesn't vary
+
+  # Select either count or lambda and add the constant:
+  if(count){
+    simdata <- simdata %>%
+      mutate(ScreenUsing = ScreenCount, PreUsing = PreCount, PostUsing1a = PostCount1a, PostUsing1b = PostCount1b, PostUsing2 = PostCount2)
+  }else{
+    simdata <- simdata %>%
+      mutate(ScreenUsing = ScreenSlide, PreUsing = PreSlide, PostUsing1a = PostSlide1a, PostUsing1b = PostSlide1b, PostUsing2 = PostSlide2)
+  }
+
+  # Then add columns for the best estimated geometric and arithmetic mean reductions based on the NS type:
+  simdata <- simdata %>%
+    group_by(Reduction) %>%
+    mutate(Prevalence = sum(ScreenCount > screen_threshold) / n()) %>%
+    mutate(BestArithmetic = 100*(1-mean(PostSlide1a)/mean(PreSlide))) %>%
+    mutate(BestGeometric = 100*(1-exp(mean(log(PostSlide1a))-mean(log(PreSlide))))) %>%
+    ungroup()
+
+  # Then subselect data according to design:
+  lc <- log_constant
+  if(design=='NS'){
+    subsampled <- simdata %>%
+      mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = NA)
+  }else if(design=='SS'){
+    subsampled <- simdata %>%
+      filter(PreCount > screen_threshold) %>%
+      mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = NA)
+  }else if(design=='SSR1'){
+    subsampled <- simdata %>%
+      filter(ScreenCount > screen_threshold) %>%
+      mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = NA)
+  }else if(design=='SSR2'){
+    subsampled <- simdata %>%
+      filter(ScreenCount > screen_threshold) %>%
+      mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = PostUsing2)
+  }else if(design=='SSR3'){
+    subsampled <- simdata %>%
+      filter(ScreenCount > screen_threshold) %>%
+      mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = PostUsing1b)
+  }else{
+    stop('Unrecognised design strategy')
+  }
+
+  # Ensure a balance between communities:
+  C <- length(unique(simdata$Community))
+  NC <- ceiling(N/C)
+
+  # Then calculate summary statistics:
+  sumstats <- subsampled %>%
+    group_by(Replicate, Reduction, Community) %>%
+    slice(1:min(n(), NC)) %>%
+    #sample_n(min(NC, n())) %>%
+    ungroup() %>%
+    group_by(Replicate, Prevalence, Reduction, TrueGeometric, TrueArithmetic, BestArithmetic, BestGeometric, OverallMean) %>%
+    summarise(Design = design, N = n(), Count = count, ArithmeticEfficacy = 100*(1-mean(c(Post1, Post2), na.rm=TRUE)/mean(Pre)), GeometricEfficacy = 100*(1-exp(mean(log(c(Post1, Post2)+lc), na.rm=TRUE)-mean(log(Pre+lc))))) %>%
+    ungroup()
+
+  if(any(sumstats$N < N))
+    warning('One or more maxN was insufficient to obtain the specified N')
+
+  return(sumstats)
+}
+##### \NOT USING

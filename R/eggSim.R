@@ -87,7 +87,7 @@ eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen 
   if(is.numeric(parallelise)){
     stopifnot(length(parallelise)==1, parallelise > 0, parallelise%%1 == 0)
     cores <- parallelise
-    paralellise <- TRUE
+    parallelise <- TRUE
   }
 
   stopifnot(is.logical(parallelise), length(parallelise)==1)
