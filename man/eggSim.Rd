@@ -14,13 +14,16 @@ eggSim(
   cv_within = 0.75,
   cv_slide = 0.25,
   cv_reduction = 0,
+  true_prevalence = 1,
   count = TRUE,
   log_constant = if (count) 1 else 0,
   screen_threshold = 0,
   grams = 1/24,
   R = 10^3,
+  summarise = TRUE,
   type = "gamma",
-  parallelise = TRUE
+  parallelise = TRUE,
+  max_vec = 5e+06
 )
 }
 \arguments{
@@ -57,6 +60,6 @@ A data frame containing the simulated data
 Simulate and summarise egg reduction rate data
 }
 \examples{
-means <- eggSim(c(0.8,0.9,0.95), cv_reduction=0)
+means <- eggSim(c(0.2,0.1,0.05), cv_reduction=0, R=10^2, parallelise=FALSE)
 
 }

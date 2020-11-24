@@ -13,7 +13,8 @@ library(eggSim)
 ```{r}
 
 budget <- 1200
-reduction <- 0.05
+reduction <- 0.2
+prevalence <- 0.5
 
 # Decide on variability partitions:
 cv_between <- 1.5
@@ -31,7 +32,7 @@ combined_k(cv_between, cv_within, cv_slide, cv_reduction)
 #combined_k(cv_between, cv_within, cv_slide, cv_reduction)
 
 # Simulate data:
-simdatagp <- cgpDataSim(R=10^3, N=budget, reduction=reduction, community_mean=24, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction, grams=1/24)
+simdatagp <- cgpDataSim(R=10^3, N=budget, prevalence=prevalence, reduction=reduction, community_mean=24, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction, grams=1/24)
 
 gpmeans <- design_means(simdatagp, budget=budget, count=TRUE)
 
@@ -54,7 +55,7 @@ gpmeans %>%
   mutate(Success = 100 * sum(Communities > 0) / n()) %>%
   filter(Communities > 0) %>%
   group_by(Design, Success) %>%
-  summarise(MeanN = mean(N), ScreenProp = mean(ScreenProp), Mean = mean(ArithmeticEfficacy), Median = median(ArithmeticEfficacy), Variance = var(ArithmeticEfficacy), .groups='drop')
+  summarise(MeanN = mean(N), ScreenProp = mean(ScreenProp), ObsPrev = mean(ObsPrev), Mean = mean(ArithmeticEfficacy), Median = median(ArithmeticEfficacy), Variance = var(ArithmeticEfficacy), .groups='drop')
 ```
 
 

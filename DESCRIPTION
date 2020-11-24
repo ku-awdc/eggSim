@@ -1,7 +1,7 @@
 Package: eggSim
 Title: Simulating datasets representing egg reduction rate data
-Version: 0.1.0-1
-Date: 2020-03-03
+Version: 0.5.0-1
+Date: 2020-11-24
 Authors@R: 
     c(person(given = "Matt",
            family = "Denwood",
@@ -18,12 +18,13 @@ License: GPL-3
 Encoding: UTF-8
 LazyData: true
 Imports:
-    tidyr,
     MASS,
-    magrittr
-Depends: 
-    dplyr,
-    ggplot2
+    parallel,
+    pbapply,
+    tidyr,
+    magrittr,
+    purrr,
+    dplyr
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.1.1
 Suggests:

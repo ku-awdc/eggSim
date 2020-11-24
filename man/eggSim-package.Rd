@@ -2,8 +2,8 @@
 % Please edit documentation in R/eggSim-package.R
 \docType{package}
 \name{eggSim-package}
-\alias{eggSim}
 \alias{eggSim-package}
+\alias{_PACKAGE}
 \title{eggSim: Simulating datasets representing egg reduction rate data}
 \description{
 A collection of utilities to simulate data from different

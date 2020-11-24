@@ -8,8 +8,17 @@
 #'
 #' @return A data frame of summary statistics
 #' @examples
+#' data <- cgpDataSim(10^3, 600, 0.1, 100, 1, 1, 1, 0, true_prevalence=0.8)
+#' means <- design_means(data, second_slide_cost = c(0.1, 0.621, 1))
+#' library("dplyr")
+#' means %>%
+#'   group_by(Design, SecondSlideCost) %>%
+#'   summarise(N = mean(N), Budget = mean(ScreenBudget + SampleBudget),
+#'     Bias = median(ArithmeticEfficacy - TrueArithmetic),
+#'     SD = sd(ArithmeticEfficacy - TrueArithmetic))
 #'
-#' @importFrom tidyr replace_na
+#' @importFrom tidyr replace_na expand_grid
+#' @import dplyr
 #'
 #' @export
 design_means <- function(simdata, design = c('NS','NS2','NS3','SS','SSR1','SSR2','SSR3'), budget=600, second_slide_cost = 0.621, max_screen = 0.9, count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0)
@@ -18,7 +27,13 @@ design_means <- function(simdata, design = c('NS','NS2','NS3','SS','SSR1','SSR2'
   # TODO: check simdata is valid etc
 
   stopifnot(all(design %in% c('NS','NS1','NS2','NS3','SS','SSR1','SSR2','SSR3')))
-  res <- bind_rows(lapply(1:length(design), function(i) getmeans_slideN(simdata, design[i], budget=budget, second_slide_cost = second_slide_cost, max_screen = max_screen, count=count, log_constant=log_constant, screen_threshold=screen_threshold)))
+
+  # Allow second_slide_cost to be vectorised where relevant:
+  designcombo <- expand_grid(design = design, budget=budget, second_slide_cost = NA_real_) %>%
+    filter(! design %in% c("NS3","SSR3")) %>%
+    bind_rows( expand_grid(design = design[design %in% c("NS3","SSR3")], budget=budget, second_slide_cost = second_slide_cost))
+
+  res <- bind_rows(lapply(seq_len(nrow(designcombo)), function(i) getmeans_slideN(simdata, design=designcombo$design[i], budget=designcombo$budget[i], second_slide_cost = designcombo$second_slide_cost[i], max_screen = max_screen, count=count, log_constant=log_constant, screen_threshold=screen_threshold)))
 
   return(res)
 }
@@ -45,7 +60,6 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
   # Then add columns for the best estimated geometric and arithmetic mean reductions based on the NS type:
   simdata <- simdata %>%
     group_by(Reduction) %>%
-    mutate(Prevalence = sum(ScreenCount > screen_threshold) / n()) %>%
     mutate(BestArithmetic = 100*(1-mean(PostSlide1a)/mean(PreSlide))) %>%
     mutate(BestGeometric = 100*(1-exp(mean(log(PostSlide1a))-mean(log(PreSlide))))) %>%
     ungroup()
@@ -53,6 +67,11 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
 
   # Ensure that the budget is equal between communities:
   community_budget <- budget / length(unique(simdata$Community))
+
+  # Ensure a sufficient amount of data is available:
+  ns <- simdata %>% count(Replicate, Reduction, Community)
+  stopifnot(all(ns$n >= community_budget))
+
 
   # Helper function to round up or down randomly (not being used currently):
   # ceiloor <- function(x) floor(x) + rbinom(length(x),1,x%%1)
@@ -125,18 +144,18 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
 
   ## If all pre-tx samples are zero and/or we have used more than screen_max of the budget on screening then throw out the community:
   budgets <- subsampled %>%
-    group_by(Replicate, Prevalence, Reduction, Community) %>%
+    group_by(Replicate, TruePrev, ObsPrev, Reduction, Community) %>%
     summarise(PreMean = mean(Pre), ScreenBudget = max(ScreenBudget), SampleBudget = max(SampleBudget), ScreenProp = ScreenBudget / (ScreenBudget+SampleBudget), .groups='drop') %>%
     filter(ScreenProp <= max_screen, PreMean > 0) %>%
-    group_by(Replicate, Prevalence, Reduction) %>%
+    group_by(Replicate, TruePrev, ObsPrev, Reduction) %>%
     mutate(Communities = length(unique(Community))) %>%
     ungroup()
 
   ## Then calculate summary statistics:
   sumstats <- subsampled %>%
-    select(-PreMean, -ScreenBudget, -SampleBudget, -Prevalence) %>%
+    select(-PreMean, -ScreenBudget, -SampleBudget, -TruePrev, -ObsPrev) %>%
     inner_join(budgets, by = c("Replicate", "Community", "Reduction")) %>%
-    group_by(Replicate, Prevalence, Reduction, TrueGeometric, TrueArithmetic, BestArithmetic, BestGeometric, OverallMean, ScreenBudget, SampleBudget, ScreenProp, Communities) %>%
+    group_by(Replicate, TruePrev, ObsPrev, Reduction, TrueGeometric, TrueArithmetic, BestArithmetic, BestGeometric, OverallMean, ScreenBudget, SampleBudget, ScreenProp, Communities) %>%
     summarise(N = n(), Count = count, ArithmeticEfficacy = 100*(1-mean(c(Post1, Post2), na.rm=TRUE)/mean(Pre)), GeometricEfficacy = 100*(1-exp(mean(log(c(Post1, Post2)+lc), na.rm=TRUE)-mean(log(Pre+lc)))), .groups='drop')
 
   ## If we have completely removed a replicate (all communities gone) then re-add it:
@@ -144,7 +163,8 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
     group_by(Replicate, Reduction, TrueGeometric, TrueArithmetic, BestArithmetic, BestGeometric, OverallMean) %>%
     summarise(.groups='drop') %>%
     full_join(sumstats, by=c("Replicate", "Reduction", "TrueGeometric", "TrueArithmetic", "BestArithmetic", "BestGeometric", "OverallMean")) %>%
-    mutate(Design = design, Communities = replace_na(Communities, 0))
+    mutate(Design = design, Budget = budget, SecondSlideCost = second_slide_cost,
+           Communities = replace_na(Communities, 0))
 
   if(any(sumstats$Communities == 0)) warning("One or more replicate found nobody to sample")
 

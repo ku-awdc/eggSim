@@ -6,7 +6,7 @@
 \usage{
 design_means(
   simdata,
-  design = c("NS", "SS", "SSR1", "SSR2", "SSR3"),
+  design = c("NS", "NS2", "NS3", "SS", "SSR1", "SSR2", "SSR3"),
   budget = 600,
   second_slide_cost = 0.621,
   max_screen = 0.9,
@@ -33,5 +33,12 @@ A data frame of summary statistics
 Calculate the mean egg counts/rates according to various design types
 }
 \examples{
+data <- cgpDataSim(10^3, 100, 0.1, 100, 1, 1, 1, 0, true_prevalence=0.8)
+means <- design_means(data)
+library("dplyr")
+means \%>\%
+  group_by(Design) \%>\%
+  summarise(Bias = median(ArithmeticEfficacy - TrueArithmetic),
+    SD = sd(ArithmeticEfficacy - TrueArithmetic))
 
 }

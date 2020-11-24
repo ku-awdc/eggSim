@@ -18,14 +18,14 @@
 #' @return A data frame containing the simulated data
 #'
 #' @examples
-#' means <- eggSim(c(0.2,0.1,0.05), cv_reduction=0)
+#' means <- eggSim(c(0.2,0.1,0.05), cv_reduction=0, R=10^2, parallelise=FALSE)
 #'
 #' @importFrom parallel detectCores makeForkCluster makePSOCKcluster clusterSetRNGStream parLapply stopCluster
 #' @importFrom pbapply pblapply
 #' @importFrom purrr walk
 #'
 #' @export
-eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen = 0.9, community_mean=c(24, 48), cv_between=c(1.5), cv_within=0.75, cv_slide=0.25, cv_reduction=0, count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0, grams=1/24, R=10^3, summarise = TRUE, type="gamma", parallelise=TRUE, max_vec = 5e6)
+eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen = 0.9, community_mean=c(24, 48), cv_between=c(1.5), cv_within=0.75, cv_slide=0.25, cv_reduction=0, true_prevalence = 1, count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0, grams=1/24, R=10^3, design = c('NS','NS2','NS3','SS','SSR1','SSR2','SSR3'), summarise = TRUE, type="gamma", parallelise=TRUE, max_vec = 5e6)
 {
 
   st <- Sys.time()
@@ -62,9 +62,6 @@ eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen 
   ## TODO: there is a problem with combining reductions
   ## BUT it is faster to run serially (with less RAM) anyway
   minsplits <- length(meanindex) * length(reduction)
-
-  ## TODO: vectorise budget in design_means
-  stopifnot(length(budget)==1)
 
   ## TODO: bring lognormal data option back!
   stopifnot(length(type) == 1 && type %in% "gamma")
@@ -122,13 +119,13 @@ eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen 
 
     # First simulate gamma and lognormal data:
     if(!silent) cat('Simulating gamma data...\n')
-    simdatagp <- cgpDataSim(R, max(budget), red, commu, cv_between, cv_within, cv_slide, cv_reduction, grams=grams)
+    simdatagp <- cgpDataSim(R, max(budget), red, commu, cv_between, cv_within, cv_slide, cv_reduction, true_prevalence=true_prevalence, grams=grams)
     #if(!silent) cat('Simulating lognormal data...\n')
-    #simdatalp <- clpDataSim(R, max(budget), red, commu, cv_between, cv_within, cv_slide, cv_reduction, grams=grams)
+    #simdatalp <- clpDataSim(R, max(budget), red, commu, cv_between, cv_within, cv_slide, cv_reduction, true_prevalence=true_prevalence, grams=grams)
 
     # Then summarise:
     if(!silent) cat('Summarising gamma data...\n')
-    meansgp <- design_means(simdatagp, budget=budget, second_slide_cost=second_slide_cost, max_screen=max_screen, count=count, log_constant=log_constant, screen_threshold=screen_threshold) %>% mutate(ComparisonArithmetic = TrueArithmetic, ComparisonGeometric = BestGeometric, IncludeNS = "Arithmetic", Data = if(count) 'Gamma-Poisson' else 'Gamma')
+    meansgp <- design_means(simdatagp, design=design, budget=budget, second_slide_cost=second_slide_cost, max_screen=max_screen, count=count, log_constant=log_constant, screen_threshold=screen_threshold) %>% mutate(ComparisonArithmetic = TrueArithmetic, ComparisonGeometric = BestGeometric, IncludeNS = "Arithmetic", Data = if(count) 'Gamma-Poisson' else 'Gamma')
 
     #if(!silent) cat('Summarising lognormal data...\n')
     #meanslp <- design_means(simdatalp, N=N, count=count) %>% mutate(ComparisonArithmetic = BestArithmetic, ComparisonGeometric = TrueGeometric, IncludeNS = "Geometric", Data = if(count) 'Lognormal-Poisson' else 'Lognormal')
@@ -157,16 +154,16 @@ eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen 
   # Then join data frames:
   cat('Summarising output...\n')
   means <- output %>%
-    select(Design, Prevalence, ComparisonArithmetic, ComparisonGeometric, IncludeNS, Data, OverallMean, Count, ScreenProp, N, Communities, ArithmeticEfficacy, GeometricEfficacy) %>%
-    gather(Type, Efficacy, -Design, -ComparisonArithmetic, -ComparisonGeometric, -IncludeNS, -Data, -OverallMean, -Count, -Communities, -ScreenProp, -N, -Prevalence) %>%
+    select(Design, TruePrev, ObsPrev, ComparisonArithmetic, ComparisonGeometric, IncludeNS, Data, OverallMean, Count, ScreenProp, N, Communities, ArithmeticEfficacy, GeometricEfficacy) %>%
+    gather(Type, Efficacy, -Design, -ComparisonArithmetic, -ComparisonGeometric, -IncludeNS, -Data, -OverallMean, -Count, -Communities, -ScreenProp, -N, -TruePrev, -ObsPrev) %>%
     mutate(Type = gsub('Efficacy','',Type), Target = ifelse(Type=='Arithmetic', ComparisonArithmetic, ComparisonGeometric)) %>%
     mutate(Set = paste0(Data, ' - ', Type), Cheating = Design=='NS' & IncludeNS!=Type) %>%
     group_by(Design, Set, Data, Type, Target, OverallMean) %>%
     mutate(Success = sum(Communities > 0) / n()) %>%
     ungroup() %>%
     filter(Communities > 0) %>%
-    group_by(Design, Set, Data, Type, Cheating, OverallMean, Target, Success) %>%
-    summarise(Prevalence = mean(Prevalence), ScreenProp = mean(ScreenProp), MeanN = mean(N), Bias = mean(Efficacy - Target), MedianBias = median(Efficacy - Target), MeanRatio = mean(Efficacy/Target), ReductionRatio = mean((1-Efficacy/100) / (1-Target/100)), LCI = Bias - 1.96*sd(Efficacy - Target)/sqrt(n()), UCI = Bias + 1.96*sd(Efficacy - Target)/sqrt(n()), Variance = var(Efficacy), VarianceMeanRatio = var(Efficacy/Target)) %>%
+    group_by(Design, Set, Data, Type, Cheating, TruePrev, ObsPrev, OverallMean, Target, Success) %>%
+    summarise(ScreenProp = mean(ScreenProp), MeanN = mean(N), Bias = mean(Efficacy - Target), MedianBias = median(Efficacy - Target), MeanRatio = mean(Efficacy/Target), ReductionRatio = mean((1-Efficacy/100) / (1-Target/100)), LCI = Bias - 1.96*sd(Efficacy - Target)/sqrt(n()), UCI = Bias + 1.96*sd(Efficacy - Target)/sqrt(n()), Variance = var(Efficacy), VarianceMeanRatio = var(Efficacy/Target)) %>%
     ungroup()
 
   # Remove bias estimates where it is cheating:

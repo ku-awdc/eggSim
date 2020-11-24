@@ -13,6 +13,7 @@ cgpDataSim(
   cv_within,
   cv_slide,
   cv_reduction,
+  true_prevalence = 1,
   overall_mean = mean(community_mean),
   grams = 1/24
 )
@@ -45,6 +46,6 @@ A data frame containing the simulated data
 Simulate ERR data from a compound gamma Poisson distribution
 }
 \examples{
-cgpDataSim(10, 10, c(0.05, 0.1, 0.15), c(800,1000), c(1.5, 1), 1, 1, 1)
+data <- cgpDataSim(10^3, 100, 0.1, 100, 1, 1, 1, 0, true_prevalence=0.8)
 
 }

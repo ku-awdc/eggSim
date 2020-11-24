@@ -14,13 +14,14 @@
 #' @return A data frame containing the simulated data
 #'
 #' @examples
-#' cgpDataSim(10, 10, c(0.05, 0.1, 0.15), c(800,1000), c(1.5, 1), 1, 1, 1)
+#' data <- cgpDataSim(10^3, 100, 0.1, 100, 1, 1, 1, 0, true_prevalence=0.8)
 #'
 #' @importFrom tidyr expand_grid gather spread
 #' @importFrom magrittr %>%
+#' @importFrom stats median rbeta rbinom rgamma rnorm rpois sd var
 #'
 #' @export
-cgpDataSim <- function(R, N, reduction, community_mean, cv_between, cv_within, cv_slide, cv_reduction, overall_mean = mean(community_mean), grams=1/24){
+cgpDataSim <- function(R, N, reduction, community_mean, cv_between, cv_within, cv_slide, cv_reduction, true_prevalence=1, overall_mean = mean(community_mean), grams=1/24){
 
   stopifnot(length(N) == 1 && N > 0)
 
@@ -34,6 +35,12 @@ cgpDataSim <- function(R, N, reduction, community_mean, cv_between, cv_within, c
 
   # reduction can be vectorised:
   stopifnot(length(reduction) > 0 && all(reduction >= 0.0))
+  # TODO: can this be vectorised? I am not sure it works
+  stopifnot(length(reduction)==1)
+
+  # TODO: allow true_prevalence to be length community
+  stopifnot(length(true_prevalence) == 1 && true_prevalence >= 0.0 && true_prevalence <= 1.0)
+  true_prevalence <- rep(true_prevalence, length(community_mean))
 
   # other parameters must be scalar:
   stopifnot(length(cv_within) == 1 && cv_within >= 0.0)
@@ -44,22 +51,36 @@ cgpDataSim <- function(R, N, reduction, community_mean, cv_between, cv_within, c
   # Helper function:
   rgamcv <- function(n, mu, cv){
     rv <- rgamma(n, 1/cv^2, scale=mu*cv^2)
-	## Allow cv of zero to remove this distribution:
-    rv[cv<=0] <- mu
+    ## Allow cv of zero to remove this distribution:
+    rv[cv<=0.0] <- mu
+    ## Allow mu of zero:
+    rv[mu<=0.0] <- 0.0
     return(rv)
   }
 
+  overallk <- sapply(cv_between, function(x) combined_k(x, cv_within, cv_slide, 0)[1])
+
   simdata <- expand_grid(Replicate = 1:R, Community = 1:C, Individual = 1:N, Reduction = reduction) %>%
-    mutate(TrueGeometric = NA, TrueArithmetic = 100*(1-Reduction), OverallMean = overall_mean, CommunityMean = community_mean[Community]) %>%
-    mutate(CVbetween = cv_between[Community], CVwithin = cv_within, CVslide = cv_slide, CVreduction = cv_reduction) %>%
-    mutate(PreMean = rgamcv(n(), CommunityMean, CVbetween)) %>%
-    mutate(PostMean = rgamcv(n(), PreMean*Reduction, CVreduction)) %>%
+    group_by(Community) %>%
+    mutate(TruePrev = true_prevalence[Community[1]]) %>%
+    ## This is a bad approximation when CV becomes too high as the overall distn no longer is NB:
+    # mutate(ObsPrev = Prevalence * (1 - dnbinom(0, mu=community_mean[Community[1]]*grams, size=overallk[Community[1]])), ObsPrev2 = NA_real_) %>%
+    mutate(ObsPrev = NA_real_) %>%
+    mutate(TrueGeometric = NA_real_, TrueArithmetic = 100*(1-Reduction), OverallMean = overall_mean, CommunityMean = community_mean[Community[1]]) %>%
+    mutate(CVbetween = cv_between[Community[1]], CVwithin = cv_within, CVslide = cv_slide, CVreduction = cv_reduction) %>%
+    ungroup() %>%
+    mutate(Infected = rbinom(n(), 1, TruePrev)) %>%
+    mutate(PreMean = Infected * rgamcv(n(), CommunityMean, CVbetween)) %>%
+    mutate(PostMean = Infected * rgamcv(n(), PreMean*Reduction, CVreduction)) %>%
     mutate(ScreenDayMean = rgamcv(n(), PreMean, CVwithin), PreDayMean = rgamcv(n(), PreMean, CVwithin)) %>%
     mutate(PostDay1Mean = rgamcv(n(), PostMean, CVwithin), PostDay2Mean = rgamcv(n(), PostMean, CVwithin)) %>%
     mutate(ScreenSlide = rgamcv(n(), ScreenDayMean, CVslide), PreSlide = rgamcv(n(), PreDayMean, CVslide)) %>%
     mutate(PostSlide1a = rgamcv(n(), PostDay1Mean, CVslide), PostSlide1b = rgamcv(n(), PostDay1Mean, CVslide), PostSlide2 = rgamcv(n(), PostDay2Mean, CVslide)) %>%
     mutate(ScreenCount = rpois(n(), ScreenSlide*grams), PreCount = rpois(n(), PreSlide*grams)) %>%
-    mutate(PostCount1a = rpois(n(), PostSlide1a*grams), PostCount1b = rpois(n(), PostSlide1b*grams), PostCount2 = rpois(n(), PostSlide2*grams))
+    mutate(PostCount1a = rpois(n(), PostSlide1a*grams), PostCount1b = rpois(n(), PostSlide1b*grams), PostCount2 = rpois(n(), PostSlide2*grams)) %>%
+    group_by(Community) %>%
+    mutate(ObsPrev = sum(ScreenCount>0)/n()) %>%
+    ungroup()
 
   return(simdata)
 
