@@ -110,7 +110,7 @@ ggplot(plotdata, aes(x=Target, y=Estimate, col=Prevalence, group=Prevalence)) +
   ylab(NULL) +
   xlab("\nTrue Efficacy (%)") +
   scale_x_continuous(limits=c(1,99), breaks=c(10,30,50,70,90)) +
-  guides(col = guide_legend("Observed Prevalence:")) +
+  guides(col = guide_legend("Apparent Prevalence:")) +
   theme(panel.spacing = unit(0.75, "lines"), legend.pos='bottom') #, legend.title=element_blank())
 ggsave(file.path(basewd, "figure_2.pdf"), width=10, height=6)
 
