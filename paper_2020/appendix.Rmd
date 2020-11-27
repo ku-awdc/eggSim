@@ -20,6 +20,16 @@ Basic idea:
 - Try to come up with a single graph to summarise this...
 
 
+Figure S1:  Figure NS3 and SSR3 NS1x2 and SSR1x2 for second slide cost of 0.1/0.6/1 - same as figure 1??
+
+Look at two pre-treatment samples i.e. 2x1
+
+Text Luc when done:  +31637438167
+4pm Zoom
+
+
+
+
 
 ```{r}
 library('tidyverse')

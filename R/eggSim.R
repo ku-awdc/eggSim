@@ -148,11 +148,24 @@ eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen 
       bind_rows()
   }
 
-  if(!summarise) return(output)
-
+  if(!summarise){
+    class(output) <- c("eggSim",class(output))
+    attr(output, "type") <- type
+    return(output)
+  }
 
   # Then join data frames:
   cat('Summarising output...\n')
+  means <- getsummary(output, type)
+
+  cat("Done (time elapsed: ", round(as.numeric(Sys.time()-st, units="mins"),1), " minutes)\n", sep="")
+
+  return(means)
+
+}
+
+
+getsummary <- function(output, type){
   means <- output %>%
     select(Design, TruePrev, ObsPrev, ComparisonArithmetic, ComparisonGeometric, IncludeNS, Data, OverallMean, Count, ScreenProp, N, Communities, ArithmeticEfficacy, GeometricEfficacy) %>%
     gather(Type, Efficacy, -Design, -ComparisonArithmetic, -ComparisonGeometric, -IncludeNS, -Data, -OverallMean, -Count, -Communities, -ScreenProp, -N, -TruePrev, -ObsPrev) %>%
@@ -177,10 +190,7 @@ eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen 
     means <- means %>%
       filter(Type=="Arithmetic")
   }
-
-  cat("Done (time elapsed: ", round(as.numeric(Sys.time()-st, units="mins"),1), " minutes)\n", sep="")
+  class(means) <- c("eggSim","means",class(means))
 
   return(means)
-
 }
-

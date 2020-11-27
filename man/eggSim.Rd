@@ -20,6 +20,7 @@ eggSim(
   screen_threshold = 0,
   grams = 1/24,
   R = 10^3,
+  design = c("NS", "NS2", "NS3", "SS", "SSR1", "SSR2", "SSR3"),
   summarise = TRUE,
   type = "gamma",
   parallelise = TRUE,
