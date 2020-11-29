@@ -21,12 +21,12 @@
 #' @import dplyr
 #'
 #' @export
-design_means <- function(simdata, design = c('NS','NS2','NS3','SS','SSR1','SSR2','SSR3'), budget=600, second_slide_cost = 0.621, max_screen = 0.9, count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0)
+design_means <- function(simdata, design = c('NS1','NS2','NS3','SS','SSR1','SSR2','SSR3'), budget=600, second_slide_cost = 0.621, max_screen = 0.9, count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0)
 #design_means <- function(simdata, N = c(NS=600, SS=109, SSR1=100, SSR2=92, SSR3=95), count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0)
 {
   # TODO: check simdata is valid etc
 
-  stopifnot(all(design %in% c('NS','NS1','NS2','NS3','SS','SSR1','SSR2','SSR3')))
+  stopifnot(all(design %in% c('NS','NS1','NS2','NS3','NS4','SS','SSR1','SSR2','SSR3')))
 
   # Allow second_slide_cost to be vectorised where relevant:
   designcombo <- expand_grid(design = design, budget=budget, second_slide_cost = NA_real_) %>%
@@ -102,6 +102,14 @@ getmeans_slideN <- function(simdata, design='NS', budget=600, second_slide_cost 
       filter((ScreenBudget + SampleBudget) <= community_budget) %>%
       ungroup() %>%
       mutate(Pre = PreUsing, Post1 = PostUsing1a, Post2 = PostUsing1b)
+  }else if(design=='NS4'){
+    # We simply take the first community_budget/3 individuals per simulation:
+    subsampled <- simdata %>%
+      group_by(Replicate, Reduction, Community) %>%
+      mutate(ScreenBudget = 0, SampleBudget = (1:n())*3) %>%
+      filter((ScreenBudget + SampleBudget) <= community_budget) %>%
+      ungroup() %>%
+      mutate(Pre = (ScreenUsing+PreUsing)/2, Post1 = PostUsing1a, Post2 = NA)
   }else if(design=='SS'){
     # We do new pre samples until we have exhausted the budget:
     subsampled <- simdata %>%

@@ -6,7 +6,7 @@
 \usage{
 design_means(
   simdata,
-  design = c("NS", "NS2", "NS3", "SS", "SSR1", "SSR2", "SSR3"),
+  design = c("NS1", "NS2", "NS3", "SS", "SSR1", "SSR2", "SSR3"),
   budget = 600,
   second_slide_cost = 0.621,
   max_screen = 0.9,

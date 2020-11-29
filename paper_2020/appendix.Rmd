@@ -7,7 +7,15 @@ output: word_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Supplementary figure
+## Supplementary figures
+
+NS strategy using two pre-treatment samples (and a single post-treatment sample) is worse than default NS:
+
+```{r}
+
+```
+
+
 
 For Matt to do!
 

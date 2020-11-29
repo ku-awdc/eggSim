@@ -167,15 +167,15 @@ eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen 
 
 getsummary <- function(output, type){
   means <- output %>%
-    select(Design, TruePrev, ObsPrev, ComparisonArithmetic, ComparisonGeometric, IncludeNS, Data, OverallMean, Count, ScreenProp, N, Communities, ArithmeticEfficacy, GeometricEfficacy) %>%
-    gather(Type, Efficacy, -Design, -ComparisonArithmetic, -ComparisonGeometric, -IncludeNS, -Data, -OverallMean, -Count, -Communities, -ScreenProp, -N, -TruePrev, -ObsPrev) %>%
+    select(Design, Budget, SecondSlideCost, TruePrev, ObsPrev, ComparisonArithmetic, ComparisonGeometric, IncludeNS, Data, OverallMean, Count, ScreenProp, N, Communities, ArithmeticEfficacy, GeometricEfficacy) %>%
+    gather(Type, Efficacy, -Design, -Budget, -SecondSlideCost, -ComparisonArithmetic, -ComparisonGeometric, -IncludeNS, -Data, -OverallMean, -Count, -Communities, -ScreenProp, -N, -TruePrev, -ObsPrev) %>%
     mutate(Type = gsub('Efficacy','',Type), Target = ifelse(Type=='Arithmetic', ComparisonArithmetic, ComparisonGeometric)) %>%
     mutate(Set = paste0(Data, ' - ', Type), Cheating = Design=='NS' & IncludeNS!=Type) %>%
-    group_by(Design, Set, Data, Type, Target, OverallMean) %>%
+    group_by(Design, Budget, SecondSlideCost, Set, Data, Type, Target, OverallMean) %>%
     mutate(Success = sum(Communities > 0) / n()) %>%
     ungroup() %>%
     filter(Communities > 0) %>%
-    group_by(Design, Set, Data, Type, Cheating, TruePrev, ObsPrev, OverallMean, Target, Success) %>%
+    group_by(Design, Budget, SecondSlideCost, Set, Data, Type, Cheating, TruePrev, ObsPrev, OverallMean, Target, Success) %>%
     summarise(ScreenProp = mean(ScreenProp), MeanN = mean(N), Bias = mean(Efficacy - Target), MedianBias = median(Efficacy - Target), MeanRatio = mean(Efficacy/Target), ReductionRatio = mean((1-Efficacy/100) / (1-Target/100)), LCI = Bias - 1.96*sd(Efficacy - Target)/sqrt(n()), UCI = Bias + 1.96*sd(Efficacy - Target)/sqrt(n()), Variance = var(Efficacy), VarianceMeanRatio = var(Efficacy/Target)) %>%
     ungroup()
 
