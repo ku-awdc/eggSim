@@ -138,13 +138,13 @@ save(output, plotdata, file=file.path(basewd, "simres.Rdata"))
 
 # NS strategy using two pre-treatment samples (and a single post-treatment sample) is worse than default NS:
 
-R <- 1e3
+R <- 5e3
 output <- eggSim(reduction, budget=budget, community_mean=community_mean, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction, true_prevalence=true_prevalence, R=R, summarise=TRUE, design=c("NS1","NS2","NS4"))
 
-output %>%
+tab <- output %>%
   select(Design, ObsPrev, Target, MedianBias, Variance) %>%
   arrange(ObsPrev, Target, Design)
-
+write_excel_csv(tab, file.path(basewd, "table_S1.csv"))
 
 # Look at relative variance for different SS and NS designs vs slide cost:
 reduction <- c(0.01,seq(0.05,0.95,by=0.05))
