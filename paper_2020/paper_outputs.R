@@ -59,14 +59,15 @@ ggplot(output, aes(x=DesignTxt, y=ArithmeticEfficacy)) +
   facet_grid(Efficacy ~ Prevalence, scales='fixed') +
   ylab("Observed Efficacy (%)") +
   xlab(NULL) +
-  theme(panel.spacing = unit(1.5, "lines"), axis.text.x = element_text(angle=45, vjust=1, hjust=1)) +
+  theme(panel.spacing = unit(1.5, "lines"), axis.text.x = element_text(angle=-45, vjust=0.5, hjust=0.25)) +
   scale_x_discrete(labels=function(x) parse(text=x))
 ggsave(file.path(basewd, "figure_1.pdf"), height=6, width=7)
 
 # For our interest:
 ggplot(output %>% filter(Communities > 0), aes(x=ArithmeticEfficacy, col=Design)) +
   stat_ecdf() +
-  facet_grid(OverallMean ~ TrueArithmetic, scales='free_x')
+  facet_grid(OverallMean ~ TrueArithmetic, scales='free_x') +
+  labs(y = "Empirical CDF")
 
 # Useful table?
 tab <- output %>%
@@ -152,6 +153,7 @@ community_mean <- c(pc10=3.16,pc15=5.45,pc20=8.45,pc25=12,pc35=23.5)
 second_slide_cost <- c(0.1, 0.621, 1)
 R <- 5e3  #1e3
 fig3out <- eggSim(reduction, budget=budget, second_slide_cost=second_slide_cost, design=c("NS","NS3","SSR3"), community_mean=community_mean, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction, true_prevalence=true_prevalence, R=R, summarise=TRUE, parallelise=parallel::detectCores()/2)  # Limit to physical cores as the RAM requirements are quite high
+save(fig3out, file=file.path(basewd, "simres_suppl_fig_S1.Rdata"))
 
 fig3out$Prevalence <- factor(str_c(round(fig3out$ObsPrev*100), "%"))
 fig3out$DesignTxt <- with(fig3out, case_when(
@@ -196,8 +198,9 @@ ggplot(plot3data %>% filter(Type == "Relative SD", Design%in%c("NS3","SSR3")), a
   facet_grid(Design2 ~ CostTxt, scales='fixed', labeller=labeller(Design2=label_parsed, CostTxt=label_value)) +
   ylab(NULL) +
   xlab("\nTrue Efficacy (%)") +
+  ylab("Relative standard deviation\n") +
   scale_x_continuous(limits=c(1,99), breaks=c(10,30,50,70,90)) +
   guides(col = guide_legend("Apparent Baseline Prevalence:")) +
   theme(panel.spacing = unit(0.75, "lines"), legend.pos='bottom') #, legend.title=element_blank())
-ggsave(file.path(basewd, "figure_S1_draft.pdf"), width=6, height=4)
+ggsave(file.path(basewd, "figure_S1.pdf"), width=6, height=4)
 
