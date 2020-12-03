@@ -14,48 +14,118 @@ knitr::opts_chunk$set(
 )
 ```
 
+# eggSim package
+
+The eggSim pacakge is intended to facilitate simulation-based assessment of survey design strategies for testing anthelmintic efficacy via faecal egg count reduction (FECRT) tests.  The software is currently a work in progress, and comments/suggestions/contributions are very welcome to the package maintainers!
+
+The package is designed to work in a tidyverse-like way, so loading the tidyverse meta-package along with the eggSim package is a good idea:
+
 ```{r setup}
-library("tidyverse")
 library("eggSim")
+library("tidyverse")
 ```
 
+## Parameter values
+
+Before running a simulation we need to decide on the parameters to use. For example, we could use a single community with a mean count of 3.16 EPG:
+
 ```{r}
+community_mean <- 3.16
+```
 
-budget <- 600
-reduction <- 0.05
+And an expected efficacy of 80%:
 
-# Decide on variability partitions:
+```{r}
+reduction <- 1 - 0.8
+```
+
+Then the coefficients of variation at the four available levels need to be chosen:
+
+```{r}
+# Between individuals:
 cv_between <- 1.5
+# Within an individual over different days:
 cv_within <- 0.75
+# Within the same individual and the same day:
 cv_slide <- 0.25
+# Variation in efficacy between individuals:
 cv_reduction <- 0
-# Overall k is about 0.23 - seems sensible??
+```
+
+The overall results are highly dependent on these values, but unfortunately it is currently difficult to decide on reasonable values to use due to the absence of applicable data. But we can assess the overall over-dispersion (which is easier to estimate based on available data) using the following function:
+
+```{r}
 combined_k(cv_between, cv_within, cv_slide, cv_reduction)
+```
 
-# Simulate data:
-simdatagp <- cgpDataSim(R=10^3, N=budget, reduction=reduction, community_mean=24, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction, grams=1/24)
+Finally the budget and relative cost of a second slide must be chosen:
 
-gpmeans <- design_means(simdatagp, budget=budget, count=TRUE)
+```{r}
+budget <- 1200
+second_slide_cost <- 0.621
+```
 
-comnrs <- gpmeans %>%
-  count(Design, Communities)
-ggplot(comnrs, aes(x=Design, y=n, fill=factor(Communities))) +
-  geom_col()
+## Running a simulation
 
-ggplot(gpmeans %>% filter(Communities > 0), aes(x=Design, y=ScreenProp)) +
+The main interface for running simulations is via the eggSim function. We can run 1000 simulated FECRT as follows:
+
+```{r}
+efficacies <- eggSim(R=1e3, summarise=FALSE, reduction=reduction, budget=budget, second_slide_cost=second_slide_cost, community_mean=community_mean, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction)
+```
+
+This gives us a data frame of 1000 observed arithmetic (and geometric) mean efficacies for each of the default survey designs, along with other parameter values that do not vary between iterations:
+
+```{r}
+str(efficacies)
+```
+
+We can summarise these using e.g. a boxplot:
+
+```{r}
+ggplot(efficacies, aes(x=Design, y=ArithmeticEfficacy)) +
   geom_boxplot()
+```
 
-ggplot(gpmeans %>% filter(Communities > 0), aes(x=Design, y=ArithmeticEfficacy)) +
-  geom_hline(yintercept=100*(1-reduction)) +
-  geom_boxplot()
+## Running multiple simulations
 
-ggplot(gpmeans %>% filter(Communities > 0), aes(x=ArithmeticEfficacy, col=Design)) +
-  stat_ecdf()
+To facilitate looking at multiple scenarios, the expected efficacy (reduction), community mean, budget, and second slide cost (for relevant design types) can be vectorised on input to eggSim. For example we can look at vectorised reduction and community mean values:
 
-gpmeans %>%
-  mutate(Success = 100 * sum(Communities > 0) / n()) %>%
-  filter(Communities > 0) %>%
-  group_by(Design, Success) %>%
-  summarise(ScreenProp = mean(ScreenProp), Mean = mean(ArithmeticEfficacy), Median = median(ArithmeticEfficacy), Variance = var(ArithmeticEfficacy), .groups='drop')
+```{r}
+community_mean <- c(3.16, 23.5)
+reduction <- 1 - c(0.95, 0.8)
+```
+
+And then run the simulations on 2 cores to improve speed of computation:
+
+```{r}
+biases <- eggSim(R=1e3, summarise=TRUE, parallelise=2, reduction=reduction, budget=budget, second_slide_cost=second_slide_cost, community_mean=community_mean, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction)
+```
+
+This time we asked eggSim to summarise the iterations, so we end up with a smaller data frame with summary statistics over the 1000 iterations per parameter value set. We can extract the most relevant columns like so:
+
+```{r}
+biases %>%
+  select(OverallMean, ObsPrev, Target, Design, MeanN, Bias, MedianBias, Variance) %>%
+  arrange(OverallMean, Target, Design) %>%
+  print(n=Inf)
+```
+
+Obviously the relationship between mean, efficacy and bias/variance of the estimator is easiest to visualise graphically - we are working on an autoplot method for the package to facilitate doing this.
+
+
+## Contributing
+
+We would highly value any contributions (either comments, suggestions or code patches) on this package!  You can contribute by either working with the [GitHub repository](https://github.com/ku-awdc/eggSim) or by emailing the package maintainers using the email addresses available from:
+
+```{r eval=FALSE}
+?`eggSim-package`
+```
+
+## sessionInfo
+
+This vignette was built on the following system:
+
+```{r}
+sessionInfo()
 ```
 

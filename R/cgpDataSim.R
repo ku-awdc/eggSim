@@ -10,6 +10,7 @@
 #' @param cv_reduction Variation in efficacy between individuals
 #' @param overall_mean The overall mean (i.e. the mean of the distribution reflecting community means)
 #' @param grams The grams of faeces examined (0.0417g i.e. 1/24 EPG is standard for Kato-Katz)
+#' @param true_prevalence The true prevalence of infected individuals, i.e. one minus the zero inflation at individual level
 #'
 #' @return A data frame containing the simulated data
 #'

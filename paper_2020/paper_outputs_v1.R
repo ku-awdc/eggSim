@@ -1,3 +1,9 @@
+### This file recreates the analyses presented in the 2020 paper:
+# Coffeng LE, Levecke B, Hattendorf J, Walker M, Denwood MJ (under review). Survey design to monitor drug efficacy for the control of soil-transmitted helminthiasis and schistosomiasis. Clin Infect Dis.
+
+## Code last updated 2020-11-30
+## Intended for use with eggSim version 0.9.0
+
 library('tidyverse')
 library('eggSim')
 
@@ -15,7 +21,7 @@ xlabs <- c(
   SSR3 = '"SSR"["1x2"]'
 )
 
-### Generate figures and tables for 2020 paper
+## Set a working directory subfolder within the package:
 basewd <- "paper_2020"
 
 ## Fixed parameters:
@@ -69,7 +75,7 @@ ggplot(output %>% filter(Communities > 0), aes(x=ArithmeticEfficacy, col=Design)
   facet_grid(OverallMean ~ TrueArithmetic, scales='free_x') +
   labs(y = "Empirical CDF")
 
-# Useful table?
+# Useful table:
 tab <- output %>%
   mutate(Success = 100 * sum(Communities > 0) / n()) %>%
   filter(Communities > 0) %>%
@@ -139,7 +145,6 @@ save(output, plotdata, file=file.path(basewd, "simres.Rdata"))
 
 # NS strategy using two pre-treatment samples (and a single post-treatment sample) is worse than default NS:
 
-R <- 5e3
 output <- eggSim(reduction, budget=budget, community_mean=community_mean, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction, true_prevalence=true_prevalence, R=R, summarise=TRUE, design=c("NS1","NS2","NS4"))
 
 tab <- output %>%
@@ -151,7 +156,7 @@ write_excel_csv(tab, file.path(basewd, "table_S1.csv"))
 reduction <- c(0.01,seq(0.05,0.95,by=0.05))
 community_mean <- c(pc10=3.16,pc15=5.45,pc20=8.45,pc25=12,pc35=23.5)
 second_slide_cost <- c(0.1, 0.621, 1)
-R <- 5e3  #1e3
+
 fig3out <- eggSim(reduction, budget=budget, second_slide_cost=second_slide_cost, design=c("NS","NS3","SSR3"), community_mean=community_mean, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction, true_prevalence=true_prevalence, R=R, summarise=TRUE, parallelise=parallel::detectCores()/2)  # Limit to physical cores as the RAM requirements are quite high
 save(fig3out, file=file.path(basewd, "simres_suppl_fig_S1.Rdata"))
 

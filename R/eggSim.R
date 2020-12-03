@@ -1,19 +1,25 @@
 #' Simulate and summarise egg reduction rate data
 #'
 #' @param R The number of replicate datasets
-#' @param N The maximum number of individuals in total
 #' @param reduction The arithmetic mean reduction (may be vectorised)
 #' @param community_mean A vector of arithmetic mean pre-treatment EPG in each community
 #' @param cv_between A vector of CV reflecting variation in EPG between individuals in each community
 #' @param cv_within Day-to-day variation in EPG within an individual
 #' @param cv_slide Variation between faecal samples from the same individual and day
 #' @param cv_reduction Variation in efficacy between individuals
-#' @param edt The egg detection threshold (24 EPG is standard for Kato-Katz)
-#' @param N A named vector of number of included individuals depending on design type
+#' @param grams The volume of faeces actually examined for eggs (1/24 grams is standard for Kato-Katz)
 #' @param count Logical flag to base means on count data or the underlying rates
 #' @param log_constant A constant to add to the count data before calculating geometric means (ignored if count==FALSE)
+#' @param budget The total budget to use for each design
+#' @param second_slide_cost The cost of a second examination (e.g. Kato-Katz slide) from the same faecal sample, relative to the cost of an entirely independent sample
+#' @param max_screen The maximum proportion of the budget to use on screening
+#' @param true_prevalence The true prevalence of infected individuals, i.e. one minus the zero inflation at individual level
+#' @param design The survey design(s) to be examined
+#' @param summarise Should the simulation results be summarised?
+#' @param type One of gamma or lognormal - at present only the former is suppoered
+#' @param parallelise Option to parallelise simulations (can also be an integer giving the number of cores to use, or a cluster pre-created using the parallal package)
+#' @param max_vec The maximum number of data frame rows to use for vectorisation (affects memory usage)
 #' @param screen_threshold The threshold count on which to screen individuals
-#' @param maxN The maximum number of simulated individuals (on which subsampling occurs)
 #'
 #' @return A data frame containing the simulated data
 #'
@@ -23,6 +29,7 @@
 #' @importFrom parallel detectCores makeForkCluster makePSOCKcluster clusterSetRNGStream parLapply stopCluster
 #' @importFrom pbapply pblapply
 #' @importFrom purrr walk
+#' @importFrom rlang .data
 #'
 #' @export
 eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen = 0.9, community_mean=c(24, 48), cv_between=c(1.5), cv_within=0.75, cv_slide=0.25, cv_reduction=0, true_prevalence = 1, count=TRUE, log_constant=if(count) 1 else 0, screen_threshold = 0, grams=1/24, R=10^3, design = c('NS','NS2','NS3','SS','SSR1','SSR2','SSR3'), summarise = TRUE, type="gamma", parallelise=TRUE, max_vec = 5e6)
@@ -125,7 +132,8 @@ eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen 
 
     # Then summarise:
     if(!silent) cat('Summarising gamma data...\n')
-    meansgp <- design_means(simdatagp, design=design, budget=budget, second_slide_cost=second_slide_cost, max_screen=max_screen, count=count, log_constant=log_constant, screen_threshold=screen_threshold) %>% mutate(ComparisonArithmetic = TrueArithmetic, ComparisonGeometric = BestGeometric, IncludeNS = "Arithmetic", Data = if(count) 'Gamma-Poisson' else 'Gamma')
+    meansgp <- design_means(simdatagp, design=design, budget=budget, second_slide_cost=second_slide_cost, max_screen=max_screen, count=count, log_constant=log_constant, screen_threshold=screen_threshold) %>%
+      mutate(ComparisonArithmetic = .data$TrueArithmetic, ComparisonGeometric = .data$BestGeometric, IncludeNS = "Arithmetic", Data = if(count) 'Gamma-Poisson' else 'Gamma')
 
     #if(!silent) cat('Summarising lognormal data...\n')
     #meanslp <- design_means(simdatalp, N=N, count=count) %>% mutate(ComparisonArithmetic = BestArithmetic, ComparisonGeometric = TrueGeometric, IncludeNS = "Geometric", Data = if(count) 'Lognormal-Poisson' else 'Lognormal')

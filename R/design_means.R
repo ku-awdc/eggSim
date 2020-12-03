@@ -1,10 +1,13 @@
 #' Calculate the mean egg counts/rates according to various design types
 #'
 #' @param simdata The data as simulated by cgpDataSim or clpDataSim
-#' @param N A named vector of number of included individuals depending on design type
 #' @param count Logical flag to base means on count data or the underlying rates
 #' @param log_constant A constant to add to the count data before calculating geometric means (ignored if count==FALSE)
 #' @param screen_threshold The threshold count on which to screen individuals
+#' @param budget The total budget to use for each design
+#' @param second_slide_cost The cost of a second examination (e.g. Kato-Katz slide) from the same faecal sample, relative to the cost of an entirely independent sample
+#' @param max_screen The maximum proportion of the budget to use on screening
+#' @param design The survey design(s) to be examined
 #'
 #' @return A data frame of summary statistics
 #' @examples

@@ -18,13 +18,19 @@ design_means(
 \arguments{
 \item{simdata}{The data as simulated by cgpDataSim or clpDataSim}
 
+\item{design}{The survey design(s) to be examined}
+
+\item{budget}{The total budget to use for each design}
+
+\item{second_slide_cost}{The cost of a second examination (e.g. Kato-Katz slide) from the same faecal sample, relative to the cost of an entirely independent sample}
+
+\item{max_screen}{The maximum proportion of the budget to use on screening}
+
 \item{count}{Logical flag to base means on count data or the underlying rates}
 
 \item{log_constant}{A constant to add to the count data before calculating geometric means (ignored if count==FALSE)}
 
 \item{screen_threshold}{The threshold count on which to screen individuals}
-
-\item{N}{A named vector of number of included individuals depending on design type}
 }
 \value{
 A data frame of summary statistics
