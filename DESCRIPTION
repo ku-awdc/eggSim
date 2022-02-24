@@ -26,9 +26,10 @@ Imports:
     purrr,
     rlang,
     dplyr,
-    ggplot2
+    ggplot2,
+    Rcpp
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.1.1
+RoxygenNote: 7.1.2
 Suggests:
     tidyverse,
     testthat (>= 2.1.0),
@@ -37,3 +38,5 @@ Suggests:
     spelling
 VignetteBuilder: knitr
 Language: en-GB
+LinkingTo: 
+    Rcpp

@@ -6,9 +6,7 @@
 \alias{_PACKAGE}
 \title{eggSim: Simulating datasets representing egg reduction rate data}
 \description{
-A collection of utilities to simulate data from different
-    compound over-dispersed count distributions representing egg reduction
-    rate (ERR; aka faecal egg count reduction) datasets.
+A collection of utilities to simulate data from different compound over-dispersed count distributions representing egg reduction rate (ERR; aka faecal egg count reduction) datasets.
 }
 \author{
 \strong{Maintainer}: Matt Denwood \email{md@sund.ku.dk}
