@@ -1,7 +1,8 @@
 #include <Rcpp.h>
-using namespace Rcpp;
 
-double survey_ns(int N_individ, int N_day_pre, int N_sample_pre,
-                 int N_day_post, int N_sample_post, double mu_pre,
-                 double individ_k, double day_k,
-                 double sample_k, double efficacy_a, double efficacy_b);
+Rcpp::NumericVector survey_ns(const int N_individ, const int N_day_pre, const int N_aliquot_pre,
+                 const int N_day_post, const int N_aliquot_post, const double mu_pre,
+                 const double weight, const double performance,
+                 const double cost_sample, const double cost_aliquot,
+                 const double individ_k, const double day_k,
+                 const double aliquot_k, const double efficacy_a, const double efficacy_b);

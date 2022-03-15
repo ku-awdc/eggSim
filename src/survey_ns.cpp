@@ -1,28 +1,70 @@
-#include <Rcpp.h>
-
 #include "survey_ns.hpp"
 
-double survey_ns(int N_individ, int N_day_pre, int N_sample_pre,
-                 int N_day_post, int N_sample_post, double mu_pre,
-                 double individ_k, double day_k,
-                 double sample_k, double efficacy_a, double efficacy_b)
+#include <Rcpp.h>
+
+Rcpp::NumericVector survey_ns(const int N_individ, const int N_day_pre, const int N_aliquot_pre,
+                 const int N_day_post, const int N_aliquot_post, const double mu_pre,
+                 const double weight, const double performance,
+                 const double cost_sample, const double cost_aliquot,
+                 const double individ_k, const double day_k,
+                 const double aliquot_k, const double efficacy_a, const double efficacy_b)
 {
   double pre_mean = 0.0;
-  int pre_n = 0L;
+  double post_mean = 0.0;
+  int pre_n=0L;
+  int post_n=0L;
+
+  const double wp = weight * performance;
+
   for(int ind=0L; ind<N_individ; ++ind)
   {
-    double mu_ind = R::rgamma(individ_k, individ_k / mu_pre);
+    double mu_ind = R::rgamma(individ_k, mu_pre / individ_k);
     for(int day=0L; day<N_day_pre; ++day)
     {
-      double mu_day = R::rgamma(day_k, day_k / mu_ind);
-      for(int sample=0L; sample<N_sample_pre; ++sample)
+      const double mu_day = R::rgamma(day_k, mu_ind / day_k) * wp;
+      for(int aliquot=0L; aliquot<N_aliquot_pre; ++aliquot)
       {
-        double mu_sample = R::rgamma(sample_k, sample_k / mu_day);
-        int count = R::rpois(mu_sample);
-        pre_mean -= (pre_mean - static_cast<double>(count)) / ++pre_n;
+        /*
+        double mu_aliquot = R::rgamma(aliquot_k, mu_day / aliquot_k);
+        int count = R::rpois(mu_aliquot);
+        */
+        const int count = rnbinom_mu(aliquot_k, mu_day);  // get compiler error with R::rnbinom_mu for some reason
+        pre_mean -= (pre_mean - static_cast<double>(count)) / static_cast<double>(++pre_n);
+      }
+    }
+
+    mu_ind *= R::rbeta(efficacy_a, efficacy_b);
+    for(int day=0L; day<N_day_post; ++day)
+    {
+      const double mu_day = R::rgamma(day_k, mu_ind / day_k) * wp;
+      for(int aliquot=0L; aliquot<N_aliquot_post; ++aliquot)
+      {
+        /*
+        double mu_aliquot = R::rgamma(aliquot_k, mu_day / aliquot_k);
+        int count = R::rpois(mu_aliquot);
+        */
+        const int count = rnbinom_mu(aliquot_k, mu_day);  // get compiler error with R::rnbinom_mu for some reason
+        post_mean -= (post_mean - static_cast<double>(count)) / static_cast<double>(++post_n);
       }
     }
   }
 
-	return pre_mean;
+  Rcpp::NumericVector rv(2L);
+
+  // If zero eggs observed (safe float comparison: fewer than 0.5 eggs in total):
+  if(pre_mean < (0.5/(N_individ*N_day_pre*N_aliquot_pre)))
+  {
+    rv[0] = NA_REAL;
+  }
+  else
+  {
+    rv[0] = 1.0 - post_mean/pre_mean;
+  }
+
+  // Total cost:
+  const double cost = N_individ * N_day_pre * (cost_sample + cost_aliquot * N_aliquot_pre) +
+                N_individ * N_day_post * (cost_sample + cost_aliquot * N_aliquot_post);
+  rv[1] = cost;
+
+  return rv;
 }
