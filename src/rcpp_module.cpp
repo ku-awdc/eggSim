@@ -3,12 +3,13 @@
 #include "survey_ns.hpp"
 #include "survey_sim.hpp"
 
-// TODO: templates with compile-time polymorphism for common day/aliquot types
-
 RCPP_MODULE(eggSimModule){
 
 	using namespace Rcpp;
+	
 	function("Rcpp_survey_ns", &survey_ns);
-	function("Rcpp_survey_sim", &survey_sim);
+	
+	function("Rcpp_survey_sim_std", &survey_sim_std);
+	function("Rcpp_survey_sim_nstd", &survey_sim_nstd);
 
 }
