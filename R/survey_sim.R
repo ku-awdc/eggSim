@@ -35,6 +35,8 @@ survey_sim <- function(design = "NS_2x2", iterations = 1e3, n_individ=100,
                                               n_day_post=1, n_aliquot_post=1),
                        weight=1, performance=1,
                        cost_sample=1, cost_aliquot=1,
+                       extra_eggs_mult=0, # A multiplier for the cost of counting for other spp
+                       extra_eggs_add=0, # An additive (expected) cost of counting for other spp
                        individ_cv=1, day_cv=1,
                        aliquot_cv=1, reduction_cv=0.1,
                        family = "gamma", pb=NA,
