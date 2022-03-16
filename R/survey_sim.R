@@ -3,20 +3,18 @@
 #' @param design
 #' @param iterations
 #' @param n_individ
-#' @param n_day_pre
-#' @param n_aliquot_pre
-#' @param n_day_post
-#' @param n_aliquot_post
 #' @param mu_pre
+#' @param reduction
+#' @param n_samples
 #' @param weight
 #' @param performance
 #' @param cost_sample
 #' @param cost_aliquot
-#' @param individ_k
-#' @param day_k
-#' @param aliquot_k
-#' @param efficacy_a
-#' @param efficacy_b
+#' @param individ_cv
+#' @param day_cv
+#' @param aliquot_cv
+#' @param reduction_cv
+#' @param family currently ignored
 #' @param pb
 #' @param parameter_output
 #'
@@ -25,17 +23,21 @@
 #' @importFrom dplyr group_by group_split select bind_rows bind_cols
 #' @importFrom rlang .data
 #'
+#' @examples
+#' results <- survey_sim(design = c("NS_1x1", "NS_2x2"))
+#'
 #' @export
-survey_sim <- function(design = "NS", iterations = 10, n_individ=10,
-                       mu_pre=10, reduction=0.9,
+survey_sim <- function(design = "NS_2x2", iterations = 1e3, n_individ=100,
+                       mu_pre=100, reduction=0.9,
                        n_samples = data.frame(n_label = "example",
+                                              n_day_screen=1, n_aliquot_screen=1,
                                               n_day_pre=1, n_aliquot_pre=1,
                                               n_day_post=1, n_aliquot_post=1),
                        weight=1, performance=1,
                        cost_sample=1, cost_aliquot=1,
                        individ_cv=1, day_cv=1,
-                       aliquot_cv=1, reduction_cv=1,
-                       pb=NA,
+                       aliquot_cv=1, reduction_cv=0.1,
+                       family = "gamma", pb=NA,
                        parameter_output=NA){
 
   # Allow design (including n_samples) to be replicated for each parameter set:
@@ -45,10 +47,13 @@ survey_sim <- function(design = "NS", iterations = 10, n_individ=10,
   nparsets <- max(sapply(parset, length))
   stopifnot(all(sapply(parset, length) %in% c(1, nparsets)))
 
-  stop("ALLOW nparsets==iterations AS ALT")
+  if(nparsets==iterations){
+    parset <- as.data.frame(c(parset, list(iteration=1:iterations)))
+  }else{
+    parset <- as.data.frame(parset) |> expand_grid(iteration=1:iterations)
+  }
 
-  parset <- as.data.frame(c(parset, list(iteration=1:iterations)))
-  stopifnot(all(c("n_label","n_day_pre","n_aliquot_pre","n_day_post","n_aliquot_post") %in% names(n_samples)))
+  stopifnot(all(c("n_label","n_day_screen","n_aliquot_screen","n_day_pre","n_aliquot_pre","n_day_post","n_aliquot_post") %in% names(n_samples)))
   stopifnot(all(table(n_samples$n_label)==1))
 
   # Ignore n_samples for standard designs:
@@ -72,8 +77,13 @@ survey_sim <- function(design = "NS", iterations = 10, n_individ=10,
 
   appfun(designs, function(x){
     if(x$design %in% stddsgn){
-      y <- Rcpp_survey_sim_std(x$design, as.data.frame(parset))
+      des <- str_replace(x$design, "_.*$", "")
+      if(des!="NS") stop("Currently only NS is implemented", call.=FALSE)
+      # TODO: implement standard specialisations
+      # y <- Rcpp_survey_sim_std(x$design, as.data.frame(parset))
+      y <- Rcpp_survey_sim_nstd(des, as.integer(x$n_day_pre), as.integer(x$n_aliquot_pre), as.integer(x$n_day_post), as.integer(x$n_aliquot_post), as.data.frame(parset))
     }else{
+      if(x$design!="NS") stop("Currently only NS is implemented", call.=FALSE)
       y <- Rcpp_survey_sim_nstd(x$design, as.integer(x$n_day_pre), as.integer(x$n_aliquot_pre), as.integer(x$n_day_post), as.integer(x$n_aliquot_post), as.data.frame(parset))
     }
     bind_cols(x |> select(-set), y, parset)
@@ -92,46 +102,6 @@ survey_sim <- function(design = "NS", iterations = 10, n_individ=10,
     }else{
       results <- results |> select(design, iteration, efficacy, cost)
     }
-  }
-  results
-}
-
-
-# Old version:
-survey_ns <- function(design = "NS", iterations = 10, n_individ=10, n_day_pre=1,
-                       n_aliquot_pre=1, n_day_post=1,
-                       n_aliquot_post=1, mu_pre=10, weight=1, performance=1,
-                       cost_sample=1, cost_aliquot=1, individ_k=1, day_k=1,
-                       aliquot_k=1, efficacy_a=1, efficacy_b=1,
-                       pb=(length(design)*iterations)>1e4,
-                       parameter_output=FALSE){
-
-  if(pb) appfun <- pbapply::pblapply else appfun <- base::lapply
-
-  # Allow design to be replicated for each parameter set:
-  parset <- list(Iteration = 1:iterations, n_individ=n_individ, n_day_pre=n_day_pre, n_aliquot_pre=n_aliquot_pre, n_day_post=n_day_post, n_aliquot_post=n_aliquot_post, mu_pre=mu_pre, weight=weight, performance=performance, cost_sample=cost_sample, cost_aliquot=cost_aliquot, individ_k=individ_k, day_k=day_k, aliquot_k=aliquot_k, efficacy_a=efficacy_a, efficacy_b=efficacy_b)
-  # TODO: check recycling i.e. all length 1 or iterations
-
-  # TODO: do this in C++ (split and combine has overhead):
-  expand_grid(Design = design, as.data.frame(parset)) |>
-    group_by(Design, Iteration) |>
-    group_split() |>
-    appfun(function(x){
-      if(x[["Design"]]=="NS"){
-        rv <- with(x, Rcpp_survey_ns(as.integer(n_individ), as.integer(n_day_pre), as.integer(n_aliquot_pre), as.integer(n_day_post), as.integer(n_aliquot_post), as.double(mu_pre), as.double(weight), as.double(performance), as.double(cost_sample), as.double(cost_aliquot), as.double(individ_k), as.double(day_k), as.double(aliquot_k), as.double(efficacy_a), as.double(efficacy_b)), simplify=TRUE)
-      }else{
-        stop("Unrecognised survey design", call.=FALSE)
-      }
-      bind_cols(data.frame(Efficacy = rv[1], Cost = rv[2]), x)
-    }) |>
-    bind_rows() |>
-    identity() ->
-    results
-
-  if(parameter_output){
-    results <- results |> select(Design, Iteration, Efficacy, Cost, everything())
-  }else{
-    results <- results |> select(Design, Iteration, Efficacy, Cost)
   }
   results
 }

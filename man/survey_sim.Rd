@@ -5,30 +5,35 @@
 \title{Title}
 \usage{
 survey_sim(
-  design = "NS",
-  iterations = 10,
-  n_individ = 10,
-  n_day_pre = 1,
-  n_aliquot_pre = 1,
-  n_day_post = 1,
-  n_aliquot_post = 1,
-  mu_pre = 10,
+  design = "NS_2x2",
+  iterations = 1000,
+  n_individ = 100,
+  mu_pre = 100,
+  reduction = 0.9,
+  n_samples = data.frame(n_label = "example", n_day_screen = 1, n_aliquot_screen = 1,
+    n_day_pre = 1, n_aliquot_pre = 1, n_day_post = 1, n_aliquot_post = 1),
   weight = 1,
   performance = 1,
   cost_sample = 1,
   cost_aliquot = 1,
-  individ_k = 1,
-  day_k = 1,
-  aliquot_k = 1,
-  efficacy_a = 1,
-  efficacy_b = 1,
-  pb = length(design) > 1,
-  parameter_output = FALSE
+  individ_cv = 1,
+  day_cv = 1,
+  aliquot_cv = 1,
+  reduction_cv = 0.1,
+  family = "gamma",
+  pb = NA,
+  parameter_output = NA
 )
 }
 \arguments{
+\item{family}{currently ignored}
+
 \item{parameter_output}{}
 }
 \description{
 Title
+}
+\examples{
+results <- survey_sim(design = c("NS_1x1", "NS_2x2"))
+
 }
