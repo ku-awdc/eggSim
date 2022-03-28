@@ -29,10 +29,8 @@
 #' @export
 survey_sim <- function(design = "NS_2x2", iterations = 1e3, n_individ=100,
                        mu_pre=100, reduction=0.9,
-                       n_samples = data.frame(n_label = "example",
-                                              n_day_screen=1, n_aliquot_screen=1,
-                                              n_day_pre=1, n_aliquot_pre=1,
-                                              n_day_post=1, n_aliquot_post=1),
+                       n_samples = survey_samples(),
+
                        weight=1, performance=1,
                        cost_sample=1, cost_aliquot=1,
                        extra_eggs_mult=0, # A multiplier for the cost of counting for other spp
@@ -42,8 +40,13 @@ survey_sim <- function(design = "NS_2x2", iterations = 1e3, n_individ=100,
                        family = "gamma", pb=NA,
                        parameter_output=NA){
 
+  count_intercept <- 2.38961691
+  count_coefficient <- 0.06612497
+  count_add <- 0
+  count_mult <- 1
+
   # Allow design (including n_samples) to be replicated for each parameter set:
-  parset <- list(n_individ=n_individ, mu_pre=mu_pre, reduction=reduction, weight=weight, performance=performance, cost_sample=cost_sample, cost_aliquot=cost_aliquot, individ_cv=individ_cv, day_cv=day_cv, aliquot_cv=aliquot_cv, reduction_cv=reduction_cv)
+  parset <- list(n_individ=n_individ, mu_pre=mu_pre, reduction=reduction, weight=weight, performance=performance, individ_cv=individ_cv, day_cv=day_cv, aliquot_cv=aliquot_cv, reduction_cv=reduction_cv, count_intercept=count_intercept, count_coefficient=count_coefficient, count_add=count_add, count_mult=count_mult)
 
   # TODO: nicer error message:
   nparsets <- max(sapply(parset, length))
@@ -95,6 +98,9 @@ survey_sim <- function(design = "NS_2x2", iterations = 1e3, n_individ=100,
 
   stopifnot(length(parameter_output)==1)
   if(is.na(parameter_output)) parameter_output <- nparsets>1
+
+  # Calculate costs:
+  results$cost <- results$time_count
 
   if(parameter_output){
     results <- results |> select(design, iteration, efficacy, cost, everything())

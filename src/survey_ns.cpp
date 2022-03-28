@@ -3,12 +3,21 @@
 #include <Rcpp.h>
 #include "utilities.hpp"
 
-Rcpp::NumericVector survey_ns(const int N_individ, const int N_day_pre, const int N_aliquot_pre,
+double count_time(const double count, const double intercept, const double coefficient)
+{
+	// log10(time to read in sec) = int + coef*log10(egg counts+1)^2 - these are raw egg counts (not in EPG)
+	const double rv = std::pow(10.0, intercept + coefficient*std::pow(std::log10(count+1.0), 2.0));	
+	return rv;
+}
+
+void survey_ns(const int N_individ, const int N_day_pre, const int N_aliquot_pre,
                  const int N_day_post, const int N_aliquot_post, const double mu_pre,
                  const double reduction, const double weight, const double performance,
-                 const double cost_sample, const double cost_aliquot,
                  const double individ_cv, const double day_cv,
-                 const double aliquot_cv, const double reduction_cv)
+                 const double aliquot_cv, const double reduction_cv,
+				 const double count_intercept, const double count_coefficient,
+				 const double count_add, const double count_mult,
+				 double &efficacy, double &t_count)
 {
   double pre_mean = 0.0;
   double post_mean = 0.0;
@@ -16,6 +25,7 @@ Rcpp::NumericVector survey_ns(const int N_individ, const int N_day_pre, const in
   int post_n=0L;
 
   const double wp = weight * performance;
+  t_count = 0.0;
 
   for(int ind=0L; ind<N_individ; ++ind)
   {
@@ -29,8 +39,9 @@ Rcpp::NumericVector survey_ns(const int N_individ, const int N_day_pre, const in
         double mu_aliquot = rgamma_cv(mu_day, aliquot_cv);
         int count = rpois(mu_aliquot);
         */
-        const int count = rnbinom_cv(mu_day, aliquot_cv);
-        pre_mean -= (pre_mean - static_cast<double>(count)) / static_cast<double>(++pre_n);
+        const double count = static_cast<double>(rnbinom_cv(mu_day, aliquot_cv));
+        pre_mean -= (pre_mean - count) / static_cast<double>(++pre_n);
+		t_count += count_time((count+count_add)*count_mult, count_intercept, count_coefficient);
       }
     }
 
@@ -44,28 +55,23 @@ Rcpp::NumericVector survey_ns(const int N_individ, const int N_day_pre, const in
         double mu_aliquot = rgamma_cv(mu_day, aliquot_cv);
         int count = rpois(mu_aliquot);
         */
-        const int count = rnbinom_cv(mu_day, aliquot_cv);
-        post_mean -= (post_mean - static_cast<double>(count)) / static_cast<double>(++post_n);
+        const double count = static_cast<double>(rnbinom_cv(mu_day, aliquot_cv));
+        post_mean -= (post_mean - count) / static_cast<double>(++post_n);
+  		t_count += count_time((count+count_add)*count_mult, count_intercept, count_coefficient);
       }
     }
   }
 
-  Rcpp::NumericVector rv(2L);
-
   // If zero eggs observed (safe float comparison: fewer than 0.5 eggs in total):
   if(pre_mean < (0.5/(N_individ*N_day_pre*N_aliquot_pre)))
   {
-    rv[0] = NA_REAL;
+    efficacy = NA_REAL;
   }
   else
   {
-    rv[0] = 1.0 - post_mean/pre_mean;
+    efficacy = 1.0 - post_mean/pre_mean;
   }
+  
+  
 
-  // Total cost:
-  const double cost = N_individ * N_day_pre * (cost_sample + cost_aliquot * N_aliquot_pre) +
-                N_individ * N_day_post * (cost_sample + cost_aliquot * N_aliquot_post);
-  rv[1] = cost;
-
-  return rv;
 }
