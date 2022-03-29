@@ -6,29 +6,24 @@
 \usage{
 survey_sim(
   design = "NS_2x2",
+  parasite = "HW",
+  method = "KK",
   iterations = 1000,
   n_individ = 100,
   mu_pre = 100,
   reduction = 0.9,
-  n_samples = data.frame(n_label = "example", n_day_screen = 1, n_aliquot_screen = 1,
-    n_day_pre = 1, n_aliquot_pre = 1, n_day_post = 1, n_aliquot_post = 1),
-  weight = 1,
-  performance = 1,
-  cost_sample = 1,
-  cost_aliquot = 1,
-  individ_cv = 1,
-  day_cv = 1,
-  aliquot_cv = 1,
-  reduction_cv = 0.1,
-  family = "gamma",
+  params_design = parameters_design(design),
+  params_parasite = parameters_parasite(parasite),
+  params_method = parameters_method(method),
+  cost = survey_cost(method),
   pb = NA,
   parameter_output = NA
 )
 }
 \arguments{
-\item{family}{currently ignored}
-
 \item{parameter_output}{}
+
+\item{family}{currently ignored}
 }
 \description{
 Title

@@ -27,74 +27,84 @@
 #' results <- survey_sim(design = c("NS_1x1", "NS_2x2"))
 #'
 #' @export
-survey_sim <- function(design = "NS_2x2", iterations = 1e3, n_individ=100,
-                       mu_pre=100, reduction=0.9,
-                       n_samples = survey_samples(),
+survey_sim <- function(design = "NS_2x2", parasite = "HW", method = "KK",
+                       iterations = 1e3,
+                       n_individ=100, mu_pre=100, reduction=0.9,
+                       params_design = parameters_design(design),
+                       params_parasite = parameters_parasite(parasite),
+                       params_method = parameters_method(method),
+                       cost = survey_cost(method),
+                       pb=NA, parameter_output=NA){
 
-                       weight=1, performance=1,
-                       cost_sample=1, cost_aliquot=1,
-                       extra_eggs_mult=0, # A multiplier for the cost of counting for other spp
-                       extra_eggs_add=0, # An additive (expected) cost of counting for other spp
-                       individ_cv=1, day_cv=1,
-                       aliquot_cv=1, reduction_cv=0.1,
-                       family = "gamma", pb=NA,
-                       parameter_output=NA){
-
-  count_intercept <- 2.38961691
-  count_coefficient <- 0.06612497
-  count_add <- 0
-  count_mult <- 1
-
-  # Allow design (including n_samples) to be replicated for each parameter set:
-  parset <- list(n_individ=n_individ, mu_pre=mu_pre, reduction=reduction, weight=weight, performance=performance, individ_cv=individ_cv, day_cv=day_cv, aliquot_cv=aliquot_cv, reduction_cv=reduction_cv, count_intercept=count_intercept, count_coefficient=count_coefficient, count_add=count_add, count_mult=count_mult)
-
-  # TODO: nicer error message:
-  nparsets <- max(sapply(parset, length))
-  stopifnot(all(sapply(parset, length) %in% c(1, nparsets)))
-
-  if(nparsets==iterations){
-    parset <- as.data.frame(c(parset, list(iteration=1:iterations)))
+  # Could be specified as a data frame or a list of data frames:
+  if(is.data.frame(params_design)){
+    params_design <- list(params_design)
   }else{
-    parset <- as.data.frame(parset) |> expand_grid(iteration=1:iterations)
+    stopifnot(is.list(params_design))
+  }
+  if(is.data.frame(params_parasite)){
+    params_parasite <- list(params_parasite)
+  }else{
+    stopifnot(is.list(params_parasite))
+  }
+  if(is.data.frame(params_method)){
+    params_method <- list(params_method)
+  }else{
+    stopifnot(is.list(params_method))
   }
 
-  stopifnot(all(c("n_label","n_day_screen","n_aliquot_screen","n_day_pre","n_aliquot_pre","n_day_post","n_aliquot_post") %in% names(n_samples)))
-  stopifnot(all(table(n_samples$n_label)==1))
+  # We will do every combo of design/parasite/method list specified, so if any
+  # design, parasite and/or method have >1 rows then they must have the same rows:
+  rows <- sapply(c(params_design,params_parasite,params_method), nrow)
 
-  # Ignore n_samples for standard designs:
-  stddsgn <- expand_grid(c("NS","SS","SSR"), c("1x1","1x2","2x1","2x2")) |>
-    apply(1,paste,collapse="_")
-  designs <- data.frame(design = design[design %in% stddsgn]) |>
-    mutate(nums = apply(str_extract_all(.data$design, "[[:digit:]]", simplify=TRUE),1,paste,collapse="_")) |>
-    separate(nums, c("n_day_pre", "n_aliquot_pre")) |>
-    mutate(n_day_pre=as.numeric(n_day_pre), n_aliquot_pre=as.numeric(n_aliquot_pre)) |>
-    mutate(n_day_post=n_day_pre, n_aliquot_post=n_aliquot_pre) |>
-    bind_rows(
-      expand_grid(design = design[!design %in% stddsgn], n_samples)
-    ) |>
-    mutate(set = 1:n()) |>
-    group_by(set) |>
-    group_split()
+  if(any(!rows %in% c(1L, max(rows)))) stop("The parameter sets for params_design, params_parasite and params_method must have either the same number of rows or 1 row", call.=FALSE)
+  if(max(rows)>1L && iterations!=max(rows)) stop("The number of iterations must match the vectorisation over parameter sets for params_design, params_parasite and params_method", call.=FALSE)
+
+  # Expand grid and also by iterations:
+  expand_grid(pd = 1:length(params_design), pp = 1:length(params_parasite), pm=1:length(params_method)) |>
+    group_by(pd, pp, pm) |>
+    group_split() |>
+    lapply(function(x){
+      bind_cols(params_design[[x$pd]], params_parasite[[x$pp]], params_method[[x$pm]], iteration=1:iterations)
+    }) |>
+    bind_rows() ->
+    parset
+
+  # The remaining parameters can be expand grid'ed:
+  expand_grid(n_individ=n_individ, mu_pre=mu_pre, reduction=reduction) |>
+    expand_grid(parset) ->
+    parset
+
+  browser()
 
   stopifnot(length(pb)==1)
-  if(is.na(pb)) pb <- length(designs)>1
+  if(is.na(pb)) pb <- length(unique(parset$design_preset)) > 1L
   if(pb) appfun <- pbapply::pblapply else appfun <- base::lapply
 
-  appfun(designs, function(x){
-    if(x$design %in% stddsgn){
-      des <- str_replace(x$design, "_.*$", "")
-      if(des!="NS") stop("Currently only NS is implemented", call.=FALSE)
-      # TODO: implement standard specialisations
-      # y <- Rcpp_survey_sim_std(x$design, as.data.frame(parset))
-      y <- Rcpp_survey_sim_nstd(des, as.integer(x$n_day_pre), as.integer(x$n_aliquot_pre), as.integer(x$n_day_post), as.integer(x$n_aliquot_post), as.data.frame(parset))
-    }else{
-      if(x$design!="NS") stop("Currently only NS is implemented", call.=FALSE)
-      y <- Rcpp_survey_sim_nstd(x$design, as.integer(x$n_day_pre), as.integer(x$n_aliquot_pre), as.integer(x$n_day_post), as.integer(x$n_aliquot_post), as.data.frame(parset))
-    }
-    bind_cols(x |> select(-set), y, parset)
-  }) |>
+  stddsgn <- expand_grid(c("NS","SS","SSR"), c("1x1","1x2","2x1","2x2")) |>
+    apply(1,paste,collapse="_")
+
+  parset |>
+    group_by(design_preset) |>
+    group_split() |>
+    appfun(function(x){
+      des <- x$design_preset[1]
+      if(des %in% stddsgn){
+        des <- str_replace(des, "_.*$", "")
+        if(des!="NS") stop("Currently only NS is implemented", call.=FALSE)
+        # TODO: implement standard specialisations
+        # y <- Rcpp_survey_sim_std(x$design, as.data.frame(parset))
+        y <- Rcpp_survey_sim_nstd(des, as.data.frame(x))
+      }else{
+        if(des!="NS") stop("Currently only NS is implemented", call.=FALSE)
+        y <- Rcpp_survey_sim_nstd(des, as.data.frame(x))
+      }
+      bind_cols(x |> select(-iteration), y, parset)
+    }) |>
     bind_rows() ->
     results
+
+  browser()
 
   stopifnot(length(parameter_output)==1)
   if(is.na(parameter_output)) parameter_output <- nparsets>1
