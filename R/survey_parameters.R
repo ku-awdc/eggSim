@@ -14,8 +14,8 @@
 #' @export
 parameters_design <- function(design_preset = "custom",
                            n_day_screen=1, n_aliquot_screen=1,
-                           n_day_pre=1, n_aliquot_pre=1,
-                           n_day_post=1, n_aliquot_post=1
+                           n_day_pre=2, n_aliquot_pre=2,
+                           n_day_post=2, n_aliquot_post=2
 ){
 
   if(FALSE){
@@ -75,7 +75,7 @@ parameters_method <- function(method_preset = "custom",
 ){
 
   rv <- lapply(method_preset, function(x)
-    data.frame(lab_preset=x, weight=weight, performance=performance, count_intercept=count_intercept, count_coefficient=count_coefficient, cost_sample=cost_sample, cost_aliquot=cost_aliquot)
+    data.frame(method_preset=x, weight=weight, performance=performance, count_intercept=count_intercept, count_coefficient=count_coefficient, cost_sample=cost_sample, cost_aliquot=cost_aliquot)
   )
 
   if(length(rv)==1L) rv <- rv[[1]]

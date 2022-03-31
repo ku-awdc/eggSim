@@ -27,7 +27,8 @@
 #' results <- survey_sim(design = c("NS_1x1", "NS_2x2"))
 #'
 #' @export
-survey_sim <- function(design = "NS_2x2", parasite = "HW", method = "KK",
+survey_sim <- function(design = c("NS_2x2","SS_2x2","SSR_2x2"),
+                       parasite = "HW", method = "KK",
                        iterations = 1e3,
                        n_individ=100, mu_pre=100, reduction=0.9,
                        params_design = parameters_design(design),
@@ -75,51 +76,52 @@ survey_sim <- function(design = "NS_2x2", parasite = "HW", method = "KK",
     expand_grid(parset) ->
     parset
 
-  browser()
-
-  stopifnot(length(pb)==1)
-  if(is.na(pb)) pb <- length(unique(parset$design_preset)) > 1L
-  if(pb) appfun <- pbapply::pblapply else appfun <- base::lapply
-
   stddsgn <- expand_grid(c("NS","SS","SSR"), c("1x1","1x2","2x1","2x2")) |>
     apply(1,paste,collapse="_")
 
   parset |>
-    group_by(design_preset) |>
-    group_split() |>
+    # group_by(design_preset, parasite_preset, method_preset, n_individ, mu_pre, reduction) |>
+    group_by(design_preset, parasite_preset, method_preset) |>
+    group_split() ->
+    parset
+
+  stopifnot(length(pb)==1)
+  if(is.na(pb)) pb <- length(parset) > 1L
+  if(pb) appfun <- pbapply::pblapply else appfun <- base::lapply
+
+  parset |>
     appfun(function(x){
       des <- x$design_preset[1]
       if(des %in% stddsgn){
-        des <- str_replace(des, "_.*$", "")
-        if(des!="NS") stop("Currently only NS is implemented", call.=FALSE)
         # TODO: implement standard specialisations
-        # y <- Rcpp_survey_sim_std(x$design, as.data.frame(parset))
+        # y <- Rcpp_survey_sim_std(des, as.data.frame(x))
+        des <- str_replace(des, "_.*$", "")
+        stopifnot(des%in%c("NS","SS","SSR"))
         y <- Rcpp_survey_sim_nstd(des, as.data.frame(x))
       }else{
-        if(des!="NS") stop("Currently only NS is implemented", call.=FALSE)
+        stopifnot(des%in%c("NS","SS","SSR"))
         y <- Rcpp_survey_sim_nstd(des, as.data.frame(x))
       }
-      bind_cols(x |> select(-iteration), y, parset)
+      bind_cols(y, x)
     }) |>
     bind_rows() ->
     results
 
-  browser()
-
   stopifnot(length(parameter_output)==1)
-  if(is.na(parameter_output)) parameter_output <- nparsets>1
+  if(is.na(parameter_output)) parameter_output <- length(params_design)>1
 
   # Calculate costs:
   results$cost <- results$time_count
 
   if(parameter_output){
-    results <- results |> select(design, iteration, efficacy, cost, everything())
+    results <- results |> select(design_preset, iteration, efficacy, cost, everything())
   }else{
-    if(!all(results$design %in% stddsgn)){
-      results <- results |> select(design, n_label, iteration, efficacy, cost)
+    if(!all(results$design_preset %in% stddsgn)){
+      results <- results |> select(design_preset, iteration, efficacy, cost)
     }else{
-      results <- results |> select(design, iteration, efficacy, cost)
+      results <- results |> select(design_preset, iteration, efficacy, cost, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post)
     }
   }
-  results
+
+  return(as_tibble(results))
 }
