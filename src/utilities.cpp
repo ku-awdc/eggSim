@@ -38,3 +38,11 @@ double rbeta_cv(const double mu, const double cv)
   const double rv = R::rbeta(a, b);
 	return rv;
 }
+
+double count_time(const double count, const double intercept, const double coefficient)
+{
+	// log10(time to read in sec) = int + coef*log10(egg counts+1)^2 - these are raw egg counts (not in EPG)
+	const double rv = std::pow(10.0, intercept + coefficient*std::pow(std::log10(count+1.0), 2.0));
+	return rv;
+}
+

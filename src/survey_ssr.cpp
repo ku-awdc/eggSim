@@ -3,13 +3,6 @@
 #include <Rcpp.h>
 #include "utilities.hpp"
 
-double count_time_ssr(const double count, const double intercept, const double coefficient)
-{
-	// log10(time to read in sec) = int + coef*log10(egg counts+1)^2 - these are raw egg counts (not in EPG)
-	const double rv = std::pow(10.0, intercept + coefficient*std::pow(std::log10(count+1.0), 2.0));
-	return rv;
-}
-
 void survey_ssr(const int N_individ, const int N_day_screen, const int N_aliquot_screen,
                  const int N_day_pre, const int N_aliquot_pre,
                  const int N_day_post, const int N_aliquot_post, const double mu_pre,
@@ -40,7 +33,7 @@ void survey_ssr(const int N_individ, const int N_day_screen, const int N_aliquot
       for(int aliquot=0L; aliquot<N_aliquot_screen; ++aliquot)
       {
 				const int count = rnbinom_cv(mu_day, aliquot_cv);
-        t_count += count_time_ssr((static_cast<double>(count)+count_add)*count_mult, count_intercept, count_coefficient);
+        t_count += count_time((static_cast<double>(count)+count_add)*count_mult, count_intercept, count_coefficient);
 				included = included || count > 0L;
         screen_n++;
       }
@@ -58,7 +51,7 @@ void survey_ssr(const int N_individ, const int N_day_screen, const int N_aliquot
 	        */
 	        const double count = static_cast<double>(rnbinom_cv(mu_day, aliquot_cv));
 	        pre_mean -= (pre_mean - count) / static_cast<double>(++pre_n);
-			    t_count += count_time_ssr((count+count_add)*count_mult, count_intercept, count_coefficient);
+			    t_count += count_time((count+count_add)*count_mult, count_intercept, count_coefficient);
 	      }
 	    }
 
@@ -74,7 +67,7 @@ void survey_ssr(const int N_individ, const int N_day_screen, const int N_aliquot
 	        */
 	        const double count = static_cast<double>(rnbinom_cv(mu_day, aliquot_cv));
 	        post_mean -= (post_mean - count) / static_cast<double>(++post_n);
-	  		  t_count += count_time_ssr((count+count_add)*count_mult, count_intercept, count_coefficient);
+	  		  t_count += count_time((count+count_add)*count_mult, count_intercept, count_coefficient);
 	      }
 	    }
     }

@@ -3,13 +3,6 @@
 #include <Rcpp.h>
 #include "utilities.hpp"
 
-double count_time_ss(const double count, const double intercept, const double coefficient)
-{
-	// log10(time to read in sec) = int + coef*log10(egg counts+1)^2 - these are raw egg counts (not in EPG)
-	const double rv = std::pow(10.0, intercept + coefficient*std::pow(std::log10(count+1.0), 2.0));
-	return rv;
-}
-
 void survey_ss(const int N_individ, const int N_day_pre, const int N_aliquot_pre,
                  const int N_day_post, const int N_aliquot_post, const double mu_pre,
                  const double reduction, const double weight, const double performance,
@@ -41,11 +34,10 @@ void survey_ss(const int N_individ, const int N_day_pre, const int N_aliquot_pre
         int count = rpois(mu_aliquot);
         */
         const int counti = rnbinom_cv(mu_day, aliquot_cv);
-		included = included || counti > 0L;
-		const double count = static_cast<double>(counti);
+		    included = included || counti > 0L;
+		    const double count = static_cast<double>(counti);
         pre_mean -= (pre_mean - count) / static_cast<double>(++pre_n);
-		t_count += count_time_ss((count+count_add)*count_mult, count_intercept, count_coefficient);
-		
+		    t_count += count_time((count+count_add)*count_mult, count_intercept, count_coefficient);
       }
     }
 
@@ -62,7 +54,7 @@ void survey_ss(const int N_individ, const int N_day_pre, const int N_aliquot_pre
 	        */
 	        const double count = static_cast<double>(rnbinom_cv(mu_day, aliquot_cv));
 	        post_mean -= (post_mean - count) / static_cast<double>(++post_n);
-	  		t_count += count_time_ss((count+count_add)*count_mult, count_intercept, count_coefficient);
+	  		  t_count += count_time((count+count_add)*count_mult, count_intercept, count_coefficient);
 	      }
 	    }
 	}
