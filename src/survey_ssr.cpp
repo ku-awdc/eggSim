@@ -3,6 +3,8 @@
 #include <Rcpp.h>
 #include "utilities.hpp"
 
+// TODO: meanepg_weight_performance should be pre-computed
+
 void survey_ssr(const int N_individ, const int N_day_screen, const int N_aliquot_screen,
                  const int N_day_pre, const int N_aliquot_pre,
                  const int N_day_post, const int N_aliquot_post, const double mu_pre,
@@ -55,7 +57,7 @@ void survey_ssr(const int N_individ, const int N_day_screen, const int N_aliquot
 	      }
 	    }
 
-	    mu_ind *= (1.0 - rbeta_cv(reduction, reduction_cv));
+	    mu_ind *= rbeta_cv(reduction, reduction_cv);
 	    for(int day=0L; day<N_day_post; ++day)
 	    {
 	      const double mu_day = rgamma_cv(mu_ind, day_cv) * wp;

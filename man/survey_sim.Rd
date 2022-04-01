@@ -5,25 +5,21 @@
 \title{Title}
 \usage{
 survey_sim(
-  design = "NS_2x2",
-  parasite = "HW",
-  method = "KK",
-  iterations = 1000,
+  design = c("NS_A", "SS_A", "SSR_A"),
+  parasite = "hookworm",
+  method = "kk",
   n_individ = 100,
-  mu_pre = 100,
-  reduction = 0.9,
-  params_design = parameters_design(design),
-  params_parasite = parameters_parasite(parasite),
-  params_method = parameters_method(method),
-  cost = survey_cost(method),
+  scenario = survey_scenario(parasite),
+  parameters = survey_parameters(design, parasite, method),
+  iterations = 1000,
   pb = NA,
-  parameter_output = NA
+  output = NA
 )
 }
 \arguments{
-\item{parameter_output}{}
-
 \item{family}{currently ignored}
+
+\item{parameter_output}{}
 }
 \description{
 Title

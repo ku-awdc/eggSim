@@ -2,40 +2,16 @@
 % Please edit documentation in R/survey_parameters.R
 \name{survey_parameters}
 \alias{survey_parameters}
-\alias{parameters_design}
-\alias{parameters_parasite}
-\alias{parameters_method}
+\alias{survey_scenario}
 \title{Parameter sets for survey simulations}
 \usage{
-parameters_design(
-  design_preset = "custom",
-  n_day_screen = 1,
-  n_aliquot_screen = 1,
-  n_day_pre = 1,
-  n_aliquot_pre = 1,
-  n_day_post = 1,
-  n_aliquot_post = 1
+survey_parameters(
+  design = c("SS_A", "NS_A", "NS_B", "SSR_A", "SSR_B"),
+  parasite = c("ascaris", "trichuris", "hookworm"),
+  method = c("kk", "miniflotac", "fecpak")
 )
 
-parameters_parasite(
-  parasite_preset = "custom",
-  individ_cv = 1,
-  day_cv = 1,
-  aliquot_cv = 1,
-  reduction_cv = 0.1,
-  count_add = 0,
-  count_mult = 1
-)
-
-parameters_method(
-  method_preset = "custom",
-  weight = 1,
-  performance = 1,
-  count_intercept = 2.38961691,
-  count_coefficient = 0.06612497,
-  cost_sample = 1,
-  cost_aliquot = 1
-)
+survey_scenario(parasite)
 }
 \arguments{
 \item{n_aliquot_post}{}

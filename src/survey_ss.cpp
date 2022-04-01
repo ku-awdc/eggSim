@@ -16,13 +16,17 @@ void survey_ss(const int N_individ, const int N_day_pre, const int N_aliquot_pre
   double post_mean = 0.0;
   int pre_n=0L;
   int post_n=0L;
+  int pre_extran=0L;
 
   const double wp = weight * performance;
   t_count = 0.0;
-
+  
   for(int ind=0L; ind<N_individ; ++ind)
   {
-	bool included = false;
+	  bool included = false;
+    const double pmsave = pre_mean;
+    const int pnsave = pre_n;
+    
     double mu_ind = rgamma_cv(mu_pre, individ_cv);
     for(int day=0L; day<N_day_pre; ++day)
     {
@@ -41,8 +45,8 @@ void survey_ss(const int N_individ, const int N_day_pre, const int N_aliquot_pre
       }
     }
 
-	if(included){
-	    mu_ind *= (1.0 - rbeta_cv(reduction, reduction_cv));
+	  if(included){
+	    mu_ind *= rbeta_cv(reduction, reduction_cv);
 	    for(int day=0L; day<N_day_post; ++day)
 	    {
 	      const double mu_day = rgamma_cv(mu_ind, day_cv) * wp;
@@ -57,7 +61,11 @@ void survey_ss(const int N_individ, const int N_day_pre, const int N_aliquot_pre
 	  		  t_count += count_time((count+count_add)*count_mult, count_intercept, count_coefficient);
 	      }
 	    }
-	}
+	  }else{
+      pre_extran += (pre_n - pnsave);
+	    pre_mean = pmsave;
+      pre_n = pnsave;
+	  }
   }
 
   // If zero eggs observed (safe float comparison: fewer than 0.5 eggs in total):
@@ -70,7 +78,7 @@ void survey_ss(const int N_individ, const int N_day_pre, const int N_aliquot_pre
     efficacy = 1.0 - post_mean/pre_mean;
   }
 
-  n_pre = pre_n;
+  n_pre = pre_n + pre_extran;
   n_post = post_n;
 
 }

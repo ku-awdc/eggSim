@@ -27,15 +27,114 @@
 #' results <- survey_sim(design = c("NS_1x1", "NS_2x2"))
 #'
 #' @export
-survey_sim <- function(design = c("NS_2x2","SS_2x2","SSR_2x2"),
-                       parasite = "HW", method = "KK",
+survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
+                       parasite = "hookworm", method = "kk",
+                       n_individ = 100,
+                       scenario = survey_scenario(parasite),
+                       parameters = survey_parameters(design, parasite, method),
                        iterations = 1e3,
-                       n_individ=100, mu_pre=100, reduction=0.9,
-                       params_design = parameters_design(design),
-                       params_parasite = parameters_parasite(parasite),
-                       params_method = parameters_method(method),
-                       cost = survey_cost(method),
-                       pb=NA, parameter_output=NA){
+                       independent_individs = 5L,
+                       pb=NA, output=NA){
+
+  # output can be without parameters, with parameters or summarised
+  # for now only without parameters
+  output <- "full"
+  summarise <- output == "summarised"
+
+  design <- check_design(design)
+  parasite <- check_parasite(parasite)
+  method <- check_method(method)
+
+  stopifnot(is.numeric(n_individ), all(n_individ > 0L), all(n_individ%%1 == 0L))
+  stopifnot(is.numeric(iterations), length(iterations)==1L, iterations > 0L, iterations%%1==0L)
+
+  # Could be specified as a list:
+  if(is.data.frame(parameters)) parameters <- list(parameters)
+  # TODO: check all needed parameter values are present and non-missing
+  check_parameters(parameters, iterations)
+
+  scenario <- check_scenario(scenario)
+
+
+  stopifnot(is.logical(pb), length(pb)==1L)
+  if(is.na(pb)) pb <- length(parameters) > 1L
+  if(pb) appfun <- pbapply::pblapply else appfun <- base::lapply
+
+
+  ## Run the parameter/scenario/n_individ combos:
+
+  parameters |>
+    appfun(function(x){
+
+      stopifnot(length(unique(x$design))==1L)
+      des <- x$design[1]
+
+      # Do whatever cost calculations can be done before expanding:
+      x |>
+        mutate(
+          time_consumables_screen = n_day_screen * (time_demography + time_prep_screen + time_record*n_aliquot_screen),
+          time_consumables_pre = n_day_pre * (time_demography + time_prep_pre + time_record*n_aliquot_pre),
+          time_consumables_post = n_day_post * (time_demography + time_prep_post + time_record*n_aliquot_post),
+
+          cost_consumables_screen = n_day_screen * (cost_sample + cost_aliquot_screen),
+          cost_consumables_pre = n_day_pre * (cost_sample + cost_aliquot_pre),
+          cost_consumables_post = n_day_post * (cost_sample + cost_aliquot_post)
+        ) |>
+        # This supercedes the following variables:
+        # time_demography, time_prep_*, time_record, cost_sample, cost_aliquot_*
+        # select(-time_demography, -starts_with("time_prep"), -time_record, -cost_sample, -starts_with("cost_qliauot")) |>
+        identity() ->
+        x
+
+      # Replicate the parameters over iterations (if necessary),
+      # expand_grid with n_individ, and then inner_join with scenario:
+      bind_cols(x, iteration = 1:iterations) |>
+        expand_grid(n_individ = n_individ) |>
+        inner_join(scenario, by="parasite") ->
+        x
+
+      # TODO: n_individ should be a separate vector argument, don't expand
+      # parameters by iteration unless needed
+
+      # Work out if this is a standard or a non-standard design:
+      if(des %in% stddsgn){
+        # TODO: implement standard specialisations
+        # y <- Rcpp_survey_sim_std(des, as.data.frame(x), summarise)
+      # }else{
+        des <- str_replace(des, "_.*$", "")
+      }
+      if(TRUE){
+        stopifnot(des%in%c("NS","SS","SSR"))
+        stopifnot(!summarise)
+        y <- Rcpp_survey_sim_nstd(des, as.data.frame(x), summarise)
+      }
+
+      if(output=="full"){
+        y <- bind_cols(y, x)
+      }else{
+        stop("Unimplemented output argument", call.=FALSE)
+      }
+
+      return(y)
+    }) |>
+    bind_rows() ->
+    results
+
+  return(results)
+
+  parameters |>
+    mutate(# Note: this supercedes the following variables:
+           # time_demography, time_prep_*, time_record, cost_sample, cost_aliquot_*
+           # But I will leave them in for now
+
+           time_consumables_screen = n_day_screen * (time_demography + time_prep_screen + time_record*n_aliquot_screen),
+           time_consumables_pre = n_day_pre * (time_demography + time_prep_pre + time_record*n_aliquot_pre),
+           time_consumables_screen = n_day_post * (time_demography + time_prep_post + time_record*n_aliquot_post),
+
+           cost_consumables_screen = n_day_screen * (cost_sample + cost_aliquot_screen),
+           cost_consumables_pre = n_day_pre * (cost_sample + cost_aliquot_pre),
+           cost_consumables_post = n_day_post * (cost_sample + cost_aliquot_post)
+        )
 
   # Could be specified as a data frame or a list of data frames:
   if(is.data.frame(params_design)){
@@ -102,7 +201,14 @@ survey_sim <- function(design = c("NS_2x2","SS_2x2","SSR_2x2"),
         stopifnot(des%in%c("NS","SS","SSR"))
         y <- Rcpp_survey_sim_nstd(des, as.data.frame(x))
       }
-      bind_cols(y, x)
+
+      if(output=="full"){
+        y <- bind_cols(y, x)
+      }else{
+        stop("Unimplemented output argument", call.=FALSE)
+      }
+
+      return(y)
     }) |>
     bind_rows() ->
     results
