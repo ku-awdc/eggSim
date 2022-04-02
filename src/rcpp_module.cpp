@@ -11,7 +11,6 @@ RCPP_MODULE(eggSimModule){
 	function("rnbinom_cv", &rnbinom_cv);
 	function("rbeta_cv", &rbeta_cv);
 
-	function("Rcpp_survey_sim_std", &survey_sim_std);
-	function("Rcpp_survey_sim_nstd", &survey_sim_nstd);
+	function("Rcpp_survey_sim", &survey_sim);
 
 }

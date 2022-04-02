@@ -5,10 +5,10 @@
 \title{Title}
 \usage{
 survey_sim(
-  design = c("NS_A", "SS_A", "SSR_A"),
+  design = c("NS_11", "SS_11", "SSR_11"),
   parasite = "hookworm",
   method = "kk",
-  n_individ = 100,
+  n_individ = c(100, 200, 1000),
   scenario = survey_scenario(parasite),
   parameters = survey_parameters(design, parasite, method),
   iterations = 1000,

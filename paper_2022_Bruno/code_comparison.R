@@ -25,10 +25,10 @@ n_individ_us <- unique(bruno$n_individ)
 n_individ_us <- c(100,200,500,1000)
 #n_individ_us <- 100
 
-params <- survey_parameters()
+params <- survey_parameters(design=c("NS_11","NS_12"))
 scen <- survey_scenario()
 
-results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params)
+results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=1e3)
 
 results |>
   group_by(design, parasite, method, n_individ, scenario, mean_epg, reduction) |>

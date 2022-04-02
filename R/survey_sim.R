@@ -65,8 +65,17 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
   parameters |>
     appfun(function(x){
 
-      stopifnot(length(unique(x$design))==1L)
-      des <- x$design[1]
+      # Remove the design and ns from the parameters:
+      x |>
+        count(design, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post) |>
+        select(-n) ->
+        all_ns
+
+      stopifnot(nrow(all_ns)==1L)
+      des <- all_ns$design
+      all_ns |> select(-design) |> unlist() -> all_ns
+
+      stopifnot(length(all_ns)==6L, all(all_ns>=0L), all(all_ns%%1L == 0L))
 
       # Do whatever cost calculations can be done before expanding:
       x |>
@@ -101,19 +110,8 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
 
       # TODO: don't expand parameters by iteration unless needed??
 
-      # Work out if this is a standard or a non-standard design:
-      if(des %in% stddsgn){
-        # TODO: implement standard specialisations
-        # y <- Rcpp_survey_sim_std(des, as.data.frame(x), n_individ, summarise)
-      # }else{
-        des <- str_replace(des, "_.*$", "")
-      }
-      if(TRUE){
-        stopifnot(des%in%c("NS","SS","SSR"))
-        stopifnot(!summarise)
-
-        y <- Rcpp_survey_sim_nstd(des, as.data.frame(x), n_individ, summarise)
-      }
+      stopifnot(!summarise)
+      y <- Rcpp_survey_sim(des, all_ns, as.data.frame(x), n_individ, summarise)
 
       if(output=="extended"){
         rv <- full_join(y, x, by="replicateID")

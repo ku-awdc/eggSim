@@ -1,3 +1,6 @@
+#ifndef SURVEY_NS_HPP
+#define SURVEY_NS_HPP
+
 #include <Rcpp.h>
 
 #include "utilities.hpp"
@@ -6,8 +9,9 @@
 #include "distribution.hpp"
 
 template<methods method, dists dist_individ, dists dist_day, dists dist_aliquot, dists dist_red>
-void survey_ns(Rcpp::IntegerVector N_individ, const int N_day_pre, const int N_aliquot_pre,
-                 const int N_day_post, const int N_aliquot_post, const double mu_pre,
+void survey_ns(const int N_day_pre, const int N_aliquot_pre,
+                 const int N_day_post, const int N_aliquot_post, 
+				 const Rcpp::IntegerVector& N_individ, const double mu_pre,
                  const double reduction, const double individ_cv, const double day_cv,
                  const double aliquot_cv, const double reduction_cv,
 				 const double count_intercept, const double count_coefficient,
@@ -89,3 +93,5 @@ void survey_ns(Rcpp::IntegerVector N_individ, const int N_day_pre, const int N_a
   }
 
 }
+
+#endif // SURVEY_NS_HPP

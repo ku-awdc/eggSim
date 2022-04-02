@@ -6,12 +6,12 @@
 \title{Parameter sets for survey simulations}
 \usage{
 survey_parameters(
-  design = c("SS_A", "NS_A", "NS_B", "SSR_A", "SSR_B"),
+  design = c("SS_11", "SS_12", "NS_11", "NS_12", "SSR_11", "SSR_12"),
   parasite = c("ascaris", "trichuris", "hookworm"),
   method = c("kk", "miniflotac", "fecpak")
 )
 
-survey_scenario(parasite)
+survey_scenario(parasite = c("ascaris", "trichuris", "hookworm"))
 }
 \arguments{
 \item{n_aliquot_post}{}

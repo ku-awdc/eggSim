@@ -1,3 +1,6 @@
+#ifndef DISTRIBUTION_HPP
+#define DISTRIBUTION_HPP
+
 #include <Rcpp.h>
 
 #include "enums.hpp"
@@ -144,3 +147,5 @@ public:
   }
 
 };
+
+#endif // DISTRIBUTION_HPP

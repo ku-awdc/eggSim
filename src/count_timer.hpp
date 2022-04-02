@@ -1,3 +1,6 @@
+#ifndef COUNT_TIMER_HPP
+#define COUNT_TIMER_HPP
+
 #include <Rcpp.h>
 
 #include "enums.hpp"
@@ -34,3 +37,5 @@ public:
   }
 
 };
+
+#endif // COUNT_TIMER_HPP
