@@ -1,49 +1,52 @@
-#include <Rcpp.h>
 #include "utilities.hpp"
 
-double rgamma_cv(const double mu, const double cv)
+#include <Rcpp.h>
+
+#include "distribution.hpp"
+#include "count_timer.hpp"
+
+Rcpp::NumericVector rgamma_cv(const int n, const double mu, const double cv)
 {
-  if(cv <= 0.0)
+  Rcpp::NumericVector rv(n);
+  distribution<dists::rgamma> distn(cv, mu);
+  for(int i=0L; i<n; ++i)
   {
-    return mu;
+    rv[i] = distn.draw();
   }
-  const double k = pow(cv, -2.0);
-  const double rv = R::rgamma(k, mu/k);
 	return rv;
 }
 
-int rnbinom_cv(const double mu, const double cv)
+Rcpp::IntegerVector rnbinom_cv(const int n, const double mu, const double cv)
 {
-  if(cv <= 0.0)
+  Rcpp::IntegerVector rv(n);
+  distribution<dists::rnbinom> distn(cv, mu);
+  for(int i=0L; i<n; ++i)
   {
-    return R::rpois(mu);
+    rv[i] = distn.draw();
   }
-  const double k = pow(cv, -2.0);
-  const int rv = rnbinom_mu(k, mu);    // get compiler error with rnbinom_mu for some reason
-  // TODO: check for int overflow
-  
 	return rv;
 }
 
-double rbeta_cv(const double mu, const double cv)
+Rcpp::NumericVector rbeta_cv(const int n, const double mu, const double cv)
 {
-  if(cv <= 0.0)
+  Rcpp::NumericVector rv(n);
+  distribution<dists::rbeta> distn(cv, mu);
+  for(int i=0L; i<n; ++i)
   {
-    return mu;
+    rv[i] = distn.draw();
   }
-  
-  const double sd = cv * mu;
-  const double a = mu * ( (mu*(1.0-mu) / pow(sd,2.0)) - 1.0 );
-  const double b = (1.0 - mu) * ( (mu*(1.0-mu) / pow(sd,2.0)) - 1.0);
-  const double rv = R::rbeta(a, b);
 	return rv;
 }
 
-double count_time(const double count, const double intercept, const double coefficient)
+double count_time(const Rcpp::IntegerVector& count, const double intercept,
+                  const double coefficient, const double add, const double mult)
 {
-  // TODO: should this be log10 or loge???
-	// log10(time to read in sec) = int + coef*log10(egg counts+1)^2 - these are raw egg counts (not in EPG)
-	const double rv = std::pow(10.0, intercept + coefficient*std::pow(std::log10(count+1.0), 2.0));
-	return rv;
+  count_timer<methods::custom> counter(intercept, coefficient, add, mult);
+  for(int i=0L; i<count.length(); ++i)
+  {
+    counter.add_count(count[i]);
+  }
+
+	return counter.get_total();
 }
 

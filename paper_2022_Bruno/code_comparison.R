@@ -22,13 +22,13 @@ list(
 
 library("eggSim")
 n_individ_us <- unique(bruno$n_individ)
-n_individ_us <- c(100,200,500,1000)
+#n_individ_us <- c(100,200,500,1000)
 #n_individ_us <- 100
 
-params <- survey_parameters(design=c("NS_11","NS_12"))
+params <- survey_parameters()
 scen <- survey_scenario()
 
-results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=1e3)
+results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=1e3, output="extended")
 
 results |>
   group_by(design, parasite, method, n_individ, scenario, mean_epg, reduction) |>
@@ -37,6 +37,64 @@ results |>
   mutate(method = factor(method, levels=c("kk", "fecpak", "miniflotac"), labels=c("KK","FP","MF")) |> as.character()) ->
   matt
 
+
+both <- inner_join(matt |> rename(matt = "proportion") |> select(-code, -cost, -miss),
+                  bruno |> rename(bruno = "power") |> select(-code, -cost, -miss)
+)
+theme_set(theme_light())
+ggplot(both, aes(x=bruno, y=matt, group = mean_epg, col=interaction(n_individ, mean_epg, drop=TRUE, sep=" / "))) +
+  geom_line() +
+  geom_abline(slope=1, intercept=0) +
+  geom_point() +
+  facet_wrap(~ design + parasite + method, ncol=9) +
+  theme(legend.position = "none")
+ggsave("comparison_proportion.pdf", width=15, height=15)
+
+
+both <- inner_join(matt |> rename(matt = "cost") |> select(-code, -miss),
+                   bruno |> rename(bruno = "cost") |> select(-code, -miss)
+)
+theme_set(theme_light())
+ggplot(both, aes(x=bruno/1e3, y=matt/1e3, group = mean_epg, col=interaction(n_individ, mean_epg, drop=TRUE, sep=" / "))) +
+  geom_line() +
+  geom_abline(slope=1, intercept=0) +
+  geom_point() +
+  facet_wrap(~ design + parasite + method, ncol=9) +
+  theme(legend.position = "none")
+ggsave("comparison_cost.pdf", width=15, height=15)
+
+
+stop()
+
+# Compare timings for specialisation:
+library("eggSim")
+
+n_individ_us <- c(100,200,500,1000)
+scen <- survey_scenario()
+
+params1 <- survey_parameters(c("NS_12"))
+params2 <- lapply(params1, function(x){
+  x$design <- "NS"
+  x
+})
+
+# Difference is maybe around 5% ??
+system.time({
+  results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params2, iterations=1e3)
+})
+system.time({
+  results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params1, iterations=1e3)
+})
+
+# Test utility functions:
+eggSim:::Rcpp_rbeta_cv(5, 0.5, 0)
+eggSim:::Rcpp_rbeta_cv(5, 0.5, 0.1)
+eggSim:::Rcpp_rgamma_cv(5, 5, 0)
+eggSim:::Rcpp_rgamma_cv(5, 5, 1)
+eggSim:::Rcpp_rnbinom_cv(50, 5, 0)
+eggSim:::Rcpp_rnbinom_cv(50, 5, 5)
+eggSim:::Rcpp_count_time(eggSim:::Rcpp_rnbinom_cv(50, 5, 5), 1, 1, 0, 1)
+# Maybe I should export these?
 
 results |>
   group_by(design, parasite, method, n_individ, mean_epg, reduction, individ_cv, day_cv, aliquot_cv, reduction_cv, cutoff, weight, recovery) |>
@@ -97,27 +155,6 @@ forluc <- parsets |>
 
 #save(forluc, rgamma_cv, rnbinom_cv, rbeta_cv, file="forluc.RData")
 #write_excel_csv(forluc, "parameters.csv")
-
-theme_set(theme_light())
-ggplot(both, aes(x=bruno, y=matt, group = mean_epg, col=interaction(n_individ, mean_epg, drop=TRUE, sep=" / "))) +
-  geom_line() +
-  geom_abline(slope=1, intercept=0) +
-  geom_point() +
-  facet_wrap(~ design + parasite + method, ncol=9)
-ggsave("comparison_proportion.pdf", width=15, height=15)
-
-both <- inner_join(matt |> rename(matt = "cost") |> select(-code, -miss),
-                   bruno |> rename(bruno = "cost") |> select(-code, -miss)
-)
-
-theme_set(theme_light())
-ggplot(both, aes(x=bruno/1e3, y=matt/1e3, group = mean_epg, col=interaction(n_individ, mean_epg, drop=TRUE, sep=" / "))) +
-  geom_line() +
-  geom_abline(slope=1, intercept=0) +
-  geom_point() +
-  facet_wrap(~ design + parasite + method, ncol=9)
-ggsave("comparison_cost.pdf", width=15, height=15)
-
 
 # Problems:  KK, SS11, SS12,
 

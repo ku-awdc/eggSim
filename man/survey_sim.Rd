@@ -13,7 +13,7 @@ survey_sim(
   parameters = survey_parameters(design, parasite, method),
   iterations = 1000,
   pb = NA,
-  output = NA
+  output = "full"
 )
 }
 \arguments{

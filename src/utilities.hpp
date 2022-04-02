@@ -1,8 +1,6 @@
 #include <Rcpp.h>
 
-// TODO: local compilation within e.g. survey_ns for optimisation?
-
-double rgamma_cv(const double mu, const double cv);
-int rnbinom_cv(const double mu, const double cv);
-double rbeta_cv(const double mu, const double cv);
-double count_time(const double count, const double intercept, const double coefficient);
+Rcpp::NumericVector rgamma_cv(const int n, const double mu, const double cv);
+Rcpp::IntegerVector rnbinom_cv(const int n, const double mu, const double cv);
+Rcpp::NumericVector rbeta_cv(const int n, const double mu, const double cv);
+double count_time(const Rcpp::IntegerVector& count, const double intercept, const double coefficient, const double add, const double mult);

@@ -27,12 +27,7 @@ public:
 
   double draw() const
   {
-    if(m_cv <= 0.0)
-    {
-      return m_mu;
-    }
-    const double rv = R::rgamma(m_k, m_mu/m_k);
-  	return rv;
+    return draw(m_mu);
   }
 
   double draw(const double mu) const
@@ -50,15 +45,25 @@ public:
 template<>
 class distribution<dists::rnbinom> {
 private:
+  const double m_mu = 0.0;
   const double m_cv = 0.0;
   const double m_k = 0.0;
 public:
-  distribution(const double cv) : m_cv(cv), m_k(pow(cv, -2.0))
+  distribution(const double cv, const double mu) : m_mu(mu), m_cv(cv), m_k(pow(cv, -2.0))
+  {
+
+  }
+  
+  distribution(const double cv) : m_mu(0.0), m_cv(cv), m_k(pow(cv, -2.0))
   {
 
   }
 
-  // Note: must have a mu argument here
+  double draw() const
+  {
+    return draw(m_mu);
+  }
+  
   double draw(const double mu) const
   {
     if(m_cv <= 0.0)
@@ -99,7 +104,7 @@ private:
   double m_b = 0.0;
 public:
   
-  distribution(const double cv, const double mu) : m_mu(cv), m_cv(cv)
+  distribution(const double cv, const double mu) : m_mu(mu), m_cv(cv)
   {
     const double sd = cv * mu;
     m_a = mu * ( (mu*(1.0-mu) / pow(sd,2.0)) - 1.0 );
@@ -138,7 +143,7 @@ public:
 
   double draw() const
   {
-    return m_mu;
+    return draw(m_mu);
   }
 
   double draw(const double mu) const
