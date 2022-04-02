@@ -29,11 +29,10 @@
 #' @export
 survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                        parasite = "hookworm", method = "kk",
-                       n_individ = 100,
+                       n_individ = c(100, 200, 1000),
                        scenario = survey_scenario(parasite),
                        parameters = survey_parameters(design, parasite, method),
                        iterations = 1e3,
-                       independent_individs = 5L,
                        pb=NA, output=NA){
 
   # output can be without parameters, with parameters or summarised
@@ -87,35 +86,50 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
         x
 
       # Replicate the parameters over iterations (if necessary),
-      # expand_grid with n_individ, and then inner_join with scenario:
-      bind_cols(x, iteration = 1:iterations) |>
-        expand_grid(n_individ = n_individ) |>
-        inner_join(scenario, by="parasite") ->
-        x
+      # and then inner_join with scenario and add replicate ID:
+      if(nrow(x)>1L){
+        stopifnot("iteration" %in% names(x))
+        x <- x |> arrange(iteration)
+        stopifnot(all(x$iteration == 1:iterations))
+      }else{
+        x <- bind_cols(x, iteration = 1:iterations)
+      }
+      x <- inner_join(x, scenario, by="parasite") |>
+        mutate(replicateID = 1:n())
 
-      # TODO: n_individ should be a separate vector argument, don't expand
-      # parameters by iteration unless needed
+      n_individ <- sort(n_individ)
+      stopifnot(all(n_individ > 0L), all(n_individ%%1 == 0))
+
+      # TODO: don't expand parameters by iteration unless needed??
 
       # Work out if this is a standard or a non-standard design:
       if(des %in% stddsgn){
         # TODO: implement standard specialisations
-        # y <- Rcpp_survey_sim_std(des, as.data.frame(x), summarise)
+        # y <- Rcpp_survey_sim_std(des, as.data.frame(x), n_individ, summarise)
       # }else{
         des <- str_replace(des, "_.*$", "")
       }
       if(TRUE){
         stopifnot(des%in%c("NS","SS","SSR"))
         stopifnot(!summarise)
-        y <- Rcpp_survey_sim_nstd(des, as.data.frame(x), summarise)
+
+        y <- Rcpp_survey_sim_nstd(des, as.data.frame(x), n_individ, summarise)
       }
 
-      if(output=="full"){
-        y <- bind_cols(y, x)
+      if(output=="extended"){
+        rv <- full_join(y, x, by="replicateID")
+        stopifnot(nrow(rv)==nrow(y))
+      }else if(output=="full"){
+        rv <- full_join(y,
+                        x |> select(design, parasite, method, parameter_set, iteration, scenario, mean_epg, reduction, replicateID),
+                        by="replicateID")
+        stopifnot(nrow(rv)==nrow(y))
+        # Do nothing: just return y
       }else{
         stop("Unimplemented output argument", call.=FALSE)
       }
 
-      return(y)
+      return(rv)
     }) |>
     bind_rows() ->
     results

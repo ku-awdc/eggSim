@@ -10,11 +10,16 @@
 
 Rcpp::DataFrame survey_sim_nstd(const std::string& design,
 								const Rcpp::DataFrame& parameters,
+								const Rcpp::IntegerVector& n_individ,
 								const bool summarise)
 {
-	const int n = parameters.nrow();
+	const int np = parameters.nrow();
+	const int ni = n_individ.length();
 
 	// TODO: meanepg_weight_recovery should be pre-computed
+	// TODO: n_day/aliquot_* shouldn't be vectorised here
+	
+	const Rcpp::IntegerVector replicateID = parameters["replicateID"];
 	
 	const Rcpp::IntegerVector n_day_screen = parameters["n_day_screen"];
 	const Rcpp::IntegerVector n_aliquot_screen = parameters["n_aliquot_screen"];
@@ -22,7 +27,6 @@ Rcpp::DataFrame survey_sim_nstd(const std::string& design,
 	const Rcpp::IntegerVector n_aliquot_pre = parameters["n_aliquot_pre"];
 	const Rcpp::IntegerVector n_day_post = parameters["n_day_post"];
 	const Rcpp::IntegerVector n_aliquot_post = parameters["n_aliquot_post"];
-	const Rcpp::NumericVector n_individ = parameters["n_individ"];
 	const Rcpp::NumericVector mu_pre = parameters["mean_epg"];
 	const Rcpp::NumericVector reduction = parameters["reduction"];
 	const Rcpp::NumericVector weight = parameters["weight"];
@@ -47,74 +51,97 @@ Rcpp::DataFrame survey_sim_nstd(const std::string& design,
 	const Rcpp::NumericVector cost_salary = parameters["cost_salary"];
 	const Rcpp::NumericVector cost_travel = parameters["cost_travel"];
 	
-	Rcpp::NumericVector efficacy(n);
-	Rcpp::IntegerVector n_screen(n);
-	Rcpp::IntegerVector n_pre(n);
-	Rcpp::IntegerVector n_post(n);
-	Rcpp::NumericVector time_count(n);
+	// Create the output vectors:	
+	Rcpp::NumericVector efficacy(np*ni);
+	Rcpp::NumericVector n_screen(np*ni);
+	Rcpp::NumericVector n_pre(np*ni);
+	Rcpp::NumericVector n_post(np*ni);
+	Rcpp::NumericVector time_count(np*ni);
+	
+	Rcpp::NumericVector consumables_cost(np*ni);
+	Rcpp::NumericVector salary_cost(np*ni);
+	Rcpp::NumericVector travel_cost(np*ni);
+	Rcpp::NumericVector total_cost(np*ni);
+	
+	// Memory offset for indexing results for different n_individ:
+	ptrdiff_t offset = 1L;
 
-	if( design == "NS" )
+	int ind = 0L;
+	for(int p=0L; p<np; ++p)
 	{
-		for(int i=0L; i<n; ++i)
+		if( design == "NS" )
 		{
-			survey_ns(n_individ[i], n_day_pre[i], n_aliquot_pre[i], n_day_post[i], n_aliquot_post[i],
-												mu_pre[i], reduction[i], weight[i], performance[i],
-												individ_cv[i], day_cv[i], aliquot_cv[i], reduction_cv[i],
-												count_intercept[i], count_coefficient[i], count_add[i], count_mult[i],
-												efficacy[i], n_pre[i], n_post[i], time_count[i]);
-
-			n_screen[i] = 0L;
+			survey_ns(n_individ, n_day_pre[p], n_aliquot_pre[p], n_day_post[p], n_aliquot_post[p],
+												mu_pre[p], reduction[p], weight[p], performance[p],
+												individ_cv[p], day_cv[p], aliquot_cv[p], reduction_cv[p],
+												count_intercept[p], count_coefficient[p], count_add[p], count_mult[p],
+												&efficacy[ind], &n_screen[ind], &n_pre[ind], &n_post[ind], &time_count[ind], offset);
 		}
+		/*
 	}else if( design == "SS" )
 	{
 		for(int i=0L; i<n; ++i)
 		{
-			survey_ss(n_individ[i], n_day_pre[i], n_aliquot_pre[i], n_day_post[i], n_aliquot_post[i],
-												mu_pre[i], reduction[i], weight[i], performance[i],
-												individ_cv[i], day_cv[i], aliquot_cv[i], reduction_cv[i],
-												count_intercept[i], count_coefficient[i], count_add[i], count_mult[i],
-												efficacy[i], n_pre[i], n_post[i], time_count[i]);
+			survey_ss(n_individ[p], n_day_pre[p], n_aliquot_pre[p], n_day_post[p], n_aliquot_post[p],
+												mu_pre[p], reduction[p], weight[p], performance[p],
+												individ_cv[p], day_cv[p], aliquot_cv[p], reduction_cv[p],
+												count_intercept[p], count_coefficient[p], count_add[p], count_mult[p],
+												efficacy[p], n_pre[p], n_post[p], time_count[p]);
 
-			n_screen[i] = 0L;
+			n_screen[p] = 0L;
 		}
 	}else if( design == "SSR" )
 	{
 		for(int i=0L; i<n; ++i)
 		{
-			survey_ssr(n_individ[i], n_day_screen[i], n_aliquot_screen[i], n_day_pre[i], n_aliquot_pre[i], n_day_post[i], n_aliquot_post[i],
-												mu_pre[i], reduction[i], weight[i], performance[i],
-												individ_cv[i], day_cv[i], aliquot_cv[i], reduction_cv[i],
-												count_intercept[i], count_coefficient[i], count_add[i], count_mult[i],
-												efficacy[i], n_screen[i], n_pre[i], n_post[i], time_count[i]);
+			survey_ssr(n_individ[p], n_day_screen[p], n_aliquot_screen[p], n_day_pre[p], n_aliquot_pre[p], n_day_post[p], n_aliquot_post[p],
+												mu_pre[p], reduction[p], weight[p], performance[p],
+												individ_cv[p], day_cv[p], aliquot_cv[p], reduction_cv[p],
+												count_intercept[p], count_coefficient[p], count_add[p], count_mult[p],
+												efficacy[p], n_screen[p], n_pre[p], n_post[p], time_count[p]);
 		}
 	}else
 	{
 		Rcpp::stop("Unrecognised design type");
 	}
+		*/
+		
+		// Do cost calculations:
+		for(int i=0; i<ni; ++i)
+		{
+			const double cons_cost = n_screen[ind] * cost_consumables_screen[p] + 
+										n_pre[ind] * cost_consumables_pre[p] + 
+										n_post[ind] * cost_consumables_post[p];
+		
+			const double totaltime = n_screen[ind] * time_consumables_screen[p] + 
+										n_pre[ind] * time_consumables_pre[p] + 
+										n_post[ind] * time_consumables_post[p] + 
+										time_count[ind];
+			
+			const double ndays = totaltime / (n_technicians[p] * 4.0 * 60.0 * 60.0);
+			const double sal_cost = ndays * n_team[p] * cost_salary[p];
+		
+			const int tra_cost = ndays * cost_travel[p];
+		
+			consumables_cost[ind] = cons_cost;
+			salary_cost[ind] = sal_cost;
+			travel_cost[ind] = tra_cost;
+			total_cost[ind] = cons_cost + sal_cost + tra_cost;
+			
+			ind++;
+		}
 
-	Rcpp::NumericVector consumables_cost(n);
-	Rcpp::NumericVector salary_cost(n);
-	Rcpp::NumericVector travel_cost(n);
-	Rcpp::NumericVector total_cost(n);
-
-	// Do cost calculations:
-	for(int i=0L; i<n; ++i)
-	{
-		const double cons_cost = n_screen[i] * cost_consumables_screen[i] + n_pre[i] * cost_consumables_pre[i] + n_post[i] * cost_consumables_post[i];
-		
-		const double totaltime = n_screen[i] * time_consumables_screen[i] + n_pre[i] * time_consumables_pre[i] + n_post[i] * time_consumables_post[i] + time_count[i];
-		const double ndays = totaltime / (n_technicians[i] * 4.0 * 60.0 * 60.0);
-		const double sal_cost = ndays * n_team[i] * cost_salary[i];
-		
-		const int tra_cost = ndays * cost_travel[i];
-		
-		consumables_cost[i] = cons_cost;
-		salary_cost[i] = sal_cost;
-		travel_cost[i] = tra_cost;
-		total_cost[i] = cons_cost + sal_cost + tra_cost;
 	}
 	
-	Rcpp::DataFrame df = Rcpp::DataFrame::create( Rcpp::_["efficacy"] = efficacy, Rcpp::_["n_screen"] = n_screen, Rcpp::_["n_pre"] = n_pre,
+	// Create the final output:
+	Rcpp::Function expgrd("expand.grid");
+	// NB: deliberately backwards as we use expand.grid and not expand_grid:
+	Rcpp::DataFrame repmean = expgrd(n_individ, replicateID);
+	Rcpp::IntegerVector nind = repmean[0L];
+	Rcpp::IntegerVector repID = repmean[1L];
+	
+	Rcpp::DataFrame df = Rcpp::DataFrame::create( 	Rcpp::_["replicateID"] = repID, Rcpp::_["n_individ"] = nind,
+													Rcpp::_["efficacy"] = efficacy, Rcpp::_["n_screen"] = n_screen, Rcpp::_["n_pre"] = n_pre,
 		 											Rcpp::_["n_post"] = n_post, Rcpp::_["time_count"] = time_count, 
 													Rcpp::_["consumables_cost"] = consumables_cost, Rcpp::_["salary_cost"] = salary_cost,
 													Rcpp::_["travel_cost"] = travel_cost, Rcpp::_["total_cost"] = total_cost);
@@ -122,13 +149,14 @@ Rcpp::DataFrame survey_sim_nstd(const std::string& design,
 }
 
 
-Rcpp::DataFrame survey_sim_std(const std::string& design, const Rcpp::DataFrame& parameters, const bool summarise)
+Rcpp::DataFrame survey_sim_std(const std::string& design, const Rcpp::DataFrame& parameters, 
+								const Rcpp::IntegerVector& n_individ, const bool summarise)
 {
 	Rcpp::DataFrame rv;
 
 	if( design == "NS_2x2" )
 	{
-		rv = survey_sim_nstd("NS", parameters, summarise);
+		rv = survey_sim_nstd("NS", parameters, n_individ, summarise);
 	}
 	else
 	{
