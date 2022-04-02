@@ -11,6 +11,8 @@ Rcpp::DataFrame survey_sim(const std::string& design,
 {
 	Rcpp::DataFrame rv;
   
+  // TODO: specialise on if aliquot_cv is always 0
+  
 	if( design == "NS_11" )
 	{
     rv = survey_template<designs::NS, methods::custom, dists::rgamma, dists::rgamma, dists::rnbinom, dists::rgamma>
