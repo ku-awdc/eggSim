@@ -95,8 +95,8 @@ forluc <- parsets |>
   filter(!is.na(reduction)) |>
   arrange(desc(abs(matt-bruno)))
 
-save(forluc, rgamma_cv, rnbinom_cv, rbeta_cv, file="forluc.RData")
-write_excel_csv(forluc, "parameters.csv")
+#save(forluc, rgamma_cv, rnbinom_cv, rbeta_cv, file="forluc.RData")
+#write_excel_csv(forluc, "parameters.csv")
 
 theme_set(theme_light())
 ggplot(both, aes(x=bruno, y=matt, group = mean_epg, col=interaction(n_individ, mean_epg, drop=TRUE, sep=" / "))) +

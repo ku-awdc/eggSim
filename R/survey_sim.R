@@ -37,7 +37,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
 
   # output can be without parameters, with parameters or summarised
   # for now only without parameters
-  output <- "full"
+  output <- "extended"
   summarise <- output == "summarised"
 
   design <- check_design(design)
@@ -81,7 +81,6 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
         ) |>
         # This supercedes the following variables:
         # time_demography, time_prep_*, time_record, cost_sample, cost_aliquot_*
-        # select(-time_demography, -starts_with("time_prep"), -time_record, -cost_sample, -starts_with("cost_qliauot")) |>
         identity() ->
         x
 
@@ -95,7 +94,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
         x <- bind_cols(x, iteration = 1:iterations)
       }
       x <- inner_join(x, scenario, by="parasite") |>
-        mutate(replicateID = 1:n())
+        mutate(replicateID = 1:n(), mu_pre = mean_epg * weight * recovery)
 
       n_individ <- sort(n_individ)
       stopifnot(all(n_individ > 0L), all(n_individ%%1 == 0))
