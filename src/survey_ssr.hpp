@@ -91,8 +91,9 @@ void survey_ssr(const int N_day_screen, const int N_aliquot_screen,
     // Save output:
     if((ind+1L) == N_individ[outn])
     {
+      // TODO: distinguish between pre_n==0 and pre_mean==0, and also adjust minimum N required??
       // If zero eggs observed (safe float comparison: fewer than 0.5 eggs in total):
-      if(pre_mean < (0.5/(static_cast<double>((ind+1L)*N_day_pre*N_aliquot_pre))))
+      if(pre_n == 0L || pre_mean < (0.5/(static_cast<double>((ind+1L)*N_day_pre*N_aliquot_pre))))
       {
         *(efficacy+outoffset) = NA_REAL;
       }

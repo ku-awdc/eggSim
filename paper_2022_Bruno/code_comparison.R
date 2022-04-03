@@ -25,6 +25,8 @@ n_individ_us <- unique(bruno$n_individ)
 #n_individ_us <- c(100,200,500,1000)
 #n_individ_us <- 100
 
+# TODO: how are NA efficacy handled (where pre-tx == 0)
+
 params <- survey_parameters()
 scen <- survey_scenario()
 
@@ -63,6 +65,9 @@ ggplot(both, aes(x=bruno/1e3, y=matt/1e3, group = mean_epg, col=interaction(n_in
   theme(legend.position = "none")
 ggsave("comparison_cost.pdf", width=15, height=15)
 
+
+## TODO: some of the discrepancy may be due to how pre-mean==0 is handled?
+
 bruno$proportion <- bruno$power
 
 pdf("all_proportion.pdf")
@@ -84,6 +89,20 @@ for(pp in unique(matt$parasite)){
   for(pn in c("matt","bruno")){
     dt <- get(pn)
     pt <- ggplot(dt |> filter(parasite==pp), aes(x=-cost, y=proportion, col=design, group=design)) +
+      geom_line() +
+      #  geom_point() +
+      facet_grid(mean_epg ~ method) +
+      ggtitle(str_c(pp, " - ", pn))
+    print(pt)
+  }
+}
+dev.off()
+
+pdf("all_missingness.pdf")
+for(pp in unique(matt$parasite)){
+  for(pn in c("matt","bruno")){
+    dt <- get(pn)
+    pt <- ggplot(dt |> filter(parasite==pp), aes(x=n_individ, y=miss, col=design, group=design)) +
       geom_line() +
       #  geom_point() +
       facet_grid(mean_epg ~ method) +
