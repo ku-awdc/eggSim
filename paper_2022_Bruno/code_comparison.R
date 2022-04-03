@@ -34,7 +34,7 @@ results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = para
 
 results |>
   group_by(design, parasite, method, n_individ, scenario, mean_epg, reduction) |>
-  summarise(nonmiss = sum(!is.na(efficacy)), proportion = sum(efficacy < cutoff, na.rm=TRUE) / nonmiss, miss = 1-(nonmiss/n()), cost = mean(total_cost), .groups="drop") |>
+  summarise(nonmiss = sum(!is.na(efficacy)), proportion = sum(efficacy < cutoff, na.rm=TRUE) / nonmiss, precision = 1/var(efficacy, na.rm=TRUE), miss = 1-(nonmiss/n()), cost = mean(total_cost), .groups="drop") |>
   mutate(design = str_replace(design, "_", ""), code = "matt") |>
   mutate(method = factor(method, levels=c("kk", "fecpak", "miniflotac"), labels=c("KK","FP","MF")) |> as.character()) ->
   matt
@@ -69,6 +69,34 @@ ggsave("comparison_cost.pdf", width=15, height=15)
 ## TODO: some of the discrepancy may be due to how pre-mean==0 is handled?
 
 bruno$proportion <- bruno$power
+
+pdf("all_precision.pdf")
+for(pp in unique(matt$parasite)){
+  for(pn in c("matt")){
+    dt <- get(pn)
+    pt <- ggplot(dt |> filter(parasite==pp), aes(x=n_individ, y=precision, col=design, group=design)) +
+      geom_line() +
+      #  geom_point() +
+      facet_grid(mean_epg ~ method) +
+      ggtitle(str_c(pp, " - ", pn))
+    print(pt)
+  }
+}
+dev.off()
+
+pdf("all_tradeoff_po.pdf")
+for(pp in unique(matt$parasite)){
+  for(pn in c("matt")){
+    dt <- get(pn)
+    pt <- ggplot(dt |> filter(parasite==pp), aes(x=-cost, y=precision, col=design, group=design)) +
+      geom_line() +
+      #  geom_point() +
+      facet_grid(mean_epg ~ method) +
+      ggtitle(str_c(pp, " - ", pn))
+    print(pt)
+  }
+}
+dev.off()
 
 pdf("all_proportion.pdf")
 for(pp in unique(matt$parasite)){
