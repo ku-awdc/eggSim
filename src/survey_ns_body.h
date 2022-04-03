@@ -1,4 +1,4 @@
-// This file is a dirty macro-based hack to avoid writing the body of this function twice in survey_ns.hpp
+// This file is a dirty macro-based hack to avoid writing the body of this function twice in survey_ns.h
 
   double pre_mean = 0.0;
   double post_mean = 0.0;

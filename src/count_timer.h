@@ -1,9 +1,9 @@
-#ifndef COUNT_TIMER_HPP
-#define COUNT_TIMER_HPP
+#ifndef COUNT_TIMER_H
+#define COUNT_TIMER_H
 
 #include <Rcpp.h>
 
-#include "enums.hpp"
+#include "enums.h"
 
 template<methods method>
 class count_timer;
@@ -38,4 +38,4 @@ public:
 
 };
 
-#endif // COUNT_TIMER_HPP
+#endif // COUNT_TIMER_H

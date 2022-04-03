@@ -1,9 +1,9 @@
 #include <Rcpp.h>
 
-#include "enums.hpp"
-#include "survey_ns.hpp"
-#include "survey_ss.hpp"
-#include "survey_ssr.hpp"
+#include "enums.h"
+#include "survey_ns.h"
+#include "survey_ss.h"
+#include "survey_ssr.h"
 
 template<designs design, int nd0, int na0, int nd1, int na1, int nd2, int na2,
           methods method, dists dist_individ, dists dist_day, dists dist_aliquot, dists dist_red>

@@ -39,6 +39,6 @@ survey_sim(
 Simulate one or more survey design
 }
 \examples{
-results <- survey_sim(design = c("NS_11", "NS_12"))
+results <- survey_sim()
 
 }

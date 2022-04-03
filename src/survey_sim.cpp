@@ -1,9 +1,9 @@
-#include "survey_sim.hpp"
+#include "survey_sim.h"
 
 #include <Rcpp.h>
 
-#include "enums.hpp"
-#include "survey_template.hpp"
+#include "enums.h"
+#include "survey_template.h"
 
 // Hacky macro function to avoid lots of copy/paste:
 

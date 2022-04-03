@@ -1,9 +1,9 @@
-#ifndef DISTRIBUTION_HPP
-#define DISTRIBUTION_HPP
+#ifndef DISTRIBUTION_H
+#define DISTRIBUTION_H
 
 #include <Rcpp.h>
 
-#include "enums.hpp"
+#include "enums.h"
 
 template<dists dist>
 class distribution;
@@ -153,4 +153,4 @@ public:
 
 };
 
-#endif // DISTRIBUTION_HPP
+#endif // DISTRIBUTION_H

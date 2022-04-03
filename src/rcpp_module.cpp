@@ -1,7 +1,7 @@
 #include <Rcpp.h>
 
-#include "survey_sim.hpp"
-#include "utilities.hpp"
+#include "survey_sim.h"
+#include "utilities.h"
 
 RCPP_MODULE(eggSimModule){
 

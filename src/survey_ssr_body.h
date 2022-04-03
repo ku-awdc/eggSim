@@ -1,10 +1,10 @@
-// This file is a dirty macro-based hack to avoid writing the body of this function twice in survey_ss.hpp
+// This file is a dirty macro-based hack to avoid writing the body of this function twice in survey_ssr.h
 
   double pre_mean = 0.0;
   double post_mean = 0.0;
+  int screen_n=0L;
   int pre_n=0L;
   int post_n=0L;
-  int pre_extran=0L;
 
   count_timer<method> counter(count_intercept, count_coefficient, count_add, count_mult);
   distribution<dist_individ> rindivid(individ_cv);
@@ -18,29 +18,39 @@
 
   for(int ind=0L; ind<N_individ[N_individ.length()-1L]; ++ind)
   {
-	  bool included = false;
-    const double pmsave = pre_mean;
-    const int pnsave = pre_n;
-    
     double mu_ind = rindivid.draw(mu_pre);
-    for(int day=0L; day<N_day_pre; ++day)
+  
+    bool included = false;
+    for(int day=0L; day<N_day_screen; ++day)
     {
       const double mu_day = rday.draw(mu_ind);
-      for(int aliquot=0L; aliquot<N_aliquot_pre; ++aliquot)
+      for(int aliquot=0L; aliquot<N_aliquot_screen; ++aliquot)
       {
-        /*
-        double mu_aliquot = rgamma_cv(mu_day, aliquot_cv);
-        int count = rpois(mu_aliquot);
-        */
         const int counti = raliquot.draw(mu_day);
-		    included = included || counti > 0L;
-		    const double count = static_cast<double>(counti);
-        pre_mean -= (pre_mean - count) / static_cast<double>(++pre_n);
-		    counter.add_count(count);
+  	    included = included || counti > 0L;
+        counter.add_count(static_cast<double>(counti));
+        screen_n++;
       }
     }
+  
+    if(included){
+      for(int day=0L; day<N_day_pre; ++day)
+      {
+        const double mu_day = rday.draw(mu_ind);
+        for(int aliquot=0L; aliquot<N_aliquot_pre; ++aliquot)
+        {
+          /*
+          double mu_aliquot = rgamma_cv(mu_day, aliquot_cv);
+          int count = rpois(mu_aliquot);
+          */
+          const int counti = raliquot.draw(mu_day);
+  		    included = included || counti > 0L;
+  		    const double count = static_cast<double>(counti);
+          pre_mean -= (pre_mean - count) / static_cast<double>(++pre_n);
+  		    counter.add_count(count);
+        }
+      }
 
-	  if(included){
       mu_ind *= rred.draw();
       for(int day=0L; day<N_day_post; ++day)
       {
@@ -56,15 +66,12 @@
     		  counter.add_count(count);
         }
       }
-	  }else{
-      pre_extran += (pre_n - pnsave);
-	    pre_mean = pmsave;
-      pre_n = pnsave;
-	  }
+    }
 
     // Save output:
     if((ind+1L) == N_individ[outn])
     {
+      // TODO: distinguish between pre_n==0 and pre_mean==0, and also adjust minimum N required??
       // If zero eggs observed (safe float comparison: fewer than 0.5 eggs in total):
       if(pre_n == 0L || pre_mean < (0.5/(static_cast<double>((ind+1L)*N_day_pre*N_aliquot_pre))))
       {
@@ -75,8 +82,8 @@
         *(efficacy+outoffset) = 1.0 - post_mean/pre_mean;
       }
 
-      *(n_screen+outoffset) = 0.0;
-      *(n_pre+outoffset) = static_cast<double>(pre_n + pre_extran);
+      *(n_screen+outoffset) = static_cast<double>(screen_n);
+      *(n_pre+outoffset) = static_cast<double>(pre_n);
       *(n_post+outoffset) = static_cast<double>(post_n);
 
       *(time_count+outoffset) = counter.get_total();
@@ -85,4 +92,3 @@
       outoffset += offset;
     }
   }
-

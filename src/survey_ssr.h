@@ -1,12 +1,12 @@
-#ifndef SURVEY_SSR_HPP
-#define SURVEY_SSR_HPP
+#ifndef SURVEY_SSR_H
+#define SURVEY_SSR_H
 
 #include <Rcpp.h>
 
-#include "utilities.hpp"
-#include "enums.hpp"
-#include "count_timer.hpp"
-#include "distribution.hpp"
+#include "utilities.h"
+#include "enums.h"
+#include "count_timer.h"
+#include "distribution.h"
 
 template<methods method, dists dist_individ, dists dist_day, dists dist_aliquot, dists dist_red>
 void survey_ssr(const int N_day_screen, const int N_aliquot_screen,
@@ -21,7 +21,7 @@ void survey_ssr(const int N_day_screen, const int N_aliquot_screen,
                 double* time_count, ptrdiff_t offset)
 {
 
-  #include "survey_ssr_body.hpp"
+  #include "survey_ssr_body.h"
 
 }
 
@@ -43,8 +43,8 @@ void survey_ssr_tt(const Rcpp::IntegerVector& N_individ, const double mu_pre,
   const int N_day_post = nd2;
   const int N_aliquot_post = na2;
 
-  #include "survey_ssr_body.hpp"
+  #include "survey_ssr_body.h"
 
 }
 
-#endif // SURVEY_SSR_HPP
+#endif // SURVEY_SSR_H

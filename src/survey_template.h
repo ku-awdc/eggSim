@@ -1,7 +1,7 @@
 #include <Rcpp.h>
 
-#include "enums.hpp"
-#include "survey_class.hpp"
+#include "enums.h"
+#include "survey_class.h"
 
 template<designs design, int nd0, int na0, int nd1, int na1, int nd2, int na2, 
           methods method, dists dist_individ, dists dist_day, dists dist_aliquot, dists dist_red>

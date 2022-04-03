@@ -1,9 +1,9 @@
-#include "utilities.hpp"
+#include "utilities.h"
 
 #include <Rcpp.h>
 
-#include "distribution.hpp"
-#include "count_timer.hpp"
+#include "distribution.h"
+#include "count_timer.h"
 
 Rcpp::NumericVector rgamma_cv(const int n, const double mu, const double cv)
 {
