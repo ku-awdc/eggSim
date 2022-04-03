@@ -10,8 +10,11 @@ Rcpp::DataFrame survey_sim(const std::string& design, const Rcpp::StringVector& 
 								const Rcpp::IntegerVector& n_individ, const bool summarise)
 {
 
-  // TODO: other options for other elements of all_dists
+  // TODO: redo this as a string e.g. "ga_ga_nb_be" and template up available options
   const Rcpp::String aliquot_dist = all_dists[2L];
+  
+  // TODO: a pre-processor macro to generate the template set for each design
+  // or alternatively, how much performance is actually lost by having run-time polymorphism on survey type within survey_template???
 
 	Rcpp::DataFrame rv;
 
