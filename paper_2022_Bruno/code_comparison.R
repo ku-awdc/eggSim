@@ -32,6 +32,29 @@ scen <- survey_scenario()
 
 results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=1e3, output="extended")
 
+params1 <- params[[1]]
+params2 <- params[[1]]
+params2$design <- "NS"
+system.time({
+  results2 <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params2, iterations=1e4, output="extended")
+})
+system.time({
+  results1 <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params1, iterations=1e4, output="extended")
+})
+results1 |>
+  group_by(design, parasite, method, n_individ, scenario, mean_epg, reduction) |>
+  summarise(nonmiss = sum(!is.na(efficacy)), proportion = sum(efficacy < cutoff, na.rm=TRUE) / nonmiss, precision = 1/var(efficacy, na.rm=TRUE), miss = 1-(nonmiss/n()), cost = mean(total_cost), .groups="drop") |>
+  mutate(design = str_replace(design, "_", ""), code = "matt") |>
+  mutate(method = factor(method, levels=c("kk", "fecpak", "miniflotac"), labels=c("KK","FP","MF")) |> as.character()) ->
+  matt1
+results2 |>
+  group_by(design, parasite, method, n_individ, scenario, mean_epg, reduction) |>
+  summarise(nonmiss = sum(!is.na(efficacy)), proportion = sum(efficacy < cutoff, na.rm=TRUE) / nonmiss, precision = 1/var(efficacy, na.rm=TRUE), miss = 1-(nonmiss/n()), cost = mean(total_cost), .groups="drop") |>
+  mutate(design = str_replace(design, "_", ""), code = "matt") |>
+  mutate(method = factor(method, levels=c("kk", "fecpak", "miniflotac"), labels=c("KK","FP","MF")) |> as.character()) ->
+  matt2
+plot(matt1$proportion, matt2$proportion); abline(0,1)
+
 results |>
   group_by(design, parasite, method, n_individ, scenario, mean_epg, reduction) |>
   summarise(nonmiss = sum(!is.na(efficacy)), proportion = sum(efficacy < cutoff, na.rm=TRUE) / nonmiss, precision = 1/var(efficacy, na.rm=TRUE), miss = 1-(nonmiss/n()), cost = mean(total_cost), .groups="drop") |>

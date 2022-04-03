@@ -3,7 +3,8 @@
 #include "enums.hpp"
 #include "survey_class.hpp"
 
-template<designs design, methods method, dists dist_individ, dists dist_day, dists dist_aliquot, dists dist_red>
+template<designs design, int nd0, int na0, int nd1, int na1, int nd2, int na2, 
+          methods method, dists dist_individ, dists dist_day, dists dist_aliquot, dists dist_red>
 Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::DataFrame& parameters,
 								                const Rcpp::IntegerVector& n_individ, const bool summarise)
 {
@@ -57,7 +58,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   // TODO: the parent function could check to see if e.g. aliquot_cv is always 0 and specify dist_aliquot as rpois
   
   // Create the survey class once:
-  survey_class<design, method, dist_individ, dist_day, dist_aliquot, dist_red>
+  survey_class<design, nd0, na0, nd1, na1, nd2, na2, method, dist_individ, dist_day, dist_aliquot, dist_red>
     survey(n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post);
   
 	// Memory offset for indexing results for different n_individ:

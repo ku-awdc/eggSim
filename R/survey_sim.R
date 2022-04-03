@@ -132,10 +132,10 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       # TODO: don't expand parameters by iteration unless needed??
 
       stopifnot(!summarise)
-      all_dists <- c(individ="rgamma", day="rgamma", aliquot="rnbinom", reduction="rbeta")
-      if(all(x$aliquot_cv <= 0)) all_dists["aliquot"] <- "rpois"
+      dist_string <- "ga_ga_nb_be"
+      if(all(x$aliquot_cv <= 0)) dist_string <- "ga_ga_po_be"
 
-      y <- Rcpp_survey_sim(des, all_dists, all_ns, as.data.frame(x), n_individ, summarise)
+      y <- Rcpp_survey_sim(des, dist_string, all_ns, as.data.frame(x), n_individ, summarise)
 
       if(output=="extended"){
         rv <- full_join(y, x, by="replicateID")
