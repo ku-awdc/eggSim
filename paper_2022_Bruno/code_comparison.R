@@ -63,6 +63,35 @@ ggplot(both, aes(x=bruno/1e3, y=matt/1e3, group = mean_epg, col=interaction(n_in
   theme(legend.position = "none")
 ggsave("comparison_cost.pdf", width=15, height=15)
 
+bruno$proportion <- bruno$power
+
+pdf("all_proportion.pdf")
+for(pp in unique(matt$parasite)){
+  for(pn in c("matt","bruno")){
+    dt <- get(pn)
+    pt <- ggplot(dt |> filter(parasite==pp), aes(x=n_individ, y=proportion, col=design, group=design)) +
+      geom_line() +
+      #  geom_point() +
+      facet_grid(mean_epg ~ method) +
+      ggtitle(str_c(pp, " - ", pn))
+    print(pt)
+  }
+}
+dev.off()
+
+pdf("all_tradeoff.pdf")
+for(pp in unique(matt$parasite)){
+  for(pn in c("matt","bruno")){
+    dt <- get(pn)
+    pt <- ggplot(dt |> filter(parasite==pp), aes(x=-cost, y=proportion, col=design, group=design)) +
+      geom_line() +
+      #  geom_point() +
+      facet_grid(mean_epg ~ method) +
+      ggtitle(str_c(pp, " - ", pn))
+    print(pt)
+  }
+}
+dev.off()
 
 stop()
 
