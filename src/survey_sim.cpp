@@ -9,12 +9,12 @@
 
 #define EXPAND(DESIGN, VARIANT, D0, A0, D1, A1, D2, A2) ({ \
   if( design == (VARIANT) ){ \
-    if( dist_string == "ga_ga_po_be" ) \
+    if( dist_string == "cs_ga_ga_po_be" ) \
     { \
       rv = survey_template<designs::DESIGN, D0, A0, D1, A1, D2, A2, methods::custom, dists::rgamma, dists::rgamma, dists::rpois, dists::rbeta> \
       (all_ns, parameters, n_individ, summarise); \
     } \
-    else if( dist_string == "ga_ga_nb_be" ) \
+    else if( dist_string == "cs_ga_ga_nb_be" ) \
     { \
       rv = survey_template<designs::DESIGN, D0, A0, D1, A1, D2, A2, methods::custom, dists::rgamma, dists::rgamma, dists::rnbinom, dists::rbeta> \
         (all_ns, parameters, n_individ, summarise); \

@@ -2,7 +2,7 @@
 % Please edit documentation in R/survey_sim.R
 \name{survey_sim}
 \alias{survey_sim}
-\title{Title}
+\title{Simulate one or more survey design}
 \usage{
 survey_sim(
   design = c("NS_11", "SS_11", "SSR_11"),
@@ -17,14 +17,28 @@ survey_sim(
 )
 }
 \arguments{
-\item{family}{currently ignored}
+\item{design}{survey design(s) to use.  Ignored if parameters and scenario are specified.}
 
-\item{parameter_output}{}
+\item{parasite}{parasite(s) to use.  Ignored if parameters and scenario are specified.}
+
+\item{method}{method(s) to use.  Ignored if parameters and scenario are specified.}
+
+\item{n_individ}{number of individuals (can be a vector)}
+
+\item{scenario}{a data frame of scenarios (see \code{\link{survey_scenario}})}
+
+\item{parameters}{a list of parameter sets (see \code{\link{survey_parameters}})}
+
+\item{iterations}{number of iterations per simulation}
+
+\item{pb}{should a progress bar be displayed?}
+
+\item{output}{type of output:  one of summarised, full or extended}
 }
 \description{
-Title
+Simulate one or more survey design
 }
 \examples{
-results <- survey_sim(design = c("NS_1x1", "NS_2x2"))
+results <- survey_sim(design = c("NS_11", "NS_12"))
 
 }

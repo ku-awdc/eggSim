@@ -14,7 +14,11 @@ survey_parameters(
 survey_scenario(parasite = c("ascaris", "trichuris", "hookworm"))
 }
 \arguments{
-\item{n_aliquot_post}{}
+\item{design}{survey design(s) to use - must be one of the standard setups}
+
+\item{parasite}{parasite(s) to use - must be one of the standard options}
+
+\item{method}{method(s) to use - must be one of the standard options}
 }
 \description{
 Parameter sets for survey simulations

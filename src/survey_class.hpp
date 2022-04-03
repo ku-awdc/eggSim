@@ -33,8 +33,6 @@ public:
   {
     if(m_day_screen != 0L) Rcpp::stop("Invalid N_day_screen");
     if(m_aliquot_screen != 0L) Rcpp::stop("Invalid N_aliquot_screen");
-
-    // Rcpp::Rcout << "Using generic NS" << std::endl;
   }
 
   void run(const Rcpp::IntegerVector& N_individ, const double mu_pre,
@@ -79,9 +77,6 @@ public:
     if(aliquot_pre != m_aliquot_pre) Rcpp::stop("Invalid N_aliquot_pre");
     if(day_post != m_day_post) Rcpp::stop("Invalid N_day_post");
     if(aliquot_post != m_aliquot_post) Rcpp::stop("Invalid N_aliquot_post");
-
-    // Rcpp::Rcout << "Using specialised NS: " << m_day_screen << m_aliquot_screen << m_day_pre << m_aliquot_pre << m_day_post << m_aliquot_post << std::endl;
-
   }
 
   void run(const Rcpp::IntegerVector& N_individ, const double mu_pre,
@@ -92,8 +87,7 @@ public:
 			 double* efficacy, double* n_screen, double* n_pre, double* n_post,
 			 double* time_count, ptrdiff_t offset) const
   {
-    survey_ns<method, dist_individ, dist_day, dist_aliquot, dist_red>(
-      m_day_pre, m_aliquot_pre, m_day_post, m_aliquot_post,
+    survey_ns_tt<nd1, na1, nd2, na2, method, dist_individ, dist_day, dist_aliquot, dist_red>(
       N_individ, mu_pre, reduction,
       individ_cv, day_cv, aliquot_cv, reduction_cv,
       count_intercept, count_coefficient, count_add, count_mult,
@@ -179,8 +173,7 @@ public:
 			 double* efficacy, double* n_screen, double* n_pre, double* n_post,
 			 double* time_count, ptrdiff_t offset) const
   {
-    survey_ss<method, dist_individ, dist_day, dist_aliquot, dist_red>(
-      m_day_pre, m_aliquot_pre, m_day_post, m_aliquot_post,
+    survey_ss_tt<nd1, na1, nd2, na2, method, dist_individ, dist_day, dist_aliquot, dist_red>(
       N_individ, mu_pre, reduction,
       individ_cv, day_cv, aliquot_cv, reduction_cv,
       count_intercept, count_coefficient, count_add, count_mult,
@@ -265,9 +258,7 @@ public:
 			 double* efficacy, double* n_screen, double* n_pre, double* n_post,
 			 double* time_count, ptrdiff_t offset) const
   {
-    survey_ssr<method, dist_individ, dist_day, dist_aliquot, dist_red>(
-      m_day_screen, m_aliquot_screen,
-      m_day_pre, m_aliquot_pre, m_day_post, m_aliquot_post,
+    survey_ssr_tt<nd0, na0, nd1, na1, nd2, na2, method, dist_individ, dist_day, dist_aliquot, dist_red>(
       N_individ, mu_pre, reduction,
       individ_cv, day_cv, aliquot_cv, reduction_cv,
       count_intercept, count_coefficient, count_add, count_mult,
@@ -275,4 +266,3 @@ public:
   }
 
 };
-

@@ -25,12 +25,22 @@ n_individ_us <- unique(bruno$n_individ)
 #n_individ_us <- c(100,200,500,1000)
 #n_individ_us <- 100
 
-# TODO: how are NA efficacy handled (where pre-tx == 0)
-
 params <- survey_parameters()
 scen <- survey_scenario()
 
 results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=1e3, output="extended")
+
+
+# TODO: how are NA efficacy handled (where pre-tx == 0)
+
+if(FALSE){
+params <- survey_parameters("NS_11", parasite="ascaris", method="kk")
+params$design <- "NS"
+scen <- survey_scenario()
+
+system.time({
+results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=1e4, output="extended")
+})
 
 params1 <- params[[1]]
 params2 <- params[[1]]
@@ -54,6 +64,8 @@ results2 |>
   mutate(method = factor(method, levels=c("kk", "fecpak", "miniflotac"), labels=c("KK","FP","MF")) |> as.character()) ->
   matt2
 plot(matt1$proportion, matt2$proportion); abline(0,1)
+}
+
 
 results |>
   group_by(design, parasite, method, n_individ, scenario, mean_epg, reduction) |>

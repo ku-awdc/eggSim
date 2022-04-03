@@ -1,13 +1,9 @@
 #' @name survey_parameters
 #' @title Parameter sets for survey simulations
 #'
-#' @param n_label
-#' @param n_day_screen
-#' @param n_aliquot_screen
-#' @param n_day_pre
-#' @param n_aliquot_pre
-#' @param n_day_post
-#' @param n_aliquot_post
+#' @param design survey design(s) to use - must be one of the standard setups
+#' @param parasite parasite(s) to use - must be one of the standard options
+#' @param method method(s) to use - must be one of the standard options
 #'
 #' @rdname survey_parameters
 #' @export

@@ -1,22 +1,14 @@
-#' Title
+#' Simulate one or more survey design
 #'
-#' @param design
-#' @param iterations
-#' @param n_individ
-#' @param mu_pre
-#' @param reduction
-#' @param n_samples
-#' @param weight
-#' @param performance
-#' @param cost_sample
-#' @param cost_aliquot
-#' @param individ_cv
-#' @param day_cv
-#' @param aliquot_cv
-#' @param reduction_cv
-#' @param family currently ignored
-#' @param pb
-#' @param parameter_output
+#' @param design survey design(s) to use.  Ignored if parameters and scenario are specified.
+#' @param parasite parasite(s) to use.  Ignored if parameters and scenario are specified.
+#' @param method method(s) to use.  Ignored if parameters and scenario are specified.
+#' @param n_individ number of individuals (can be a vector)
+#' @param scenario a data frame of scenarios (see \code{\link{survey_scenario}})
+#' @param parameters a list of parameter sets (see \code{\link{survey_parameters}})
+#' @param iterations number of iterations per simulation
+#' @param pb should a progress bar be displayed?
+#' @param output type of output:  one of summarised, full or extended
 #'
 #' @importFrom pbapply pbsapply
 #' @importFrom tidyr expand_grid everything
@@ -24,7 +16,7 @@
 #' @importFrom rlang .data
 #'
 #' @examples
-#' results <- survey_sim(design = c("NS_1x1", "NS_2x2"))
+#' results <- survey_sim()
 #'
 #' @export
 survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
@@ -38,7 +30,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
   # TODO: pmatching for string arguments
   stopifnot(length(output)==1L, output %in% c("summarised","full","extended"))
   # Disable summarised output option for now:
-  stopifnot(output!="summarised")
+  if(output=="summarised") stop("The summarised option is not yet implemented")
   summarise <- output == "summarised"
 
   design <- check_design(design)
@@ -132,18 +124,21 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       # TODO: don't expand parameters by iteration unless needed??
 
       stopifnot(!summarise)
-      dist_string <- "ga_ga_nb_be"
-      if(all(x$aliquot_cv <= 0)) dist_string <- "ga_ga_po_be"
+      dist_string <- "cs_ga_ga_nb_be"
+      if(all(x$aliquot_cv <= 0)) dist_string <- "cs_ga_ga_po_be"
 
       y <- Rcpp_survey_sim(des, dist_string, all_ns, as.data.frame(x), n_individ, summarise)
 
       if(output=="extended"){
-        rv <- full_join(y, x, by="replicateID")
+        rv <- full_join(y, x, by="replicateID") |>
+          select(-repliacteID) |>
+          select(design, parasite, method, scenario, mean_epg, reduction, parameter_set, iteration, n_individ, efficacy, total_cost, everything())
         stopifnot(nrow(rv)==nrow(y))
       }else if(output=="full"){
         rv <- full_join(y,
                         x |> select(design, parasite, method, parameter_set, iteration, scenario, mean_epg, reduction, replicateID),
-                        by="replicateID")
+                        by="replicateID") |>
+          select(design, parasite, method, scenario, mean_epg, reduction, parameter_set, iteration, n_individ, efficacy, total_cost)
         stopifnot(nrow(rv)==nrow(y))
       }else{
         stop("Unimplemented output argument", call.=FALSE)
