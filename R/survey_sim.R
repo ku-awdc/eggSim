@@ -131,7 +131,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
 
       if(output=="extended"){
         rv <- full_join(y, x, by="replicateID") |>
-          select(-repliacteID) |>
+          select(-replicateID) |>
           select(design, parasite, method, scenario, mean_epg, reduction, parameter_set, iteration, n_individ, efficacy, total_cost, everything())
         stopifnot(nrow(rv)==nrow(y))
       }else if(output=="full"){
