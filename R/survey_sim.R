@@ -81,13 +81,33 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       # Do whatever cost calculations can be done before expanding:
       x |>
         mutate(
-          time_consumables_screen = n_day_screen * (time_demography + time_prep_screen + time_record*n_aliquot_screen),
-          time_consumables_pre = n_day_pre * (time_demography + time_prep_pre + time_record*n_aliquot_pre),
-          time_consumables_post = n_day_post * (time_demography + time_prep_post + time_record*n_aliquot_post),
+          # Note: these costs/times are per aliquot!
+          time_consumables_screen = case_when(
+            n_aliquot_screen == 0L ~ 0.0,
+            TRUE ~ (time_demography + time_prep_screen + time_record*n_aliquot_screen) / n_aliquot_screen
+          ),
+          time_consumables_pre = case_when(
+            n_aliquot_pre == 0L ~ 0.0,
+            TRUE ~ (time_demography + time_prep_pre + time_record*n_aliquot_pre) / n_aliquot_pre
+          ),
+          time_consumables_post = case_when(
+            n_aliquot_post == 0L ~ 0.0,
+            TRUE ~ (time_demography + time_prep_post + time_record*n_aliquot_post) / n_aliquot_post
+          ),
 
-          cost_consumables_screen = n_day_screen * (cost_sample + cost_aliquot_screen),
-          cost_consumables_pre = n_day_pre * (cost_sample + cost_aliquot_pre),
-          cost_consumables_post = n_day_post * (cost_sample + cost_aliquot_post)
+          cost_consumables_screen = case_when(
+            n_aliquot_screen == 0L ~ 0.0,
+            TRUE ~ (cost_sample + cost_aliquot_screen) / n_aliquot_screen
+          ),
+          cost_consumables_pre = case_when(
+            n_aliquot_pre == 0L ~ 0.0,
+            TRUE ~ (cost_sample + cost_aliquot_pre) / n_aliquot_pre
+          ),
+          cost_consumables_post = case_when(
+            n_aliquot_post == 0L ~ 0.0,
+            TRUE ~ (cost_sample + cost_aliquot_post) / n_aliquot_post
+          )
+
         ) |>
         # This supercedes the following variables:
         # time_demography, time_prep_*, time_record, cost_sample, cost_aliquot_*

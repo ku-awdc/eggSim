@@ -21,8 +21,8 @@ list(
   bruno
 
 library("eggSim")
-#n_individ_us <- unique(bruno$n_individ)
-n_individ_us <- c(100,200,500,1000)
+n_individ_us <- unique(bruno$n_individ)
+#n_individ_us <- c(100,200,500,1000)
 #n_individ_us <- 100
 
 params <- survey_parameters()
@@ -73,14 +73,16 @@ both |> filter(parasite=="trichuris", method=="FP", design%in%c("NS11","NS12"), 
 pars <- survey_parameters(c("NS_12"), "trichuris","fecpak")
 scen <- survey_scenario("trichuris")[3,]
 nind <- 1000
-matt <- survey_sim(n_individ=nind, scenario=scen, parameters=pars, output="full")
+matt <- survey_sim(n_individ=nind, scenario=scen, parameters=pars, output="extended")
 
 # Cost of consumables:
 conscost <- nind*(pars$cost_sample + pars$cost_aliquot_pre) +
   nind*(pars$cost_sample + pars$cost_aliquot_post)
 
 tcount <- matt |> summarise(time = mean(time_count)) |> pull(time)
-ttotal <- nind*2*(pars$time_demography + pars$time_prep_pre + pars$time_record) + tcount
+tcount
+ttotal <- nind*(pars$time_demography + pars$time_prep_pre + pars$time_record) +
+  nind*(pars$time_demography + pars$time_prep_post + pars$time_record*pars$n_aliquot_post) + tcount
 ndays <- ttotal / (3*4*60*60)
 
 # Cost of salary = transport
@@ -90,8 +92,11 @@ conscost + 2*salcost
 matt |> summarise(mean(total_cost))
 
 matt |> summarise(mean(consumables_cost))
+conscost
 matt |> summarise(mean(salary_cost))
+salcost
 matt |> summarise(mean(travel_cost))
+salcost
 
 # Compare timings for specialisation:
 library("eggSim")
