@@ -101,6 +101,16 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
         parasite == "trichuris" ~ 1.0,
         parasite == "hookworm" ~ 1.0
       ),
+#      count_intercept = case_when(
+#        method == "kk" ~ 2.38961691, #2.38,
+#        method == "miniflotac" ~ 2.51542336, #2.52,
+#        method == "fecpak" ~ 1.8348640, #1.84
+#      ),
+#      count_coefficient = case_when(
+#        method == "kk" ~ 0.06612497, #0.066,
+#        method == "miniflotac" ~ 0.06609474, #0.066,
+#        method == "fecpak" ~ 0.1730919, #0.172
+#      ),
       count_intercept = case_when(
         method == "kk" ~ 2.38,
         method == "miniflotac" ~ 2.52,

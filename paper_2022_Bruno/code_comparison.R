@@ -163,13 +163,21 @@ dev.off()
 
 pdf("all_n_v_cost.pdf")
 for(pp in unique(matt$parasite)){
+  mc <- 0
   for(pn in c("matt","bruno")){
     dt <- get(pn)
+    mc <- max(mc, max(dt$cost))
+  }
+
+  for(pn in c("matt","bruno")){
+    dt <- get(pn) |> filter(design!="SS12")
+
     pt <- ggplot(dt |> filter(parasite==pp), aes(x=n_individ, y=cost, col=design, group=design)) +
       geom_line() +
       #  geom_point() +
       facet_grid(mean_epg ~ method) +
-      ggtitle(str_c(pp, " - ", pn))
+      ggtitle(str_c(pp, " - ", pn)) +
+      ylim(0, mc)
     print(pt)
   }
 }
