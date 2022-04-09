@@ -43,6 +43,14 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
         variant %in% c("11") ~ 1L,
         variant %in% c("12") ~ 2L
       ),
+      min_positive_screen = case_when(
+        design %in% c("NS","SS") ~ 0L,
+        design %in% c("SSR") ~ 50L
+      ),
+      min_positive_pre = case_when(
+        design %in% c("NS","SS") ~ 50L,
+        design %in% c("SSR") ~ 1L
+      ),
       individ_cv = case_when(
         parasite == "ascaris" ~ 3.0,
         parasite == "trichuris" ~ 1.1,

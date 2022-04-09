@@ -10,7 +10,7 @@
 
 template<methods method, dists dist_individ, dists dist_day, dists dist_aliquot, dists dist_red>
 void survey_ss(const int N_day_pre, const int N_aliquot_pre,
-                 const int N_day_post, const int N_aliquot_post, 
+                 const int N_day_post, const int N_aliquot_post,
 				 const Rcpp::IntegerVector& N_individ, const double mu_pre,
                  const double reduction, const double individ_cv, const double day_cv,
                  const double aliquot_cv, const double reduction_cv,
@@ -24,7 +24,7 @@ void survey_ss(const int N_day_pre, const int N_aliquot_pre,
 
 }
 
-template<int nd1, int na1, int nd2, int na2, 
+template<int nd1, int na1, int nd2, int na2,
         methods method, dists dist_individ, dists dist_day, dists dist_aliquot, dists dist_red>
 void survey_ss_tt(const Rcpp::IntegerVector& N_individ, const double mu_pre,
                  const double reduction, const double individ_cv, const double day_cv,

@@ -25,10 +25,16 @@ n_individ_us <- unique(bruno$n_individ)
 #n_individ_us <- c(100,200,500,1000)
 #n_individ_us <- 100
 
-params <- survey_parameters()
+params <- survey_parameters(design=c("NS_11","NS_12"))
+params <- lapply(params, function(x){
+  x$design <- "NS"
+  x
+})
 scen <- survey_scenario()
 
-results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=1e3, output="extended")
+system.time({
+  results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=1e3, output="extended")
+})
 
 
 # TODO: how are NA efficacy handled (where pre-tx == 0)

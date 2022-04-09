@@ -59,7 +59,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
 
       # Remove the design and ns from the parameters:
       x |>
-        count(design, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post) |>
+        count(design, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, min_positive_screen, min_positive_pre) |>
         select(-n) ->
         all_ns
 
@@ -67,7 +67,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       stopifnot(nrow(all_ns)==1L)
       des <- all_ns$design
       all_ns |> select(-design) |> unlist() -> all_ns
-      stopifnot(length(all_ns)==6L, all(all_ns>=0L), all(all_ns%%1L == 0L))
+      stopifnot(length(all_ns)==8L, all(all_ns>=0L), all(all_ns%%1L == 0L))
       # TODO: nicer error messages
 
       # Do whatever cost calculations can be done before expanding:
