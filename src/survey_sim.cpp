@@ -38,14 +38,12 @@ Rcpp::DataFrame survey_sim(const std::string& design, const std::string& dist_st
   EXPAND(NS, "NS", false, -1L, -1L, -1L, -1L, -1L, -1L);
   EXPAND(NS, "NS_11", true, 0L, 0L, 1L, 1L, 1L, 1L);
   EXPAND(NS, "NS_12", true, 0L, 0L, 1L, 1L, 1L, 2L);
-  /*
-  EXPAND(SS, "SS", -1L, -1L, -1L, -1L, -1L, -1L);
-  EXPAND(SS, "SS_11", 0L, 0L, 1L, 1L, 1L, 1L);
-  EXPAND(SS, "SS_12", 0L, 0L, 1L, 1L, 1L, 2L);
-  EXPAND(SSR, "SSR", -1L, -1L, -1L, -1L, -1L, -1L);
-  EXPAND(SSR, "SSR_11", 1L, 1L, 1L, 1L, 1L, 1L);
-  EXPAND(SSR, "SSR_12", 1L, 1L, 1L, 1L, 1L, 2L);
-  */
+  EXPAND(SS, "SS", false, -1L, -1L, -1L, -1L, -1L, -1L);
+  EXPAND(SS, "SS_11", true, 0L, 0L, 1L, 1L, 1L, 1L);
+  EXPAND(SS, "SS_12", true, 0L, 0L, 1L, 1L, 1L, 2L);
+  EXPAND(SSR, "SSR", false, -1L, -1L, -1L, -1L, -1L, -1L);
+  EXPAND(SSR, "SSR_11", true, 1L, 1L, 1L, 1L, 1L, 1L);
+  EXPAND(SSR, "SSR_12", true, 1L, 1L, 1L, 1L, 1L, 2L);
 
   if(!handled)
   {

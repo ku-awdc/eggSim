@@ -85,9 +85,10 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
     // Save output:
     if((ind+1L) == N_individ[outn])
     {
-      Rcpp::stop("Handle result:  0=success, 1=failed min_pos_pre, 2=failed min_pos_screen, 3=unexpected error");
       if(npos < min_pos_pre)
       {
+        *(result+outoffset) = 1L;  // Failure due to insufficient pre-treatment positive
+        
         *(efficacy+outoffset) = NA_REAL;
 
         *(n_screen+outoffset) = 0.0;
@@ -101,19 +102,28 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
         // If zero eggs observed (safe float comparison: fewer than 0.5 eggs in total):
         if(pre_n == 0L || pre_mean < (0.5/(static_cast<double>((ind+1L)*N_day_pre*N_aliquot_pre))))
         {
+          *(result+outoffset) = 3L;  // Failure due to zero-mean pre-treatment
           *(efficacy+outoffset) = NA_REAL;
+          
+          *(n_screen+outoffset) = 0.0;
+          *(n_pre+outoffset) = static_cast<double>(pre_n);
+          *(n_post+outoffset) = 0.0;
+
+          *(time_count+outoffset) = counter_pre.get_total();          
         }
         else
         {
+          *(result+outoffset) = 0L;  // Success!
           *(efficacy+outoffset) = 1.0 - post_mean/pre_mean;
+
+          *(n_screen+outoffset) = 0.0;
+          *(n_pre+outoffset) = static_cast<double>(pre_n);
+          *(n_post+outoffset) = static_cast<double>(post_n);
+
+          *(time_count+outoffset) = counter_pre.get_total() + counter_post.get_total();
         }
-
-        *(n_screen+outoffset) = 0.0;
-        *(n_pre+outoffset) = static_cast<double>(pre_n);
-        *(n_post+outoffset) = static_cast<double>(post_n);
-
-        *(time_count+outoffset) = counter_pre.get_total() + counter_post.get_total();
       }
+      
       outn++;
       outoffset += offset;
     }

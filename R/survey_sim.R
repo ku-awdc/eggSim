@@ -127,18 +127,19 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       dist_string <- "cs_ga_ga_nb_be"
       if(all(x$aliquot_cv <= 0)) dist_string <- "cs_ga_ga_po_be"
 
-      y <- Rcpp_survey_sim(des, dist_string, all_ns, as.data.frame(x), n_individ, summarise)
+      y <- Rcpp_survey_sim(des, dist_string, all_ns, as.data.frame(x), n_individ, summarise) |>
+        mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre")))
 
       if(output=="extended"){
         rv <- full_join(y, x, by="replicateID") |>
           select(-replicateID) |>
-          select(design, parasite, method, scenario, mean_epg, reduction, parameter_set, iteration, n_individ, efficacy, total_cost, everything())
+          select(design, parasite, method, scenario, mean_epg, reduction, parameter_set, iteration, n_individ, result, efficacy, total_cost, everything())
         stopifnot(nrow(rv)==nrow(y))
       }else if(output=="full"){
         rv <- full_join(y,
                         x |> select(design, parasite, method, parameter_set, iteration, scenario, mean_epg, reduction, replicateID),
                         by="replicateID") |>
-          select(design, parasite, method, scenario, mean_epg, reduction, parameter_set, iteration, n_individ, efficacy, total_cost)
+          select(design, parasite, method, scenario, mean_epg, reduction, parameter_set, iteration, n_individ, result, efficacy, total_cost)
         stopifnot(nrow(rv)==nrow(y))
       }else{
         stop("Unimplemented output argument", call.=FALSE)

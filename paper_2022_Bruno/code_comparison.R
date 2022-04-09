@@ -25,19 +25,15 @@ n_individ_us <- unique(bruno$n_individ)
 #n_individ_us <- c(100,200,500,1000)
 #n_individ_us <- 100
 
-params <- survey_parameters(design=c("NS_11","NS_12"))
-params <- lapply(params, function(x){
-  x$design <- "NS"
-  x
-})
+params <- survey_parameters()
 scen <- survey_scenario()
 
 system.time({
   results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=1e3, output="extended")
 })
 
+results %>% count(design,result)
 
-# TODO: how are NA efficacy handled (where pre-tx == 0)
 
 if(FALSE){
 params <- survey_parameters("NS_11", parasite="ascaris", method="kk")
@@ -75,7 +71,7 @@ plot(matt1$proportion, matt2$proportion); abline(0,1)
 
 results |>
   group_by(design, parasite, method, n_individ, scenario, mean_epg, reduction) |>
-  summarise(nonmiss = sum(!is.na(efficacy)), proportion = sum(efficacy < cutoff, na.rm=TRUE) / nonmiss, precision = 1/var(efficacy, na.rm=TRUE), miss = 1-(nonmiss/n()), cost = mean(total_cost), .groups="drop") |>
+  summarise(nonmiss = sum(!is.na(efficacy)), proportion = sum(efficacy < cutoff, na.rm=TRUE) / n(), precision = 1/var(efficacy, na.rm=TRUE), miss = 1-(nonmiss/n()), cost = mean(total_cost), .groups="drop") |>
   mutate(design = str_replace(design, "_", ""), code = "matt") |>
   mutate(method = factor(method, levels=c("kk", "fecpak", "miniflotac"), labels=c("KK","FP","MF")) |> as.character()) ->
   matt
@@ -189,9 +185,27 @@ for(pp in unique(matt$parasite)){
 }
 dev.off()
 
+pdf("all_tradeoff.pdf")
+for(pp in unique(matt$parasite)){
+  #  for(pn in c("matt","bruno")){
+  {
+    pn <- "matt"
+    dt <- get(pn)
+    pt <- ggplot(dt |> filter(parasite==pp), aes(x=-cost, y=proportion, col=design, group=design)) +
+      geom_line() +
+      #  geom_point() +
+      facet_grid(mean_epg ~ method) +
+      ggtitle(str_c(pp, " - ", pn))
+    print(pt)
+  }
+}
+dev.off()
+
 pdf("all_missingness.pdf")
 for(pp in unique(matt$parasite)){
-  for(pn in c("matt","bruno")){
+#  for(pn in c("matt","bruno")){
+  {
+  pn <- "matt"
     dt <- get(pn)
     pt <- ggplot(dt |> filter(parasite==pp), aes(x=n_individ, y=miss, col=design, group=design)) +
       geom_line() +
