@@ -3,7 +3,7 @@
 library("tidyverse")
 library("eggSim")
 
-n_individ_us <- seq(100,1000,by=10)
+n_individ_us <- seq(100,1000,by=5)
 params <- survey_parameters()
 scen <- survey_scenario()
 
