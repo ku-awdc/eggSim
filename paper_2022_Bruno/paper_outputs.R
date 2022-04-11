@@ -4,15 +4,16 @@ library("tidyverse")
 library("eggSim")
 
 n_individ_us <- seq(100,1000,by=5)
+n_individ_us <- c(100,200,500)
 params <- survey_parameters()
 scen <- survey_scenario()
 
 iters <- 1e4
-#iters <- 1e3
+iters <- 1e3
 
 cl <- parallel::makePSOCKcluster(5)
 system.time({
-  results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=iters, cl=cl, output="summarised")
+  results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=iters, cl=cl, output="extended")
 })
 parallel::stopCluster(cl)
 

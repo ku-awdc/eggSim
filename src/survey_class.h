@@ -62,9 +62,9 @@ public:
            const double aliquot_cv, const double reduction_cv,
            const double count_intercept, const double count_coefficient,
            const double count_add, const double count_mult,
-           int* result, double* efficacy, double* n_screen,
-           double* n_pre, double* n_post,
-           double* time_count, ptrdiff_t offset) const
+           int* result, double* n_screen, double* n_pre, double* n_post,
+  				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
+  				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset) const
   {
     survey_ns<t_fixed_n, nd1, na1, nd2, na2, method, dist_individ, dist_day, dist_aliquot, dist_red>(
       m_day_pre, m_aliquot_pre, m_day_post, m_aliquot_post,
@@ -72,7 +72,9 @@ public:
       N_individ, mu_pre, reduction,
       individ_cv, day_cv, aliquot_cv, reduction_cv,
       count_intercept, count_coefficient, count_add, count_mult,
-			result, efficacy, n_screen, n_pre, n_post, time_count, offset);
+			result, n_screen, n_pre, n_post, 
+      mean_pre, mean_post, imean_pre, imean_post, 
+      time_screen, time_pre, time_post, offset);
   }
 
 };
@@ -130,9 +132,9 @@ public:
            const double aliquot_cv, const double reduction_cv,
            const double count_intercept, const double count_coefficient,
            const double count_add, const double count_mult,
-           int* result, double* efficacy, double* n_screen,
-           double* n_pre, double* n_post,
-           double* time_count, ptrdiff_t offset) const
+           int* result, double* n_screen, double* n_pre, double* n_post,
+  				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
+  				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset) const
   {
     survey_ss<t_fixed_n, nd1, na1, nd2, na2, method, dist_individ, dist_day, dist_aliquot, dist_red>(
       m_day_pre, m_aliquot_pre, m_day_post, m_aliquot_post,
@@ -140,7 +142,9 @@ public:
       N_individ, mu_pre, reduction,
       individ_cv, day_cv, aliquot_cv, reduction_cv,
       count_intercept, count_coefficient, count_add, count_mult,
-			result, efficacy, n_screen, n_pre, n_post, time_count, offset);
+			result, n_screen, n_pre, n_post, 
+      mean_pre, mean_post, imean_pre, imean_post, 
+      time_screen, time_pre, time_post, offset);
   }
 
 };
@@ -200,9 +204,9 @@ public:
            const double aliquot_cv, const double reduction_cv,
            const double count_intercept, const double count_coefficient,
            const double count_add, const double count_mult,
-           int* result, double* efficacy, double* n_screen,
-           double* n_pre, double* n_post,
-           double* time_count, ptrdiff_t offset) const
+           int* result, double* n_screen, double* n_pre, double* n_post,
+  				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
+  				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset) const
   {
     survey_ssr<t_fixed_n, nd0, na0, nd1, na1, nd2, na2, method, dist_individ, dist_day, dist_aliquot, dist_red>(
       m_day_screen, m_aliquot_screen, m_day_pre, m_aliquot_pre, m_day_post, m_aliquot_post,
@@ -210,7 +214,9 @@ public:
       N_individ, mu_pre, reduction,
       individ_cv, day_cv, aliquot_cv, reduction_cv,
       count_intercept, count_coefficient, count_add, count_mult,
-			result, efficacy, n_screen, n_pre, n_post, time_count, offset);
+			result, n_screen, n_pre, n_post, 
+      mean_pre, mean_post, imean_pre, imean_post, 
+      time_screen, time_pre, time_post, offset);
   }
 
 };

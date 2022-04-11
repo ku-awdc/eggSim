@@ -1,4 +1,5 @@
 #include <Rcpp.h>
+#include <math.h>
 
 #include "enums.h"
 #include "survey_class.h"
@@ -46,18 +47,23 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 
 	// Create the output vectors:
 	Rcpp::IntegerVector result(np*ni);
-	Rcpp::NumericVector efficacy(np*ni);
 	Rcpp::NumericVector n_screen(np*ni);
 	Rcpp::NumericVector n_pre(np*ni);
 	Rcpp::NumericVector n_post(np*ni);
-	Rcpp::NumericVector time_count(np*ni);
+	Rcpp::NumericVector efficacy(np*ni);
+	Rcpp::NumericVector mean_pre(np*ni);
+	Rcpp::NumericVector mean_post(np*ni);
+	Rcpp::NumericVector imean_pre(np*ni);
+	Rcpp::NumericVector imean_post(np*ni);
+	Rcpp::NumericVector time_screen(np*ni);
+	Rcpp::NumericVector time_pre(np*ni);
+	Rcpp::NumericVector time_post(np*ni);
 
 	Rcpp::NumericVector consumables_cost(np*ni);
 	Rcpp::NumericVector salary_cost(np*ni);
 	Rcpp::NumericVector travel_cost(np*ni);
 	Rcpp::NumericVector total_cost(np*ni);
 
-  // TODO: method can be either specified (in which case count_int/coef/add/mult must be constant and as expected) or custom
   // TODO: the parent function could check to see if e.g. aliquot_cv is always 0 and specify dist_aliquot as rpois
 
   // Create the survey class once:
@@ -67,13 +73,16 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 	// Memory offset for indexing results for different n_individ:
 	ptrdiff_t offset = 1L;
 
+  // TODO: template on summarise or not and do the loop below differently:
+
 	int ind = 0L;
 	for(int p=0L; p<np; ++p)
 	{
-    // TODO: min_pos_screen/pre should be fixed per design like nd0 etc and passed as additional arguments to constructor above
     survey.run(n_individ, mu_pre[p], reduction[p], individ_cv[p], day_cv[p], aliquot_cv[p], reduction_cv[p],
           count_intercept[p], count_coefficient[p], count_add[p], count_mult[p],
-          &result[ind], &efficacy[ind], &n_screen[ind], &n_pre[ind], &n_post[ind], &time_count[ind], offset);
+          &result[ind], &n_screen[ind], &n_pre[ind], &n_post[ind], 
+          &mean_pre[ind], &mean_post[ind], &imean_pre[ind], &imean_post[ind], 
+          &time_screen[ind], &time_pre[ind], &time_post[ind], offset);
 
 		// Do cost calculations:
 		for(int i=0; i<ni; ++i)
@@ -82,15 +91,13 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 										n_pre[ind] * cost_consumables_pre[p] +
 										n_post[ind] * cost_consumables_post[p];
 
-      // TODO: time for counting screen, pre, and post need to be separate
-      // TODO: ceiling() for each of totaltime screen, totaltime pre, totaltime post
-      // TODO: return mean of individual means of those selected
-			const double totaltime = n_screen[ind] * time_consumables_screen[p] +
-										n_pre[ind] * time_consumables_pre[p] +
-										n_post[ind] * time_consumables_post[p] +
-										time_count[ind];
-
-			const double ndays = totaltime / (n_technicians[p] * 4.0 * 60.0 * 60.0);
+			const double days_screen = (n_screen[ind] * time_consumables_screen[p] + time_screen[ind]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
+			const double days_pre = (n_pre[ind] * time_consumables_pre[p] +time_pre[ind]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
+			const double days_post = (n_post[ind] * time_consumables_post[p] + time_post[ind]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
+      
+      const double ndays =  (n_screen[ind]<0.5 ? 0.0 : ceil(days_screen)) + 
+                            (n_pre[ind]<0.5 ? 0.0 : ceil(days_pre)) + 
+                            (n_post[ind]<0.5 ? 0.0 : ceil(days_post));
 			const double sal_cost = ndays * n_team[p] * cost_salary[p];
 
 			const int tra_cost = ndays * cost_travel[p];
@@ -99,6 +106,8 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 			salary_cost[ind] = sal_cost;
 			travel_cost[ind] = tra_cost;
 			total_cost[ind] = cons_cost + sal_cost + tra_cost;
+      
+      efficacy[ind] = 1.0 - mean_post[ind] / mean_pre[ind];
 
 			ind++;
 		}
@@ -113,8 +122,11 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 	Rcpp::IntegerVector repID = repmean[1L];
 
 	Rcpp::DataFrame df = Rcpp::DataFrame::create( 	Rcpp::_["replicateID"] = repID, Rcpp::_["n_individ"] = nind,
-													Rcpp::_["result"] = result, Rcpp::_["efficacy"] = efficacy, Rcpp::_["n_screen"] = n_screen, 
-                          Rcpp::_["n_pre"] = n_pre,	Rcpp::_["n_post"] = n_post, Rcpp::_["time_count"] = time_count,
+													Rcpp::_["result"] = result, Rcpp::_["efficacy"] = efficacy,
+													Rcpp::_["pre_mean"] = mean_pre, Rcpp::_["post_mean"] = mean_post,
+													Rcpp::_["pre_imean"] = imean_pre, Rcpp::_["post_imean"] = imean_post,
+                          Rcpp::_["n_screen"] = n_screen, 
+                          Rcpp::_["n_pre"] = n_pre,	Rcpp::_["n_post"] = n_post, 
 													Rcpp::_["consumables_cost"] = consumables_cost, Rcpp::_["salary_cost"] = salary_cost,
 													Rcpp::_["travel_cost"] = travel_cost, Rcpp::_["total_cost"] = total_cost);
 	return df;

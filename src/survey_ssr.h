@@ -19,8 +19,9 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
                  const double aliquot_cv, const double reduction_cv,
 				 const double count_intercept, const double count_coefficient,
 				 const double count_add, const double count_mult,
-				 int* result, double* efficacy, double* n_screen, double* n_pre, double* n_post,
-				 double* time_count, ptrdiff_t offset)
+				 int* result, double* n_screen, double* n_pre, double* n_post,
+				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
+				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset)
 {
 
   const int N_day_screen = t_fixed_n ? nd0 : N_day_screen_;
@@ -32,6 +33,8 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
   
   double pre_mean = 0.0;
   double post_mean = 0.0;
+  double pre_imean = 0.0;
+  double post_imean = 0.0;
   int screen_n=0L;
   int pre_n=0L;
   int post_n=0L;
@@ -67,9 +70,11 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
         screen_n++;
       }
     }
-    npos_screen += static_cast<int>(included);
   
     if(included){
+      npos_screen++;
+      pre_imean -= (pre_imean - mu_ind) / static_cast<double>(npos_screen);
+      
       bool ispos = false;
       for(int day=0L; day<N_day_pre; ++day)
       {
@@ -90,6 +95,7 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
       npos_pre += static_cast<int>(ispos);
 
       mu_ind *= rred.draw();
+      post_imean -= (post_imean - mu_ind) / static_cast<double>(npos_screen);
       for(int day=0L; day<N_day_post; ++day)
       {
         const double mu_day = rday.draw(mu_ind);
@@ -113,51 +119,71 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
       {
         *(result+outoffset) = 2L;  // Failure due to insufficient screening positive
         
-        *(efficacy+outoffset) = NA_REAL;
-
         *(n_screen+outoffset) = static_cast<double>(screen_n);
         *(n_pre+outoffset) = 0.0;
         *(n_post+outoffset) = 0.0;
 
-        *(time_count+outoffset) = counter_screen.get_total();
+        *(mean_pre+outoffset) = NA_REAL;
+        *(mean_post+outoffset) = NA_REAL;
+        *(imean_pre+outoffset) = npos_screen == 0L ? NA_REAL : pre_imean;
+        *(imean_post+outoffset) = npos_screen == 0L ? NA_REAL : post_imean;
+
+        *(time_screen+outoffset) = counter_screen.get_total();
+        *(time_pre+outoffset) = 0.0;
+        *(time_post+outoffset) = 0.0;
       }
       else if(npos_pre < min_pos_pre)
       {
         *(result+outoffset) = 1L;  // Failure due to insufficient pre-treatment positive
         
-        *(efficacy+outoffset) = NA_REAL;
-
         *(n_screen+outoffset) = static_cast<double>(screen_n);
         *(n_pre+outoffset) = static_cast<double>(pre_n);
         *(n_post+outoffset) = 0.0;
 
-        *(time_count+outoffset) = counter_screen.get_total() + counter_pre.get_total();
+        *(mean_pre+outoffset) = NA_REAL;
+        *(mean_post+outoffset) = NA_REAL;
+        *(imean_pre+outoffset) = npos_screen == 0L ? NA_REAL : pre_imean;
+        *(imean_post+outoffset) = npos_screen == 0L ? NA_REAL : post_imean;
+        
+        *(time_screen+outoffset) = counter_screen.get_total();
+        *(time_pre+outoffset) = counter_pre.get_total();
+        *(time_post+outoffset) = 0.0;
+        
+      }
+      // If zero eggs observed (safe float comparison: fewer than 0.5 eggs in total):
+      else if(pre_n == 0L || pre_mean < (0.5/(static_cast<double>((ind+1L)*N_day_pre*N_aliquot_pre))))
+      {
+        *(result+outoffset) = 3L;  // Failure due to zero-mean pre-treatment
+        
+        *(n_screen+outoffset) = static_cast<double>(screen_n);
+        *(n_pre+outoffset) = static_cast<double>(pre_n);
+        *(n_post+outoffset) = 0.0;
+
+        *(mean_pre+outoffset) = NA_REAL;
+        *(mean_post+outoffset) = NA_REAL;
+        *(imean_pre+outoffset) = npos_screen == 0L ? NA_REAL : pre_imean;
+        *(imean_post+outoffset) = npos_screen == 0L ? NA_REAL : post_imean;
+        
+        *(time_screen+outoffset) = counter_screen.get_total();
+        *(time_pre+outoffset) = counter_pre.get_total();
+        *(time_post+outoffset) = 0.0;
       }
       else
       {
-        // If zero eggs observed (safe float comparison: fewer than 0.5 eggs in total):
-        if(pre_n == 0L || pre_mean < (0.5/(static_cast<double>((ind+1L)*N_day_pre*N_aliquot_pre))))
-        {
-          *(result+outoffset) = 3L;  // Failure due to zero-mean pre-treatment
-          *(efficacy+outoffset) = NA_REAL;
-          
-          *(n_screen+outoffset) = static_cast<double>(screen_n);
-          *(n_pre+outoffset) = static_cast<double>(pre_n);
-          *(n_post+outoffset) = 0.0;
+        *(result+outoffset) = 0L;  // Success!
 
-          *(time_count+outoffset) = counter_screen.get_total() + counter_pre.get_total();
-        }
-        else
-        {
-          *(result+outoffset) = 0L;  // Success!
-          *(efficacy+outoffset) = 1.0 - post_mean/pre_mean;
+        *(n_screen+outoffset) = static_cast<double>(screen_n);
+        *(n_pre+outoffset) = static_cast<double>(pre_n);
+        *(n_post+outoffset) = static_cast<double>(post_n);
 
-          *(n_screen+outoffset) = static_cast<double>(screen_n);
-          *(n_pre+outoffset) = static_cast<double>(pre_n);
-          *(n_post+outoffset) = static_cast<double>(post_n);
-
-          *(time_count+outoffset) = counter_screen.get_total() + counter_pre.get_total() + counter_post.get_total();
-        }
+        *(mean_pre+outoffset) = pre_mean;
+        *(mean_post+outoffset) = post_mean;
+        *(imean_pre+outoffset) = pre_imean;
+        *(imean_post+outoffset) = post_imean;
+        
+        *(time_screen+outoffset) = counter_screen.get_total();
+        *(time_pre+outoffset) = counter_pre.get_total();
+        *(time_post+outoffset) = counter_post.get_total();
       }
       
       outn++;
