@@ -82,6 +82,9 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 										n_pre[ind] * cost_consumables_pre[p] +
 										n_post[ind] * cost_consumables_post[p];
 
+      // TODO: time for counting screen, pre, and post need to be separate
+      // TODO: ceiling() for each of totaltime screen, totaltime pre, totaltime post
+      // TODO: return mean of individual means of those selected
 			const double totaltime = n_screen[ind] * time_consumables_screen[p] +
 										n_pre[ind] * time_consumables_pre[p] +
 										n_post[ind] * time_consumables_post[p] +
