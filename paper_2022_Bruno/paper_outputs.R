@@ -32,9 +32,21 @@ for(pp in unique(scen$parasite)){
 }
 dev.off()
 
-pdf("graph_bias.pdf")
+pdf("graph_bias_1.pdf")
 for(pp in unique(scen$parasite)){
   pt <- ggplot(results |> filter(parasite==pp), aes(x=n_individ, y=(efficacy_mean/(1-reduction)), col=design, group=design)) +
+    geom_hline(yintercept=1, lty='dashed') +
+    geom_line() +
+    #  geom_point() +
+    facet_grid(mean_epg ~ method) +
+    labs(col=pp)
+  print(pt)
+}
+dev.off()
+
+pdf("graph_bias_2.pdf")
+for(pp in unique(scen$parasite)){
+  pt <- ggplot(results |> filter(parasite==pp), aes(x=n_individ, y=bias_mean, col=design, group=design)) +
     geom_hline(yintercept=1, lty='dashed') +
     geom_line() +
     #  geom_point() +

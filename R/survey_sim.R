@@ -144,7 +144,9 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                         by="replicateID"
           ) |>
           group_by(design, parasite, scenario, mean_epg, reduction, method, n_individ, parameter_set) |>
-          summarise(below_cutoff = sum(efficacy < cutoff, na.rm=TRUE), above_cutoff = sum(efficacy >= cutoff, na.rm=TRUE), failure = sum(result!="Success"), total_n = n(), efficacy_mean = mean(efficacy, na.rm=TRUE), efficacy_precision = 1/var(efficacy, na.rm=TRUE), proportion_below = below_cutoff/total_n, cost_mean = mean(total_cost), .groups="drop") |>
+          summarise(below_cutoff = sum(efficacy < cutoff, na.rm=TRUE), above_cutoff = sum(efficacy >= cutoff, na.rm=TRUE), failure = sum(result!="Success"), total_n = n(), 
+            efficacy_mean = mean(efficacy, na.rm=TRUE), efficacy_precision = 1/var(efficacy, na.rm=TRUE), bias_mean = mean(efficacy/(1-reduction), na.rm=TRUE),
+            proportion_below = below_cutoff/total_n, cost_mean = mean(total_cost), .groups="drop") |>
           replace_na(list(below_cutoff = 0L, above_cutoff = 0L)) |>
           mutate(efficacy_mean = case_when((below_cutoff+above_cutoff)<10L ~ NA_real_, TRUE ~ efficacy_mean)) |>
           mutate(efficacy_precision = case_when((below_cutoff+above_cutoff)<10L ~ NA_real_, TRUE ~ efficacy_precision))
