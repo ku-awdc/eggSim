@@ -7,10 +7,10 @@
 #' @param scenario a data frame of scenarios (see \code{\link{survey_scenario}})
 #' @param parameters a list of parameter sets (see \code{\link{survey_parameters}})
 #' @param iterations number of iterations per simulation
-#' @param pb should a progress bar be displayed?
+#' @param cl option to specify a cluster for parallel computation
 #' @param output type of output:  one of summarised, full or extended
 #'
-#' @importFrom pbapply pbsapply
+#' @importFrom pbapply pblapply
 #' @importFrom tidyr expand_grid everything
 #' @importFrom dplyr group_by group_split select bind_rows bind_cols
 #' @importFrom rlang .data
@@ -25,13 +25,14 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                        scenario = survey_scenario(parasite),
                        parameters = survey_parameters(design, parasite, method),
                        iterations = 1e3,
-                       pb=NA, output="full"){
+                       cl=NULL, output="full"){
 
   # TODO: pmatching for string arguments
   stopifnot(length(output)==1L, output %in% c("summarised","full","extended"))
-  # Disable summarised output option for now:
-  if(output=="summarised") stop("The summarised option is not yet implemented")
-  summarise <- output == "summarised"
+  # For now, summarising happens in R:
+  # if(output=="summarised") stop("The summarised option is not yet implemented")
+  # summarise <- output == "summarised"
+  summarise <- FALSE
 
   design <- check_design(design)
   parasite <- check_parasite(parasite)
@@ -47,15 +48,10 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
 
   scenario <- check_scenario(scenario)
 
-  # TODO: possibility for parallel apply?
-  stopifnot(is.logical(pb), length(pb)==1L)
-  if(is.na(pb)) pb <- length(parameters) > 1L
-  if(pb) appfun <- pbapply::pblapply else appfun <- base::lapply
-
-
   ## Run the parameter/scenario/n_individ combos:
   parameters |>
-    appfun(function(x){
+    # Use of cl argument means we always should use pblapply:
+    pblapply(function(x){
 
       # Remove the design and ns from the parameters:
       x |>
@@ -133,20 +129,33 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       if(output=="extended"){
         rv <- full_join(y, x, by="replicateID") |>
           select(-replicateID) |>
-          select(design, parasite, method, scenario, mean_epg, reduction, parameter_set, iteration, n_individ, result, efficacy, total_cost, everything())
+          select(design, parasite, scenario, mean_epg, reduction, method, n_individ, parameter_set, iteration, result, efficacy, total_cost, everything())
         stopifnot(nrow(rv)==nrow(y))
       }else if(output=="full"){
         rv <- full_join(y,
-                        x |> select(design, parasite, method, parameter_set, iteration, scenario, mean_epg, reduction, replicateID),
-                        by="replicateID") |>
-          select(design, parasite, method, scenario, mean_epg, reduction, parameter_set, iteration, n_individ, result, efficacy, total_cost)
+                        x |> select(design, parasite, cutoff, method, parameter_set, iteration, scenario, mean_epg, reduction, replicateID),
+                        by="replicateID"
+          ) |>
+          select(design, parasite, scenario, mean_epg, reduction, cutoff, method, n_individ, parameter_set, iteration, result, efficacy, total_cost)
         stopifnot(nrow(rv)==nrow(y))
-      }else{
+      }else if(output=="summarised"){
+        rv <- full_join(y,
+                        x |> select(design, parasite, cutoff, method, parameter_set, iteration, scenario, mean_epg, reduction, replicateID),
+                        by="replicateID"
+          ) |>
+          group_by(design, parasite, scenario, mean_epg, reduction, method, n_individ, parameter_set) |>
+          summarise(below_cutoff = sum(efficacy < cutoff, na.rm=TRUE), above_cutoff = sum(efficacy >= cutoff, na.rm=TRUE), failure = sum(result!="Success"), total_n = n(), efficacy_mean = mean(efficacy, na.rm=TRUE), efficacy_precision = 1/var(efficacy, na.rm=TRUE), proportion_below = below_cutoff/total_n, cost_mean = mean(total_cost), .groups="drop") |>
+          replace_na(list(below_cutoff = 0L, above_cutoff = 0L)) |>
+          mutate(efficacy_mean = case_when((below_cutoff+above_cutoff)<10L ~ NA_real_, TRUE ~ efficacy_mean)) |>
+          mutate(efficacy_precision = case_when((below_cutoff+above_cutoff)<10L ~ NA_real_, TRUE ~ efficacy_precision))
+        with(rv, stopifnot(all(abs((below_cutoff+above_cutoff+failure) == total_n))))
+
+      }else if(output=="summarised"){
         stop("Unimplemented output argument", call.=FALSE)
       }
 
       return(rv)
-    }) |>
+    }, cl=cl) |>
     bind_rows() ->
     results
 
