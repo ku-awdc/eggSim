@@ -126,3 +126,82 @@ for(pp in unique(scen$parasite)){
 }
 dev.off()
 
+
+## Investigating bias
+results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=iters, cl=NULL, output="extended")
+
+
+results |>
+  group_by(parasite, design, scenario, method, n_individ, mean_epg, reduction, weight, recovery, mu_pre) |>
+  mutate(bias_efficacy = (1-reduction)-efficacy) |>
+  mutate(bias_reduction = (reduction)-(1-efficacy)) |>
+  summarise(pre_mean=mean(pre_mean, na.rm=TRUE), post_mean=mean(post_mean, na.rm=TRUE), pre_imean=mean(pre_imean, na.rm=TRUE), post_imean=mean(post_imean, na.rm=TRUE), efficacy = mean(efficacy, na.rm=TRUE), bias_efficacy = mean(bias_efficacy, na.rm=TRUE), bias_reduction = mean(bias_reduction, na.rm=TRUE), .groups="drop") ->
+  sumstats
+
+sumstats
+
+pdf("graph_diff.pdf")
+for(pp in unique(scen$parasite)){
+  pt <- ggplot(sumstats |> filter(parasite==pp), aes(x=n_individ, y=efficacy-(1-post_mean/pre_mean), col=design, group=design)) +
+    geom_hline(yintercept=0, lty='dashed') +
+    geom_line() +
+    #  geom_point() +
+    facet_grid(mean_epg ~ method) +
+    labs(col=pp)
+  print(pt)
+}
+dev.off()
+
+
+pdf("graph_bias_reduction.pdf")
+for(pp in unique(scen$parasite)){
+  pt <- ggplot(sumstats |> filter(parasite==pp), aes(x=n_individ, y=reduction-(post_mean/pre_mean), col=design, group=design)) +
+    geom_hline(yintercept=0, lty='dashed') +
+    geom_line() +
+    #  geom_point() +
+    facet_grid(mean_epg ~ method) +
+    labs(col=pp)
+  print(pt)
+}
+dev.off()
+
+pdf("graph_bias_efficacy.pdf")
+for(pp in unique(scen$parasite)){
+  pt <- ggplot(sumstats |> filter(parasite==pp), aes(x=n_individ, y=(1-reduction)-(1-post_mean/pre_mean), col=design, group=design)) +
+    geom_hline(yintercept=0, lty='dashed') +
+    geom_line() +
+    #  geom_point() +
+    facet_grid(mean_epg ~ method) +
+    labs(col=pp)
+  print(pt)
+}
+dev.off()
+
+
+
+
+# No bias in reduction estimates at individual mean level:
+pdf("graph_bias_1.pdf")
+for(pp in unique(scen$parasite)){
+  pt <- ggplot(sumstats |> filter(parasite==pp), aes(x=n_individ, y=(reduction/(post_imean/pre_imean)), col=design, group=design)) +
+    geom_hline(yintercept=1, lty='dashed') +
+    geom_line() +
+    #  geom_point() +
+    facet_grid(mean_epg ~ method) +
+    labs(col=pp)
+  print(pt)
+}
+dev.off()
+
+# There is no bias in efficacy at individual level:
+pdf("graph_bias_1.pdf")
+for(pp in unique(scen$parasite)){
+  pt <- ggplot(sumstats |> filter(parasite==pp), aes(x=n_individ, y=(pre_imean*reduction)/post_imean, col=design, group=design)) +
+    geom_hline(yintercept=1, lty='dashed') +
+    geom_line() +
+    #  geom_point() +
+    facet_grid(mean_epg ~ method) +
+    labs(col=pp)
+  print(pt)
+}
+dev.off()

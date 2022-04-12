@@ -25,7 +25,12 @@ n_individ_us <- unique(bruno$n_individ)
 #n_individ_us <- c(100,200,500,1000)
 #n_individ_us <- 100
 
-params <- survey_parameters()
+params <- survey_parameters() |>
+  lapply(function(x){
+    x$min_positive_screen <- min(x$min_positive_screen, 1L)
+    x$min_positive_pre <- 1L
+    x
+  })
 scen <- survey_scenario()
 
 system.time({
@@ -102,6 +107,8 @@ ggplot(both, aes(x=bruno/1e3, y=matt/1e3, group = mean_epg, col=interaction(n_in
   theme(legend.position = "none")
 ggsave("comparison_cost.pdf", width=15, height=15)
 
+
+stop()
 
 ## TODO: some of the discrepancy may be due to how pre-mean==0 is handled?
 
