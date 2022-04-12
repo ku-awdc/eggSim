@@ -7,16 +7,16 @@
 
 // Hacky macro function to avoid lots of copy/paste:
 
-#define EXPAND(DESIGN, VARIANT, FIXN, D0, A0, D1, A1, D2, A2) ({ \
-  if( design == (VARIANT) ){ \
+#define EXPAND(SUMMARISE, DESIGN, VARIANT, FIXN, D0, A0, D1, A1, D2, A2) ({ \
+  if( summarise == SUMMARISE && design == (VARIANT) ){ \
     if( dist_string == "cs_ga_ga_po_be" ) \
     { \
-      rv = survey_template<designs::DESIGN, FIXN, D0, A0, D1, A1, D2, A2, methods::custom, dists::rgamma, dists::rgamma, dists::rpois, dists::rbeta> \
+      rv = survey_template<SUMMARISE, designs::DESIGN, FIXN, D0, A0, D1, A1, D2, A2, methods::custom, dists::rgamma, dists::rgamma, dists::rpois, dists::rbeta> \
       (all_ns, parameters, n_individ, summarise); \
     } \
     else if( dist_string == "cs_ga_ga_nb_be" ) \
     { \
-      rv = survey_template<designs::DESIGN, FIXN, D0, A0, D1, A1, D2, A2, methods::custom, dists::rgamma, dists::rgamma, dists::rnbinom, dists::rbeta> \
+      rv = survey_template<SUMMARISE, designs::DESIGN, FIXN, D0, A0, D1, A1, D2, A2, methods::custom, dists::rgamma, dists::rgamma, dists::rnbinom, dists::rbeta> \
         (all_ns, parameters, n_individ, summarise); \
     } \
     else \
@@ -35,15 +35,24 @@ Rcpp::DataFrame survey_sim(const std::string& design, const std::string& dist_st
 	Rcpp::DataFrame rv;
   bool handled = false;
 
-  EXPAND(NS, "NS", false, -1L, -1L, -1L, -1L, -1L, -1L);
-  EXPAND(NS, "NS_11", true, 0L, 0L, 1L, 1L, 1L, 1L);
-  EXPAND(NS, "NS_12", true, 0L, 0L, 1L, 1L, 1L, 2L);
-  EXPAND(SS, "SS", false, -1L, -1L, -1L, -1L, -1L, -1L);
-  EXPAND(SS, "SS_11", true, 0L, 0L, 1L, 1L, 1L, 1L);
-  EXPAND(SS, "SS_12", true, 0L, 0L, 1L, 1L, 1L, 2L);
-  EXPAND(SSR, "SSR", false, -1L, -1L, -1L, -1L, -1L, -1L);
-  EXPAND(SSR, "SSR_11", true, 1L, 1L, 1L, 1L, 1L, 1L);
-  EXPAND(SSR, "SSR_12", true, 1L, 1L, 1L, 1L, 1L, 2L);
+  EXPAND(false, NS, "NS", false, -1L, -1L, -1L, -1L, -1L, -1L);
+  EXPAND(false, NS, "NS_11", true, 0L, 0L, 1L, 1L, 1L, 1L);
+  EXPAND(false, NS, "NS_12", true, 0L, 0L, 1L, 1L, 1L, 2L);
+  EXPAND(true, NS, "NS", false, -1L, -1L, -1L, -1L, -1L, -1L);
+  EXPAND(true, NS, "NS_11", true, 0L, 0L, 1L, 1L, 1L, 1L);
+  EXPAND(true, NS, "NS_12", true, 0L, 0L, 1L, 1L, 1L, 2L);
+  EXPAND(false, SS, "SS", false, -1L, -1L, -1L, -1L, -1L, -1L);
+  EXPAND(false, SS, "SS_11", true, 0L, 0L, 1L, 1L, 1L, 1L);
+  EXPAND(false, SS, "SS_12", true, 0L, 0L, 1L, 1L, 1L, 2L);
+  EXPAND(true, SS, "SS", false, -1L, -1L, -1L, -1L, -1L, -1L);
+  EXPAND(true, SS, "SS_11", true, 0L, 0L, 1L, 1L, 1L, 1L);
+  EXPAND(true, SS, "SS_12", true, 0L, 0L, 1L, 1L, 1L, 2L);
+  EXPAND(false, SSR, "SSR", false, -1L, -1L, -1L, -1L, -1L, -1L);
+  EXPAND(false, SSR, "SSR_11", true, 1L, 1L, 1L, 1L, 1L, 1L);
+  EXPAND(false, SSR, "SSR_12", true, 1L, 1L, 1L, 1L, 1L, 2L);
+  EXPAND(true, SSR, "SSR", false, -1L, -1L, -1L, -1L, -1L, -1L);
+  EXPAND(true, SSR, "SSR_11", true, 1L, 1L, 1L, 1L, 1L, 1L);
+  EXPAND(true, SSR, "SSR_12", true, 1L, 1L, 1L, 1L, 1L, 2L);
 
   if(!handled)
   {

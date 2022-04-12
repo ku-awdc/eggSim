@@ -28,11 +28,8 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                        cl=NULL, output="full"){
 
   # TODO: pmatching for string arguments
-  stopifnot(length(output)==1L, output %in% c("summarised","full","extended"))
-  # For now, summarising happens in R:
-  # if(output=="summarised") stop("The summarised option is not yet implemented")
-  # summarise <- output == "summarised"
-  summarise <- FALSE
+  stopifnot(length(output)==1L, output %in% c("rsummarised","summarised","full","extended"))
+  summarise <- output == "summarised"
 
   design <- check_design(design)
   parasite <- check_parasite(parasite)
@@ -119,16 +116,17 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
 
       # TODO: don't expand parameters by iteration unless needed??
 
-      stopifnot(!summarise)
       dist_string <- "cs_ga_ga_nb_be"
       if(all(x$aliquot_cv <= 0)) dist_string <- "cs_ga_ga_po_be"
 
-      y <- Rcpp_survey_sim(des, dist_string, all_ns, as.data.frame(x), n_individ, summarise) |>
-        mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre")))
+      browser()
+
+      y <- Rcpp_survey_sim(des, dist_string, all_ns, as.data.frame(x), n_individ, summarise)
 
       if(output=="extended"){
         rv <- full_join(y, x, by="replicateID") |>
           select(-replicateID) |>
+          mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre"))) |>
           select(design, parasite, scenario, mean_epg, reduction, method, n_individ, parameter_set, iteration, result, efficacy, total_cost, everything())
         stopifnot(nrow(rv)==nrow(y))
       }else if(output=="full"){
@@ -136,15 +134,17 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                         x |> select(design, parasite, cutoff, method, parameter_set, iteration, scenario, mean_epg, reduction, replicateID),
                         by="replicateID"
           ) |>
+          mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre"))) |>
           select(design, parasite, scenario, mean_epg, reduction, cutoff, method, n_individ, parameter_set, iteration, result, efficacy, total_cost)
         stopifnot(nrow(rv)==nrow(y))
-      }else if(output=="summarised"){
+      }else if(output=="rsummarised"){
         rv <- full_join(y,
                         x |> select(design, parasite, cutoff, method, parameter_set, iteration, scenario, mean_epg, reduction, replicateID),
                         by="replicateID"
           ) |>
+          mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre"))) |>
           group_by(design, parasite, scenario, mean_epg, reduction, method, n_individ, parameter_set) |>
-          summarise(below_cutoff = sum(efficacy < cutoff, na.rm=TRUE), above_cutoff = sum(efficacy >= cutoff, na.rm=TRUE), failure = sum(result!="Success"), total_n = n(), 
+          summarise(below_cutoff = sum(efficacy < cutoff, na.rm=TRUE), above_cutoff = sum(efficacy >= cutoff, na.rm=TRUE), failure = sum(result!="Success"), total_n = n(),
             efficacy_mean = mean(efficacy, na.rm=TRUE), efficacy_precision = 1/var(efficacy, na.rm=TRUE), bias_mean = mean(efficacy/(1-reduction), na.rm=TRUE),
             proportion_below = below_cutoff/total_n, cost_mean = mean(total_cost), .groups="drop") |>
           replace_na(list(below_cutoff = 0L, above_cutoff = 0L)) |>

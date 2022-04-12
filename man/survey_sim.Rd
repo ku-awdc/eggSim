@@ -12,7 +12,7 @@ survey_sim(
   scenario = survey_scenario(parasite),
   parameters = survey_parameters(design, parasite, method),
   iterations = 1000,
-  apply_method = NA,
+  cl = NULL,
   output = "full"
 )
 }
@@ -31,9 +31,9 @@ survey_sim(
 
 \item{iterations}{number of iterations per simulation}
 
-\item{output}{type of output:  one of summarised, full or extended}
+\item{cl}{option to specify a cluster for parallel computation}
 
-\item{pb}{should a progress bar be displayed?}
+\item{output}{type of output:  one of summarised, full or extended}
 }
 \description{
 Simulate one or more survey design
