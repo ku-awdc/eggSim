@@ -79,6 +79,57 @@ all_costs
 
 stop()
 
+
+# Simple evaluation of bias:
+
+mu <- c(20, 1)
+k <- c(0.5, 0.2)
+N <- 50
+iters <- 1e5
+
+# Note that the following are equivalent:
+rnbinom(1, k[1]*N, mu=mu[1]*N)/N
+mean(rnbinom(N, k[1], mu=mu[1]))
+
+# So we can use the former to calculate the mean of iters datasets quickly:
+pre <- rnbinom(iters, k[1]*N, mu=mu[1]*N)/N
+post <- rnbinom(iters, k[2]*N, mu=mu[2]*N)/N
+
+# These are unbiased:
+mean(pre) - mu[1]
+mean(post) - mu[2]
+mean(post)/mean(pre) - mu[2]/mu[1]
+# But these are not the same:
+mean(post)/mean(pre); mean(post/pre)
+# And the latter is biased:
+mean(post/pre) - mu[2]/mu[1]
+
+library("tidyverse")
+theme_set(theme_light())
+
+# Bias for different values of N:
+expand_grid(N = seq(10,1000,by=10), ii=1:it) |>
+  mutate(pre = rnbinom(n(), k[1]*N, mu=mu[1]*N)/N) |>
+  mutate(post = rnbinom(n(), k[2]*N, mu=mu[2]*N)/N) |>
+  group_by(N) |>
+  summarise(red1 = mean(post/pre), red2 = mean(post)/mean(pre)) |>
+  pivot_longer(c("red1", "red2"), names_to="type", values_to="reduction") |>
+  mutate(type = factor(type, levels=c("red1","red2"), labels=c("mean(post/pre)", "mean(post)/mean(pre)"))) ->
+  bias
+
+ggplot(bias, aes(x=N, y=100 * (1-reduction), col=type)) +
+  geom_line() +
+  geom_hline(yintercept=100 * (1-mu[2]/mu[1]), lty="dashed") +
+  theme(legend.title = element_blank(), legend.position = "bottom") +
+  ylab("Efficacy") +
+  ggtitle("Plot of bias (black dashed line is true value)")
+ggsave("simple_bias.pdf")
+
+mean(mean2)/mean(mean1)
+mean(mean2/mean1)
+
+
+
 # To get parameters:
 
 library("eggSim")
