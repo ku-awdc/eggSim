@@ -11,7 +11,7 @@
 #'
 #' @return A data frame of summary statistics
 #' @examples
-#' data <- cgpDataSim(10^3, 600, 0.1, 100, 1, 1, 1, 0, true_prevalence=0.8)
+#' data <- cgpDataSim(10^2, 600, 0.1, 100, 1, 1, 1, 0, true_prevalence=0.8)
 #' means <- design_means(data, second_slide_cost = c(0.1, 0.621, 1))
 #' library("dplyr")
 #' means %>%

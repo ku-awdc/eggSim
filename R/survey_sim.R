@@ -11,14 +11,14 @@
 #' @param output type of output:  one of summarised, full or extended
 #'
 #' @importFrom pbapply pblapply
-#' @importFrom parallel makeForkCluster makePSOCKcluster stopCluster
+#' @importFrom parallel makeForkCluster makePSOCKcluster stopCluster clusterSetRNGStream clusterExport
 #' @importFrom tidyr expand_grid everything
 #' @importFrom dplyr group_by group_split select bind_rows bind_cols
 #' @importFrom rlang .data
 #' @import tidyverse
 #'
 #' @examples
-#' results <- survey_sim()
+#' results <- survey_sim(design="NS_11", n_individ = c(100,200,300,400,500))
 #'
 #' @export
 survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
@@ -55,6 +55,8 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
     }else{
       cl <- makePSOCKcluster(cl)
     }
+    # Required to honour set.seed() on PSOCK clusters:
+    clusterSetRNGStream(cl, NULL)
     on.exit({
       stopCluster(cl)
     })

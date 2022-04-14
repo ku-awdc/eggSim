@@ -75,6 +75,6 @@ A data frame containing the simulated data
 Simulate and summarise egg reduction rate data
 }
 \examples{
-means <- eggSim(c(0.2,0.1,0.05), cv_reduction=0, R=10^2, parallelise=FALSE)
+means <- eggSim(c(0.2,0.1), cv_reduction=0, R=10^2, design = c('NS','SS'), parallelise=FALSE)
 
 }

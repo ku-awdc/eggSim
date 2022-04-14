@@ -4,7 +4,7 @@
 \name{eggSim-package}
 \alias{eggSim-package}
 \alias{_PACKAGE}
-\title{eggSim: Simulating datasets representing egg reduction rate data}
+\title{eggSim: Simulating Datasets Representing Egg Reduction Rate Data}
 \description{
 A collection of utilities to simulate data from different compound over-dispersed count distributions representing egg reduction rate (ERR; aka faecal egg count reduction) datasets.
 }

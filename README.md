@@ -3,7 +3,7 @@ eggSim is an R package developed by Matt Denwood and Luc Coffeng to assess diffe
 
 ## Website
 
-For a background to our work along with simple installation and usage instructions see our website:  [https://www.fecrt.com/surveys](https://www.fecrt.com/surveys)
+For a background to our work along with simple installation and usage instructions see our website:  [https://www.fecrt.com/surveys/](https://www.fecrt.com/surveys/)
 
 ## TODO
 

@@ -39,6 +39,6 @@ survey_sim(
 Simulate one or more survey design
 }
 \examples{
-results <- survey_sim()
+results <- survey_sim(design="NS_11", n_individ = c(100,200,300,400,500))
 
 }

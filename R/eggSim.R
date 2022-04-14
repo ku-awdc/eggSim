@@ -24,7 +24,7 @@
 #' @return A data frame containing the simulated data
 #'
 #' @examples
-#' means <- eggSim(c(0.2,0.1,0.05), cv_reduction=0, R=10^2, parallelise=FALSE)
+#' means <- eggSim(c(0.2,0.1), cv_reduction=0, R=10^2, design = c('NS','SS'), parallelise=FALSE)
 #'
 #' @importFrom parallel detectCores makeForkCluster makePSOCKcluster clusterSetRNGStream parLapply stopCluster
 #' @importFrom pbapply pblapply
@@ -106,6 +106,10 @@ eggSim <- function(reduction, budget=600, second_slide_cost = 0.621, max_screen 
         cl <- makePSOCKcluster(cores)
       }
       clusterSetRNGStream(cl, NULL)
+
+      cenv <- environment()
+      clusterExport(cl, c("community_mean", "R",  "budget", "cv_between", "cv_within", "cv_slide", "cv_reduction", "true_prevalence", "grams", "design", "budget", "second_slide_cost", "max_screen", "count", "log_constant", "screen_threshold"), envir=cenv)
+
       on.exit(stopCluster(cl))
     }
     stopifnot(inherits(cl, "cluster"))
