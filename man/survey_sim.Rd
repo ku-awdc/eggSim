@@ -8,12 +8,12 @@ survey_sim(
   design = c("NS_11", "SS_11", "SSR_11"),
   parasite = "hookworm",
   method = "kk",
-  n_individ = c(100, 200, 1000),
+  n_individ = seq(100, 1000, by = 10),
   scenario = survey_scenario(parasite),
   parameters = survey_parameters(design, parasite, method),
   iterations = 1000,
   cl = NULL,
-  output = "full"
+  output = "summarised"
 )
 }
 \arguments{
@@ -31,7 +31,7 @@ survey_sim(
 
 \item{iterations}{number of iterations per simulation}
 
-\item{cl}{option to specify a cluster for parallel computation}
+\item{cl}{option to specify either a number of cores or an existing cluster for parallel computation (passed to \code{\link[pbapply]{pblapply}})}
 
 \item{output}{type of output:  one of summarised, full or extended}
 }

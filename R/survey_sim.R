@@ -7,13 +7,15 @@
 #' @param scenario a data frame of scenarios (see \code{\link{survey_scenario}})
 #' @param parameters a list of parameter sets (see \code{\link{survey_parameters}})
 #' @param iterations number of iterations per simulation
-#' @param cl option to specify a cluster for parallel computation
+#' @param cl option to specify either a number of cores or an existing cluster for parallel computation (passed to \code{\link[pbapply]{pblapply}})
 #' @param output type of output:  one of summarised, full or extended
 #'
 #' @importFrom pbapply pblapply
+#' @importFrom parallel makeForkCluster makePSOCKcluster stopCluster
 #' @importFrom tidyr expand_grid everything
 #' @importFrom dplyr group_by group_split select bind_rows bind_cols
 #' @importFrom rlang .data
+#' @import tidyverse
 #'
 #' @examples
 #' results <- survey_sim()
@@ -21,7 +23,7 @@
 #' @export
 survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                        parasite = "hookworm", method = "kk",
-                       n_individ = c(100, 200, 1000),
+                       n_individ = seq(100,1000,by=10),
                        scenario = survey_scenario(parasite),
                        parameters = survey_parameters(design, parasite, method),
                        iterations = 1e3,
@@ -45,7 +47,23 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
 
   scenario <- check_scenario(scenario)
 
+  ## If cl is an int then set up a cluster:
+  if(!is.null(cl) && is.numeric(cl)){
+    stopifnot(length(cl)==1L, !is.na(cl), cl > 0L, cl%%1 == 0.0)
+    if(.Platform$OS.type=="unix"){
+      cl <- makeForkCluster(cl)
+    }else{
+      cl <- makePSOCKcluster(cl)
+    }
+    on.exit({
+      stopCluster(cl)
+    })
+  }
+
   ## Run the parameter/scenario/n_individ combos:
+  cat("Running simulations for ", length(parameters), " parameter sets...\n", sep="")
+  st <- Sys.time()
+
   parameters |>
     # Use of cl argument means we always should use pblapply:
     pblapply(function(x){
@@ -62,6 +80,9 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       all_ns |> select(-design) |> unlist() -> all_ns
       stopifnot(length(all_ns)==8L, all(all_ns>=0L), all(all_ns%%1L == 0L))
       # TODO: nicer error messages
+
+      # Ensure that parameter_set is consistent:
+      stopifnot(all(x$parameter_set == x$parameter_set[1L]))
 
       # Do whatever cost calculations can be done before expanding:
       x |>
@@ -92,7 +113,6 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
             n_aliquot_post == 0L ~ 0.0,
             TRUE ~ (cost_sample + cost_aliquot_post) / n_aliquot_post
           )
-
         ) |>
         # This supercedes the following variables:
         # time_demography, time_prep_*, time_record, cost_sample, cost_aliquot_*
@@ -102,7 +122,9 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       # Add a scenario_int that is guaranteed to be 0...S:
       scenario |>
         filter(parasite %in% x$parasite) |>
-        mutate(scenario_int = (1:n())-1L) ->
+        mutate(scenario_int = (1:n())-1L) |>
+        # Changed parameter name:
+        mutate(reduction = 1-true_efficacy) ->
         tscenario
 
       # Replicate the parameters over iterations (if necessary),
@@ -116,11 +138,10 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       }
       x <- inner_join(x, tscenario, by="parasite") |>
         mutate(replicateID = 1:n(), mu_pre = mean_epg * weight * recovery)
+      stopifnot(min(x$scenario_int)==0L)
 
       n_individ <- sort(n_individ)
       stopifnot(all(n_individ > 0L), all(n_individ%%1 == 0))
-
-      # TODO: don't expand parameters by iteration unless needed??
 
       dist_string <- "cs_ga_ga_nb_be"
       if(all(x$aliquot_cv <= 0)) dist_string <- "cs_ga_ga_po_be"
@@ -128,40 +149,55 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       y <- Rcpp_survey_sim(des, dist_string, all_ns, as.data.frame(x), n_individ, summarise)
 
       if(output=="extended"){
+
         rv <- full_join(y, x, by="replicateID") |>
           select(-replicateID, -scenario_int) |>
           mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre"))) |>
-          select(design, parasite, scenario, mean_epg, reduction, method, n_individ, parameter_set, iteration, result, efficacy, total_cost, everything())
+          select(-reduction) |>
+          select(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set, iteration, result, efficacy, total_cost, everything())
         stopifnot(nrow(rv)==nrow(y))
+
       }else if(output=="full"){
+
         rv <- full_join(y,
-                        x |> select(design, parasite, cutoff, method, parameter_set, iteration, scenario, mean_epg, reduction, replicateID),
+                        x |> select(design, parasite, cutoff, method, parameter_set, iteration, scenario, mean_epg, true_efficacy, replicateID),
                         by="replicateID"
           ) |>
           mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre"))) |>
-          select(design, parasite, scenario, mean_epg, reduction, cutoff, method, n_individ, parameter_set, iteration, result, efficacy, total_cost)
+          select(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set, iteration, result, efficacy, total_cost)
         stopifnot(nrow(rv)==nrow(y))
+
       }else if(output=="rsummarised"){
+
         rv <- full_join(y,
-                        x |> select(design, parasite, cutoff, method, parameter_set, iteration, scenario, mean_epg, reduction, replicateID),
+                        x |> select(design, parasite, cutoff, method, parameter_set, iteration, scenario, mean_epg, true_efficacy, replicateID),
                         by="replicateID"
           ) |>
           mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre"))) |>
-          group_by(design, parasite, scenario, mean_epg, reduction, method, n_individ, parameter_set) |>
-          summarise(below_cutoff = sum(efficacy < cutoff, na.rm=TRUE), above_cutoff = sum(efficacy >= cutoff, na.rm=TRUE), failure = sum(result!="Success"), total_n = n(),
-            efficacy_mean = mean(efficacy, na.rm=TRUE), efficacy_precision = 1/var(efficacy, na.rm=TRUE), bias_mean = mean(efficacy/(1-reduction), na.rm=TRUE),
-            proportion_below = below_cutoff/total_n, cost_mean = mean(total_cost), .groups="drop") |>
-          replace_na(list(below_cutoff = 0L, above_cutoff = 0L)) |>
-          mutate(efficacy_mean = case_when((below_cutoff+above_cutoff)<10L ~ NA_real_, TRUE ~ efficacy_mean)) |>
-          mutate(efficacy_precision = case_when((below_cutoff+above_cutoff)<10L ~ NA_real_, TRUE ~ efficacy_precision))
-        with(rv, stopifnot(all(abs((below_cutoff+above_cutoff+failure) == total_n))))
+          group_by(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set) |>
+
+          summarise(below_cutoff = sum(efficacy < cutoff, na.rm=TRUE), above_cutoff = sum(efficacy >= cutoff, na.rm=TRUE), failure_n = sum(result!="Success"), total_n = n(),
+            pre_mean = mean(pre_mean, na.rm=TRUE), post_mean = mean(post_mean, na.rm=TRUE),
+            pre_imean = mean(pre_imean, na.rm=TRUE), post_imean = mean(post_imean, na.rm=TRUE),
+            efficacy_mean = mean(efficacy, na.rm=TRUE), efficacy_variance = var(efficacy, na.rm=TRUE),
+            proportion_below = below_cutoff/total_n, cost_mean = mean(total_cost), cost_variance = var(total_cost), .groups="drop") |>
+          replace_na(list(below_cutoff = 0L, above_cutoff = 0L))
+        with(rv, stopifnot(all((below_cutoff+above_cutoff+failure_n) == total_n)))
 
       }else if(output=="summarised"){
+
         rv <- x |>
-          count(design, parasite, method, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, min_positive_screen, min_positive_pre, scenario, cutoff, mean_epg, reduction, scenario_int) |>
+          count(design, parasite, method, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, min_positive_screen, min_positive_pre, scenario, cutoff, mean_epg, true_efficacy, parameter_set, scenario_int) |>
           full_join(y, by="scenario_int") |>
-          select(-scenario_int)
+          mutate(efficacy_variance = var_efficacy, failure_n = n_result_1+n_result_2+n_result_3,
+                 total_n = n_total, proportion_below = n_below_cutoff/total_n) |>
+          select(-scenario_int) |>
+          select(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set,
+                 below_cutoff = n_below_cutoff, above_cutoff = n_above_cutoff, failure_n, total_n,
+                 pre_mean = mean_pre, post_mean = mean_post, pre_imean = imean_pre, post_imean = imean_post,
+                 efficacy_mean = mean_efficacy, efficacy_variance, proportion_below, cost_mean = mean_cost, cost_variance = var_cost)
         stopifnot(nrow(y)==nrow(rv), nrow(rv)==(nrow(tscenario)*length(n_individ)))
+        with(rv, stopifnot(all((below_cutoff+above_cutoff+failure_n) == total_n)))
       }
 
       return(rv)
@@ -169,9 +205,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
     bind_rows() ->
     results
 
-  warning("TODO: Tidy up names of summarised and rsummarised and write test to check summarised outputs are the same with same PRNG")
-  warning("TODO: Move cutoff to scenario rather than parameters")
-  warning("TODO: allow cl to specify number of cores")
+  cat("Done in ", round(as.numeric(Sys.time()-st, units='mins'), 1), " minutes\n", sep="")
 
   return(as_tibble(results))
 }

@@ -1,0 +1,124 @@
+---
+title: "survey_sim"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{survey_sim}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# survey_sim function
+
+TODO: tidy up and expand
+
+## Installation
+
+The eggSim package is hosted via a public repository at (https://github.com/ku-awdc/eggSim), so you can install it directly from there using remotes::install_github().  However, this installation from source requires C++ compilers etc.
+
+We therefore recommend that you install a pre-compiled stable/release version from our drat repository using the following command:
+
+```{r eval=FALSE}
+install.packages('eggSim', repos=c(CRAN="https://cran.rstudio.com/", "ku-awdc"="https://ku-awdc.github.io/drat/"))
+```
+
+
+## Introduction
+
+The eggSim pacakge is intended to facilitate simulation-based assessment of survey design strategies for testing anthelmintic efficacy via faecal egg count reduction (FECRT) tests.  The software is currently a work in progress, and comments/suggestions/contributions are very welcome to the package maintainers!
+
+The package is designed to work in a tidyverse-like way, so loading the tidyverse meta-package along with the eggSim package is a good idea:
+
+```{r setup}
+library("eggSim")
+library("tidyverse")
+```
+
+## Scenarios
+
+First define the scenarios to test.  This should be a data frame with columns parasite, scenario, mean_epg, true_efficacy and cutoff.
+
+```{r}
+scenarios <- survey_scenario(parasite = c("ascaris","trichuris","hookworm"))
+scenarios
+```
+
+Then define the parameters, either as a data frame for a single parameter set, or a list of data frames for multiple parameter sets.  Each data frame can either have 1 row, or multiple rows corresponding to iterations where uncertainty in parameter estimates will be integrated over by the simulation.
+
+```{r}
+par_1 <- survey_parameters(design = c("NS_11"), parasite = c("ascaris"), method = c("kk"))
+par_1
+
+par_all <- survey_parameters(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11","SSR_12"), parasite = c("ascaris","trichuris","hookworm"), method = c("kk","miniflotac","fecpak"))
+length(par_all)
+par_all[[1]]
+```
+If you need to change the parameter values then it is probably easiest to do so by first generating parameter values from survey_parameters() and then modifying the data frame afterwards.
+
+Then run the simulation, specifying a vector of number of individuals, number of iterations, and optionally the number of parallel cores to use:
+
+```{r}
+results <- survey_sim(n_individ = seq(100,1000,by=10), scenario = scenarios, parameters = par_all, iterations = 1e3, cl=2L, output="summarised")
+```
+
+Note that the default option for the output is to pre-summarise (in order to reduce memory usage).  If you prefer, then you can ask for either full output or extended output, which return results at the level of iteration:
+
+```{r}
+results_full <- survey_sim(n_individ = seq(100,1000,by=10), scenario = scenarios, parameters = par_1, iterations = 1e3, cl=2L, output="full")
+```
+
+Here are some suggested plots:
+
+```{r}
+pp <- "ascaris"
+ggplot(results |> filter(parasite==pp), aes(x=n_individ, y=(failure_n/total_n), col=design, group=design)) +
+  geom_line() +
+  facet_grid(mean_epg ~ method) +
+  labs(col=pp)
+```
+
+```{r}
+ggplot(results |> filter(parasite==pp), aes(x=n_individ, y=proportion_below, col=design, group=design)) +
+    geom_line() +
+    facet_grid(mean_epg ~ method) +
+    labs(col=pp)
+```
+
+```{r}
+ggplot(results |> filter(parasite==pp), aes(x=-cost_mean, y=proportion_below, col=design, group=design)) +
+  geom_line() +
+  facet_grid(mean_epg ~ method) +
+  labs(col=pp)
+```
+
+```{r}
+ggplot(results |> filter(parasite==pp), aes(x=-cost_mean, y=proportion_below, col=design, group=design)) +
+  geom_line() +
+  facet_grid(mean_epg ~ method) +
+  labs(col=pp) +
+  coord_cartesian(ylim=c(0.5, NA))
+```
+
+
+## Contributing
+
+We would highly value any contributions (either comments, suggestions or code patches) on this package!  You can contribute by either working with the [GitHub repository](https://github.com/ku-awdc/eggSim) or by emailing the package maintainers using the email addresses available from:
+
+```{r eval=FALSE}
+?`eggSim-package`
+```
+
+## sessionInfo
+
+This vignette was built on the following system:
+
+```{r}
+sessionInfo()
+```
+

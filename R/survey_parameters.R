@@ -78,11 +78,6 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
         parasite == "trichuris" ~ beta_to_cv(56.1, 30.2),
         parasite == "hookworm" ~ beta_to_cv(17.9, 53.8)
       ),
-      cutoff = case_when(
-        parasite == "ascaris" ~ 0.85,
-        parasite == "trichuris" ~ 0.40,
-        parasite == "hookworm" ~ 0.80
-      ),
       weight = case_when(
         method == "kk" ~ 1/24.0,
         method == "miniflotac" ~ 1/10.0,
@@ -241,13 +236,19 @@ survey_scenario <- function(parasite = c("ascaris","trichuris","hookworm")){
                    "hookworm", 4L, 210.3
   )
 
-  reduction <- tribble(~parasite, ~reduction,
-                    "ascaris", beta_to_mu(12.4, 49.5),
-                    "trichuris", beta_to_mu(56.1, 30.2),
-                    "hookworm", beta_to_mu(17.9, 53.8)
+  reduction <- tribble(~parasite, ~true_efficacy,
+                    "ascaris", 1-beta_to_mu(12.4, 49.5),
+                    "trichuris", 1-beta_to_mu(56.1, 30.2),
+                    "hookworm", 1-beta_to_mu(17.9, 53.8)
   )
 
-  full_join(mean_epg, reduction, by="parasite") |> filter(.data$parasite %in% parin)
+  full_join(mean_epg, reduction, by="parasite") |>
+    filter(.data$parasite %in% parin) |>
+    mutate(cutoff = case_when(
+      parasite == "ascaris" ~ 0.85,
+      parasite == "trichuris" ~ 0.40,
+      parasite == "hookworm" ~ 0.80
+    ))
 
 }
 
@@ -267,7 +268,7 @@ check_parameters <- function(pp, iters=1L){
 
 check_scenario <- function(scenario){
   stopifnot(is.data.frame(scenario))
-  stopifnot(all(c("parasite","scenario","mean_epg","reduction") %in% names(scenario)))
+  stopifnot(all(c("parasite","scenario","mean_epg","true_efficacy","cutoff") %in% names(scenario)))
   scenario$parasite <- check_parasite(scenario$parasite)
   scenario
 }
