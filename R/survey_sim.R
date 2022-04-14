@@ -25,7 +25,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                        scenario = survey_scenario(parasite),
                        parameters = survey_parameters(design, parasite, method),
                        iterations = 1e3,
-                       cl=NULL, output="full"){
+                       cl=NULL, output="summarised"){
 
   # TODO: pmatching for string arguments
   stopifnot(length(output)==1L, output %in% c("rsummarised","summarised","full","extended"))
@@ -99,6 +99,12 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
         identity() ->
         x
 
+      # Add a scenario_int that is guaranteed to be 0...S:
+      scenario |>
+        filter(parasite %in% x$parasite) |>
+        mutate(scenario_int = (1:n())-1L) ->
+        tscenario
+
       # Replicate the parameters over iterations (if necessary),
       # and then inner_join with scenario and add replicate ID:
       if(nrow(x)>1L){
@@ -108,7 +114,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       }else{
         x <- bind_cols(x, iteration = 1:iterations)
       }
-      x <- inner_join(x, scenario, by="parasite") |>
+      x <- inner_join(x, tscenario, by="parasite") |>
         mutate(replicateID = 1:n(), mu_pre = mean_epg * weight * recovery)
 
       n_individ <- sort(n_individ)
@@ -119,13 +125,11 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       dist_string <- "cs_ga_ga_nb_be"
       if(all(x$aliquot_cv <= 0)) dist_string <- "cs_ga_ga_po_be"
 
-      browser()
-
       y <- Rcpp_survey_sim(des, dist_string, all_ns, as.data.frame(x), n_individ, summarise)
 
       if(output=="extended"){
         rv <- full_join(y, x, by="replicateID") |>
-          select(-replicateID) |>
+          select(-replicateID, -scenario_int) |>
           mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre"))) |>
           select(design, parasite, scenario, mean_epg, reduction, method, n_individ, parameter_set, iteration, result, efficacy, total_cost, everything())
         stopifnot(nrow(rv)==nrow(y))
@@ -153,13 +157,21 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
         with(rv, stopifnot(all(abs((below_cutoff+above_cutoff+failure) == total_n))))
 
       }else if(output=="summarised"){
-        stop("Unimplemented output argument", call.=FALSE)
+        rv <- x |>
+          count(design, parasite, method, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, min_positive_screen, min_positive_pre, scenario, cutoff, mean_epg, reduction, scenario_int) |>
+          full_join(y, by="scenario_int") |>
+          select(-scenario_int)
+        stopifnot(nrow(y)==nrow(rv), nrow(rv)==(nrow(tscenario)*length(n_individ)))
       }
 
       return(rv)
     }, cl=cl) |>
     bind_rows() ->
     results
+
+  warning("TODO: Tidy up names of summarised and rsummarised and write test to check summarised outputs are the same with same PRNG")
+  warning("TODO: Move cutoff to scenario rather than parameters")
+  warning("TODO: allow cl to specify number of cores")
 
   return(as_tibble(results))
 }

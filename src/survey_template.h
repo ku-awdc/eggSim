@@ -4,16 +4,20 @@
 #include "enums.h"
 #include "survey_class.h"
 
-template<bool t_summarise, designs design, bool t_fixed_n, int nd0, int na0, int nd1, int na1, int nd2, int na2, 
+template<bool t_summarise, designs design, bool t_fixed_n, int nd0, int na0, int nd1, int na1, int nd2, int na2,
           methods method, dists dist_individ, dists dist_day, dists dist_aliquot, dists dist_red>
 Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::DataFrame& parameters,
 								                const Rcpp::IntegerVector& n_individ, const bool summarise)
 {
+	const Rcpp::IntegerVector scenario_int = parameters["scenario_int"];
+
 	const int np = parameters.nrow();
 	const int ni = n_individ.length();
-  
-  // If summarising then we only need one output per n_individ, otherwise iterations as well:
-  const int ol = t_summarise ? ni : (np*ni);
+	const int ns = Rcpp::max(scenario_int) + 1L;
+  if(Rcpp::min(scenario_int)!=0L) Rcpp::stop("Invalid scenario_int");
+
+  // If summarising then we only need one output per n_individ+scenario:
+  const int ol = t_summarise ? (ni*ns) : (np*ni);
 
 	const int n_day_screen = all_ns["n_day_screen"];
 	const int n_aliquot_screen = all_ns["n_aliquot_screen"];
@@ -54,24 +58,26 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 
 	// Memory offset for indexing results for different n_individ:
 	ptrdiff_t offset = 1L;
-  
+
   // Eventual output:
   Rcpp::DataFrame df;
 
   if constexpr(t_summarise)
   {
-  	const Rcpp::IntegerVector scenario = parameters["scenario"];
-    
+  	const Rcpp::NumericVector cutoff = parameters["cutoff"];
+
   	// Create the output vectors:
     // Rcpp::IntegerVector result(ol);
   	Rcpp::NumericVector n_screen(ol);
   	Rcpp::NumericVector n_pre(ol);
   	Rcpp::NumericVector n_post(ol);
   	Rcpp::NumericVector efficacy(ol);
+  	Rcpp::NumericVector efficacy_var(ol);
+
   	Rcpp::NumericVector mean_pre(ol);
   	Rcpp::NumericVector mean_post(ol);
-  	//Rcpp::NumericVector imean_pre(ol);
-  	//Rcpp::NumericVector imean_post(ol);
+  	Rcpp::NumericVector imean_pre(ol);
+  	Rcpp::NumericVector imean_post(ol);
   	//Rcpp::NumericVector time_screen(ol);
   	//Rcpp::NumericVector time_pre(ol);
   	//Rcpp::NumericVector time_post(ol);
@@ -80,6 +86,21 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	//Rcpp::NumericVector salary_cost(ol);
   	//Rcpp::NumericVector travel_cost(ol);
   	Rcpp::NumericVector total_cost(ol);
+
+    Rcpp::IntegerVector n_result_0(ol);
+    Rcpp::IntegerVector n_result_1(ol);
+    Rcpp::IntegerVector n_result_2(ol);
+    Rcpp::IntegerVector n_result_3(ol);
+
+    Rcpp::IntegerVector n_above_cutoff(ol);
+    Rcpp::IntegerVector n_below_cutoff(ol);
+
+    Rcpp::IntegerVector n_individ_out(ol);
+    Rcpp::IntegerVector scenario_int_out(ol);
+
+    // Counters for number non-missing imean:
+    std::vector<int> imean_pre_nn(ol);
+    std::vector<int> imean_post_nn(ol);
 
     // Create local vectors:
     std::vector<int> result_ll(ni);
@@ -92,10 +113,10 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
     std::vector<double> imean_post_ll(ni);
     std::vector<double> time_screen_ll(ni);
     std::vector<double> time_pre_ll(ni);
-    std::vector<double> time_post_ll(ni);  
-    
+    std::vector<double> time_post_ll(ni);
+
     // Initialise for running mean:
-		for(int i=0; i<ni; ++i)
+		for(int i=0; i<ol; ++i)
 		{
       /*
       consumables_cost[i] = 0.0;
@@ -104,26 +125,55 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
       */
       total_cost[i] = 0.0;
       efficacy[i] = 0.0;
+      efficacy_var[i] = 0.0;
+
       n_screen[i] = 0.0;
       n_pre[i] = 0.0;
       n_post[i] = 0.0;
       mean_pre[i] = 0.0;
       mean_post[i] = 0.0;
-      // TODO: include imean_pre and imean_post??
+      imean_pre[i] = 0.0;
+      imean_post[i] = 0.0;
+
+      n_result_0[i] = 0L;
+      n_result_1[i] = 0L;
+      n_result_2[i] = 0L;
+      n_result_3[i] = 0L;
+
+      n_above_cutoff[i] = 0L;
+      n_below_cutoff[i] = 0L;
+
+      imean_pre_nn[i] = 0L;
+      imean_post_nn[i] = 0L;
     }
-    
+
+    // Save output and n_individ:
+    int ind=0L;
+    for(int s=0L; s<ns; ++s)
+    {
+      for(int i=0; i<ni; ++i)
+      {
+        scenario_int_out[ind] = s;
+        n_individ_out[ind] = n_individ[i];
+        ind++;
+      }
+    }
+
     for(int p=0L; p<np; ++p)
 	  {
       // If summarising then pass a references to local vectors:
       survey.run(n_individ, mu_pre[p], reduction[p], individ_cv[p], day_cv[p], aliquot_cv[p], reduction_cv[p],
             count_intercept[p], count_coefficient[p], count_add[p], count_mult[p],
-            &result_ll[0L], &n_screen_ll[0L], &n_pre_ll[0L], &n_post_ll[0L], 
-            &mean_pre_ll[0L], &mean_post_ll[0L], &imean_pre_ll[0L], &imean_post_ll[0L], 
+            &result_ll[0L], &n_screen_ll[0L], &n_pre_ll[0L], &n_post_ll[0L],
+            &mean_pre_ll[0L], &mean_post_ll[0L], &imean_pre_ll[0L], &imean_post_ll[0L],
             &time_screen_ll[0L], &time_pre_ll[0L], &time_post_ll[0L], offset);
-            
+
   		// Do cost calculations and running means:
   		for(int i=0; i<ni; ++i)
   		{
+        // Output index accounts for n_individ and scenario:
+        const int ind = scenario_int[p] * ni + i;
+
   			const double cons_cost = n_screen_ll[i] * cost_consumables_screen[p] +
   										n_pre_ll[i] * cost_consumables_pre[p] +
   										n_post_ll[i] * cost_consumables_post[p];
@@ -132,51 +182,111 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   			const double days_pre = (n_pre_ll[i] * time_consumables_pre[p] +time_pre_ll[i]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
   			const double days_post = (n_post_ll[i] * time_consumables_post[p] + time_post_ll[i]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
 
-        const double ndays =  (n_screen_ll[i]<0.5 ? 0.0 : ceil(days_screen)) + 
-                              (n_pre_ll[i]<0.5 ? 0.0 : ceil(days_pre)) + 
+        const double ndays =  (n_screen_ll[i]<0.5 ? 0.0 : ceil(days_screen)) +
+                              (n_pre_ll[i]<0.5 ? 0.0 : ceil(days_pre)) +
                               (n_post_ll[i]<0.5 ? 0.0 : ceil(days_post));
   			const double sal_cost = ndays * n_team[p] * cost_salary[p];
 
   			const double tra_cost = ndays * cost_travel[p];
-        
+
         const double tot_cost = cons_cost + sal_cost + tra_cost;
 
         const double di = static_cast<double>(i+1L);
-        
+
         /*
-  			consumables_cost[i] -= (consumables_cost[i] - cons_cost) / di;
-  			salary_cost[i] -= (salary_cost[i] - sal_cost) / di;
-  			travel_cost[i] -= (travel_cost[i] - tra_cost) / di;
+  			consumables_cost[ind] -= (consumables_cost[ind] - cons_cost) / di;
+  			salary_cost[ind] -= (salary_cost[ind] - sal_cost) / di;
+  			travel_cost[ind] -= (travel_cost[ind] - tra_cost) / di;
         */
-        total_cost[i] -= (total_cost[i] - tot_cost) / di;
+        total_cost[ind] -= (total_cost[ind] - tot_cost) / di;
 
-        const double eff = 1.0 - mean_post_ll[i] / mean_pre_ll[i];
-        efficacy[i] -= (efficacy[i] - eff) / di;
-        
-        n_screen[i] -= (n_screen[i] - n_screen_ll[i]) / di;
-        n_pre[i] -= (n_pre[i] - n_pre_ll[i]) / di;
-        n_post[i] -= (n_post[i] - n_post_ll[i]) / di;
+        if(result_ll[i] > 3L || result_ll[i] < 0L) Rcpp::stop("Unhandled result_ll");
+        n_result_0[ind] += static_cast<int>(result_ll[i] == 0L);
+        n_result_1[ind] += static_cast<int>(result_ll[i] == 1L);
+        n_result_2[ind] += static_cast<int>(result_ll[i] == 2L);
+        n_result_3[ind] += static_cast<int>(result_ll[i] == 3L);
 
-        mean_pre[i] -= (mean_pre[i] - mean_pre_ll[i]) / di;
-        mean_post[i] -= (mean_post[i] - mean_post_ll[i]) / di;
-        
-        // TODO: include imean_pre and imean_post??
-  		}            
+        // Only use these if the scenario was successful:
+        if(result_ll[i] == 0L)
+        {
+          const int nmi = n_result_0[ind];
+          const double eff = 1.0 - mean_post_ll[i] / mean_pre_ll[i];
+
+          const int blc = static_cast<int>(eff < cutoff[p]);
+          n_below_cutoff[ind] += blc;
+          n_above_cutoff[ind] += (1L-blc);
+
+          efficacy[ind] -= (efficacy[ind] - eff) / nmi;
+
+      		const double delta = eff - efficacy[ind];
+      		efficacy_var[ind] += delta * delta;
+
+          n_screen[ind] -= (n_screen[ind] - n_screen_ll[i]) / nmi;
+          n_pre[ind] -= (n_pre[ind] - n_pre_ll[i]) / nmi;
+          n_post[ind] -= (n_post[ind] - n_post_ll[i]) / nmi;
+
+          mean_pre[ind] -= (mean_pre[ind] - mean_pre_ll[i]) / nmi;
+          mean_post[ind] -= (mean_post[ind] - mean_post_ll[i]) / nmi;
+        }
+        else
+        {
+          n_above_cutoff[ind]++;
+        }
+
+        // Only use these if there was a non-missing imean_pre/imean_post:
+        if(!Rcpp::NumericVector::is_na(imean_pre_ll[i]))
+        {
+          imean_pre_nn[ind]++;
+          imean_pre[ind] -= (imean_pre[ind] - imean_pre_ll[i]) / imean_pre_nn[ind];
+        }
+        if(!Rcpp::NumericVector::is_na(imean_post_ll[i]))
+        {
+          imean_post_nn[ind]++;
+          imean_post[ind] -= (imean_post[ind] - imean_post_ll[i]) / imean_post_nn[ind];
+        }
+  		}
     }
-    /*
-  	df = Rcpp::DataFrame::create( 	Rcpp::_["scenario"] = scenario, Rcpp::_["n_individ"] = n_individ, 
-                            Rcpp::_["mean_efficacy"] = efficacy,
-                            Rcpp::_["mean_pre_mean"] = mean_pre, Rcpp::_["mean_post_mean"] = mean_post,	
-                            Rcpp::_["mean_n_screen"] = n_screen, Rcpp::_["mean_n_pre"] = n_pre,	Rcpp::_["mean_n_post"] = n_post, 
-  													Rcpp::_["mean_total_cost"] = total_cost);    
-    */
-    Rcpp::stop("Summarised method is broken - use rsummarised!");
-    // TODO: work out why df is not a data frame, and also return running total of result types 0:3 (check that is right)
+
+    // Set means to NA where all elements were NA:
+    for(int ind=0L; ind<ol; ++ind)
+    {
+      if(n_result_0[ind] == 0L)
+      {
+        efficacy[ind] = NA_REAL;
+        efficacy_var[ind] = NA_REAL;
+        mean_pre[ind] = NA_REAL;
+        mean_post[ind] = NA_REAL;
+      }
+      else
+      {
+        // Also calculate variance:
+        efficacy_var[ind] /= static_cast<double>(n_result_0[ind] - 1L);
+      }
+      if(imean_pre_nn[ind] == 0L)
+      {
+        imean_pre[ind] = NA_REAL;
+      }
+      if(imean_post_nn[ind] == 0L)
+      {
+        imean_post_nn[ind] = NA_REAL;
+      }
+
+    }
+
+  	df = Rcpp::DataFrame::create( 	Rcpp::_["scenario_int"] = scenario_int_out, Rcpp::_["n_individ"] = n_individ_out,
+                            Rcpp::_["mean_efficacy"] = efficacy, Rcpp::_["var_efficacy"] = efficacy_var, 
+                            Rcpp::_["n_below_cutoff"] = n_below_cutoff, Rcpp::_["n_above_cutoff"] = n_above_cutoff, 
+                            Rcpp::_["mean_pre"] = mean_pre, Rcpp::_["mean_post"] = mean_post,
+                            Rcpp::_["imean_pre"] = imean_pre, Rcpp::_["imean_post"] = imean_post,
+                            Rcpp::_["mean_n_screen"] = n_screen, Rcpp::_["mean_n_pre"] = n_pre,	Rcpp::_["mean_n_post"] = n_post,
+                            Rcpp::_["n_result_0"] = n_result_0, Rcpp::_["n_result_1"] = n_result_1,
+                            Rcpp::_["n_result_2"] = n_result_2, Rcpp::_["n_result_3"] = n_result_3,
+  													Rcpp::_["mean_total_cost"] = total_cost);
   }
   else
   {
   	const Rcpp::IntegerVector replicateID = parameters["replicateID"];
-    
+
   	// Create the output vectors:
   	Rcpp::IntegerVector result(ol);
   	Rcpp::NumericVector n_screen(ol);
@@ -195,17 +305,17 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::NumericVector salary_cost(ol);
   	Rcpp::NumericVector travel_cost(ol);
   	Rcpp::NumericVector total_cost(ol);
-    
+
   	int ind = 0L;
     for(int p=0L; p<np; ++p)
     {
       // Otherwise pass reference to the output vector:
       survey.run(n_individ, mu_pre[p], reduction[p], individ_cv[p], day_cv[p], aliquot_cv[p], reduction_cv[p],
             count_intercept[p], count_coefficient[p], count_add[p], count_mult[p],
-            &result[ind], &n_screen[ind], &n_pre[ind], &n_post[ind], 
-            &mean_pre[ind], &mean_post[ind], &imean_pre[ind], &imean_post[ind], 
+            &result[ind], &n_screen[ind], &n_pre[ind], &n_post[ind],
+            &mean_pre[ind], &mean_post[ind], &imean_pre[ind], &imean_post[ind],
             &time_screen[ind], &time_pre[ind], &time_post[ind], offset);
-            
+
   		// Do cost calculations:
   		for(int i=0; i<ni; ++i)
   		{
@@ -217,8 +327,8 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   			const double days_pre = (n_pre[ind] * time_consumables_pre[p] +time_pre[ind]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
   			const double days_post = (n_post[ind] * time_consumables_post[p] + time_post[ind]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
 
-        const double ndays =  (n_screen[ind]<0.5 ? 0.0 : ceil(days_screen)) + 
-                              (n_pre[ind]<0.5 ? 0.0 : ceil(days_pre)) + 
+        const double ndays =  (n_screen[ind]<0.5 ? 0.0 : ceil(days_screen)) +
+                              (n_pre[ind]<0.5 ? 0.0 : ceil(days_pre)) +
                               (n_post[ind]<0.5 ? 0.0 : ceil(days_post));
   			const double sal_cost = ndays * n_team[p] * cost_salary[p];
 
@@ -234,7 +344,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   			ind++;
   		}
     }
-    
+
   	// Create the final non-summarised output:
   	Rcpp::Function expgrd("expand.grid");
   	// NB: deliberately backwards as we use expand.grid and not expand_grid:
@@ -246,10 +356,10 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   													Rcpp::_["result"] = result, Rcpp::_["efficacy"] = efficacy,
   													Rcpp::_["pre_mean"] = mean_pre, Rcpp::_["post_mean"] = mean_post,
   													Rcpp::_["pre_imean"] = imean_pre, Rcpp::_["post_imean"] = imean_post,
-                            Rcpp::_["n_screen"] = n_screen, Rcpp::_["n_pre"] = n_pre,	Rcpp::_["n_post"] = n_post, 
+                            Rcpp::_["n_screen"] = n_screen, Rcpp::_["n_pre"] = n_pre,	Rcpp::_["n_post"] = n_post,
   													Rcpp::_["consumables_cost"] = consumables_cost, Rcpp::_["salary_cost"] = salary_cost,
   													Rcpp::_["travel_cost"] = travel_cost, Rcpp::_["total_cost"] = total_cost);
-    
+
 	}
 
 	return df;

@@ -11,6 +11,7 @@ scen <- survey_scenario()
 iters <- 1e4
 iters <- 1e3
 
+cl <- NULL
 cl <- parallel::makePSOCKcluster(5)
 system.time({
   results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=iters, cl=cl, output="extended")
