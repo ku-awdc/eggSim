@@ -85,6 +85,8 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
 
       # Ensure that parameter_set is consistent:
       stopifnot(all(x$parameter_set == x$parameter_set[1L]))
+      
+      stop("Demography is only recorded exactly once per individual (not at pre and post) - extract timings separately")
 
       # Do whatever cost calculations can be done before expanding:
       x |>
