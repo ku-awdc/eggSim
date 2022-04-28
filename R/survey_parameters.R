@@ -33,7 +33,9 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
       n_day_pre = case_when(
         variant %in% c("11","12") ~ 1L
       ),
+      # Note: SS_12 is different to the others!
       n_aliquot_pre = case_when(
+        design == "SS" & variant == "12" ~ 2L,
         variant %in% c("11","12") ~ 1L
       ),
       n_day_post = case_when(

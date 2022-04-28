@@ -85,8 +85,6 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
 
       # Ensure that parameter_set is consistent:
       stopifnot(all(x$parameter_set == x$parameter_set[1L]))
-      
-      stop("Demography is only recorded exactly once per individual (not at pre and post) - extract timings separately")
 
       # Do whatever cost calculations can be done before expanding:
       x |>
@@ -94,15 +92,26 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
           # Note: these costs/times are per aliquot!
           time_consumables_screen = case_when(
             n_aliquot_screen == 0L ~ 0.0,
-            TRUE ~ (time_demography + time_prep_screen + time_record*n_aliquot_screen) / n_aliquot_screen
+            TRUE ~ (time_prep_screen + time_record*n_aliquot_screen) / n_aliquot_screen
           ),
           time_consumables_pre = case_when(
             n_aliquot_pre == 0L ~ 0.0,
-            TRUE ~ (time_demography + time_prep_pre + time_record*n_aliquot_pre) / n_aliquot_pre
+            TRUE ~ (time_prep_pre + time_record*n_aliquot_pre) / n_aliquot_pre
           ),
           time_consumables_post = case_when(
             n_aliquot_post == 0L ~ 0.0,
-            TRUE ~ (time_demography + time_prep_post + time_record*n_aliquot_post) / n_aliquot_post
+            TRUE ~ (time_prep_post + time_record*n_aliquot_post) / n_aliquot_post
+          ),
+
+          # Add demography time as a single cost per individual for SSR:
+          time_consumables_screen = case_when(
+            n_aliquot_screen > 0L ~ time_consumables_screen + time_demography / (n_day_screen*n_aliquot_screen),
+            TRUE ~ time_consumables_screen
+          ),
+          # Add demography time as a single cost per individual for SS and NS:
+          time_consumables_pre = case_when(
+            n_aliquot_screen == 0L ~ time_consumables_pre + time_demography / (n_day_pre*n_aliquot_pre),
+            TRUE ~ time_consumables_pre
           ),
 
           cost_consumables_screen = case_when(

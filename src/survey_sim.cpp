@@ -41,12 +41,15 @@ Rcpp::DataFrame survey_sim(const std::string& design, const std::string& dist_st
   EXPAND(true, NS, "NS", false, -1L, -1L, -1L, -1L, -1L, -1L);
   EXPAND(true, NS, "NS_11", true, 0L, 0L, 1L, 1L, 1L, 1L);
   EXPAND(true, NS, "NS_12", true, 0L, 0L, 1L, 1L, 1L, 2L);
+  
+  // NB: the definition of SS_12 is different to that of NS_12 and SSR_12!
   EXPAND(false, SS, "SS", false, -1L, -1L, -1L, -1L, -1L, -1L);
   EXPAND(false, SS, "SS_11", true, 0L, 0L, 1L, 1L, 1L, 1L);
-  EXPAND(false, SS, "SS_12", true, 0L, 0L, 1L, 1L, 1L, 2L);
+  EXPAND(false, SS, "SS_12", true, 0L, 0L, 1L, 2L, 1L, 2L);
   EXPAND(true, SS, "SS", false, -1L, -1L, -1L, -1L, -1L, -1L);
   EXPAND(true, SS, "SS_11", true, 0L, 0L, 1L, 1L, 1L, 1L);
-  EXPAND(true, SS, "SS_12", true, 0L, 0L, 1L, 1L, 1L, 2L);
+  EXPAND(true, SS, "SS_12", true, 0L, 0L, 1L, 2L, 1L, 2L);
+  
   EXPAND(false, SSR, "SSR", false, -1L, -1L, -1L, -1L, -1L, -1L);
   EXPAND(false, SSR, "SSR_11", true, 1L, 1L, 1L, 1L, 1L, 1L);
   EXPAND(false, SSR, "SSR_12", true, 1L, 1L, 1L, 1L, 1L, 2L);

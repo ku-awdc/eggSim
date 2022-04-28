@@ -61,21 +61,44 @@ parameters |>
 
 library("eggSim")
 
-pars <- survey_parameters(design="NS_11", parasite="ascaris")
+pars <- survey_parameters(parasite="ascaris")
 scen <- survey_scenario(parasite="ascaris") |> slice(1L)
 
 # Note: recompilation needed for each!
-c_costs1 <- survey_sim(scenario=scen, parameters=pars, n_individ=100L, iterations = 1) |> mutate(scenario=1L) |> select(method, scenario, c_cost=total_cost)
-c_costs1 |> dput()
-c_costs2 <- survey_sim(scenario=scen, parameters=pars, n_individ=100L, iterations = 1) |> mutate(scenario=2L) |> select(method, scenario, c_cost=total_cost)
-c_costs2 |> dput()
+scen1 <- survey_sim(scenario=scen, parameters=pars, n_individ=100L, iterations = 1, output="extended") |> mutate(scenario=1L)
+scen2 <- survey_sim(scenario=scen, parameters=pars, n_individ=100L, iterations = 1, output="extended") |> mutate(scenario=2L)
+scenarios <- bind_rows(scen1, scen2)
+# save(scenarios, file="paper_2022_Bruno/scenarios.rda")
 
-c_costs1 <- structure(list(method = c("fecpak", "kk", "miniflotac"), scenario = c(1L,  1L, 1L), c_cost = c(1172, 748, 1136)), row.names = c(NA, -3L), class = c("tbl_df",  "tbl", "data.frame"))
-c_costs2 <- structure(list(method = c("fecpak", "kk", "miniflotac"), scenario = c(2L,  2L, 2L), c_cost = c(1352, 928, 1136)), row.names = c(NA, -3L), class = c("tbl_df",  "tbl", "data.frame"))
+# Costs:
+scenarios |>
+  select(scenario, method, design, consumables_cost) |>
+  mutate(method = factor(method, c("kk","miniflotac","fecpak"))) |>
+  mutate(design = factor(design, c("SS_11","SS_12","SSR_11","SSR_12","NS_11","NS_12"))) |>
+  arrange(scenario, method, design) ->
+  costs
+write_csv(costs, file="paper_2022_Bruno/comp_costs.csv")
 
-all_costs <- cbind(tibble(design="NS_11"), bind_rows(c_costs1, c_costs2)) |> full_join(r_costs)
+# Time for counting:
+scenarios |>
+  mutate(pre = time_screen_count + time_pre_count, post = time_post_count) |>
+  mutate(method = factor(method, c("kk","miniflotac","fecpak"))) |>
+  filter(design=="SS_11") |>
+  arrange(scenario, method, design) |>
+  select(scenario, method, pre, post) ->
+  counting
+write_csv(counting, file="paper_2022_Bruno/comp_counting.csv")
 
-all_costs
+
+# Time total:
+scenarios |>
+  mutate(method = factor(method, c("kk","miniflotac","fecpak"))) |>
+  mutate(design = factor(design, c("SS_11","SS_12","SSR_11","SSR_12","NS_11","NS_12"))) |>
+  arrange(method, design, scenario) |>
+  select(method, design, scenario, time_screen, time_screen_count, time_pre, time_pre_count, time_post, time_post_count) ->
+  time
+write_csv(time, file="paper_2022_Bruno/comp_time.csv")
+
 
 stop()
 

@@ -22,6 +22,8 @@ void survey_ss(const int N_day_pre_, const int N_aliquot_pre_,
 				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
 				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset)
 {
+  // Defined in enums.h:
+  TESTING();
 
   const int N_day_pre = t_fixed_n ? nd1 : N_day_pre_;
   const int N_aliquot_pre = t_fixed_n ? na1 : N_aliquot_pre_;
@@ -61,13 +63,29 @@ void survey_ss(const int N_day_pre_, const int N_aliquot_pre_,
       const double mu_day = rday.draw(mu_ind);
       for(int aliquot=0L; aliquot<N_aliquot_pre; ++aliquot)
       {
-        /*
-        double mu_aliquot = rgamma_cv(mu_day, aliquot_cv);
-        int count = rpois(mu_aliquot);
-        */
-        const int counti = raliquot.draw(mu_day);
-		    ispos = ispos || counti > 0L;
-		    const double count = static_cast<double>(counti);
+        // const int icount = raliquot.draw(mu_day);
+        
+        // Allow test scenarios:
+        int icount;
+        if constexpr(s_testing==0L)
+        {
+          icount = raliquot.draw(mu_day);
+        }
+        else if constexpr(s_testing==1L)
+        {
+          icount = 20L;
+        }
+        else if constexpr(s_testing==2L)
+        {
+          icount = ind+51L;
+        }
+        else
+        {
+          Rcpp::stop("Unrecognised testing setting");
+        }
+        
+		    ispos = ispos || icount > 0L;
+		    const double count = static_cast<double>(icount);
         pre_mean -= (pre_mean - count) / static_cast<double>(++pre_n);
 		    counter_pre.add_count(count);
       }
@@ -85,11 +103,60 @@ void survey_ss(const int N_day_pre_, const int N_aliquot_pre_,
         const double mu_day = rday.draw(mu_ind);
         for(int aliquot=0L; aliquot<N_aliquot_post; ++aliquot)
         {
-          /*
-          double mu_aliquot = rgamma_cv(mu_day, aliquot_cv);
-          int count = rpois(mu_aliquot);
-          */
-          const double count = static_cast<double>(raliquot.draw(mu_day));
+          // const int icount = raliquot.draw(mu_day);
+          
+          // Allow test scenarios:
+          int icount;
+          if constexpr(s_testing==0L)
+          {
+            icount = raliquot.draw(mu_day);
+          }
+          else if constexpr(s_testing==1L)
+          {
+            if(N_aliquot_post == 1L)
+            {
+              icount = 1L;
+            }
+            // If this is SS_12 then the counts come from scenarios 1 & 2, respectively:
+            else if(N_aliquot_post == 2L && aliquot == 0L)
+            {
+              icount = 1L;
+            }
+            else if(N_aliquot_post == 2L && aliquot == 1L)
+            {
+              icount = ind % 5L;
+            }
+            else
+            {
+              Rcpp::stop("Unsupported  test design");
+            }
+          }
+          else if constexpr(s_testing==2L)
+          {
+            if(N_aliquot_post == 1L)
+            {
+              icount = ind % 5L;
+            }
+            // If this is SS_12 then the counts come from scenarios 1 & 2, respectively:
+            else if(N_aliquot_post == 2L && aliquot == 0L)
+            {
+              icount = 1L;
+            }
+            else if(N_aliquot_post == 2L && aliquot == 1L)
+            {
+              icount = ind % 5L;
+            }
+            else
+            {
+              Rcpp::stop("Unsupported  test design");
+            }
+          }
+          else
+          {
+            Rcpp::stop("Unrecognised testing setting");
+          }
+          
+          const double count = static_cast<double>(icount);
           post_mean -= (post_mean - count) / static_cast<double>(++post_n);
     		  counter_post.add_count(count);
         }

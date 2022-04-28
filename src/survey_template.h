@@ -298,9 +298,13 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::NumericVector mean_post(ol);
   	Rcpp::NumericVector imean_pre(ol);
   	Rcpp::NumericVector imean_post(ol);
+    
   	Rcpp::NumericVector time_screen(ol);
   	Rcpp::NumericVector time_pre(ol);
   	Rcpp::NumericVector time_post(ol);
+  	Rcpp::NumericVector time_screen_count(ol);
+  	Rcpp::NumericVector time_pre_count(ol);
+  	Rcpp::NumericVector time_post_count(ol);
 
   	Rcpp::NumericVector consumables_cost(ol);
   	Rcpp::NumericVector salary_cost(ol);
@@ -315,7 +319,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
             count_intercept[p], count_coefficient[p], count_add[p], count_mult[p],
             &result[ind], &n_screen[ind], &n_pre[ind], &n_post[ind],
             &mean_pre[ind], &mean_post[ind], &imean_pre[ind], &imean_post[ind],
-            &time_screen[ind], &time_pre[ind], &time_post[ind], offset);
+            &time_screen_count[ind], &time_pre_count[ind], &time_post_count[ind], offset);
 
   		// Do cost calculations:
   		for(int i=0; i<ni; ++i)
@@ -323,10 +327,14 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   			const double cons_cost = n_screen[ind] * cost_consumables_screen[p] +
   										n_pre[ind] * cost_consumables_pre[p] +
   										n_post[ind] * cost_consumables_post[p];
+        
+        time_screen[ind] = n_screen[ind] * time_consumables_screen[p];
+        time_pre[ind] = n_pre[ind] * time_consumables_pre[p];
+        time_post[ind] = n_post[ind] * time_consumables_post[p];
 
-  			const double days_screen = (n_screen[ind] * time_consumables_screen[p] + time_screen[ind]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
-  			const double days_pre = (n_pre[ind] * time_consumables_pre[p] +time_pre[ind]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
-  			const double days_post = (n_post[ind] * time_consumables_post[p] + time_post[ind]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
+  			const double days_screen = (time_screen[ind] + time_screen_count[ind]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
+  			const double days_pre = (time_pre[ind] + time_pre_count[ind]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
+  			const double days_post = (time_post[ind] + time_post_count[ind]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
 
         const double ndays =  (n_screen[ind]<0.5 ? 0.0 : ceil(days_screen)) +
                               (n_pre[ind]<0.5 ? 0.0 : ceil(days_pre)) +
@@ -353,14 +361,17 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::IntegerVector nind = repmean[0L];
   	Rcpp::IntegerVector repID = repmean[1L];
 
+    // Note: this method is limited to 20 columns, but I could work around that using a list
   	df = Rcpp::DataFrame::create( 	Rcpp::_["replicateID"] = repID, Rcpp::_["n_individ"] = nind,
   													Rcpp::_["result"] = result, Rcpp::_["efficacy"] = efficacy,
   													Rcpp::_["pre_mean"] = mean_pre, Rcpp::_["post_mean"] = mean_post,
-  													Rcpp::_["pre_imean"] = imean_pre, Rcpp::_["post_imean"] = imean_post,
+//  													Rcpp::_["pre_imean"] = imean_pre, Rcpp::_["post_imean"] = imean_post,
                             Rcpp::_["n_screen"] = n_screen, Rcpp::_["n_pre"] = n_pre,	Rcpp::_["n_post"] = n_post,
+                            Rcpp::_["time_screen"] = time_screen, Rcpp::_["time_screen_count"] = time_screen_count,
+                            Rcpp::_["time_pre"] = time_pre, Rcpp::_["time_pre_count"] = time_pre_count,
+                            Rcpp::_["time_post"] = time_post, Rcpp::_["time_post_count"] = time_post_count,
   													Rcpp::_["consumables_cost"] = consumables_cost, Rcpp::_["salary_cost"] = salary_cost,
   													Rcpp::_["travel_cost"] = travel_cost, Rcpp::_["total_cost"] = total_cost);
-
 	}
 
 	return df;

@@ -22,7 +22,8 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
 				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
 				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset)
 {
-  constexpr int s_testing = 0L;
+  // Defined in enums.h:
+  TESTING();
 
   const int N_day_pre = t_fixed_n ? nd1 : N_day_pre_;
   const int N_aliquot_pre = t_fixed_n ? na1 : N_aliquot_pre_;
@@ -70,11 +71,43 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
         }
         else if constexpr(s_testing==1L)
         {
-          icount = 20L;
+          if(N_aliquot_pre == 1L)
+          {
+            icount = 20L;
+          }
+          // If this is SS_12 then the counts come from scenarios 1 & 2, respectively:
+          else if(N_aliquot_pre == 2L && aliquot == 0L)
+          {
+            icount = 20L;
+          }
+          else if(N_aliquot_pre == 2L && aliquot == 1L)
+          {
+            icount = ind+51L;
+          }
+          else
+          {
+            Rcpp::stop("Unsupported  test design");
+          }
         }
         else if constexpr(s_testing==2L)
         {
-          icount = ind+51L;
+          if(N_aliquot_pre == 1L)
+          {
+            icount = ind+51L;
+          }
+          // If this is SS_12 then the counts come from scenarios 1 & 2, respectively:
+          else if(N_aliquot_pre == 2L && aliquot == 0L)
+          {
+            icount = 20L;
+          }
+          else if(N_aliquot_pre == 2L && aliquot == 1L)
+          {
+            icount = ind+51L;
+          }
+          else
+          {
+            Rcpp::stop("Unsupported test design");
+          }
         }
         else
         {
@@ -107,11 +140,43 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
         }
         else if constexpr(s_testing==1L)
         {
-          icount = 1L;
+          if(N_aliquot_post == 1L)
+          {
+            icount = 1L;
+          }
+          // If this is SS_12 then the counts come from scenarios 1 & 2, respectively:
+          else if(N_aliquot_post == 2L && aliquot == 0L)
+          {
+            icount = 1L;
+          }
+          else if(N_aliquot_post == 2L && aliquot == 1L)
+          {
+            icount = ind % 5L;
+          }
+          else
+          {
+            Rcpp::stop("Unsupported  test design");
+          }
         }
         else if constexpr(s_testing==2L)
         {
-          icount = ind % 5L;
+          if(N_aliquot_post == 1L)
+          {
+            icount = ind % 5L;
+          }
+          // If this is SS_12 then the counts come from scenarios 1 & 2, respectively:
+          else if(N_aliquot_post == 2L && aliquot == 0L)
+          {
+            icount = 1L;
+          }
+          else if(N_aliquot_post == 2L && aliquot == 1L)
+          {
+            icount = ind % 5L;
+          }
+          else
+          {
+            Rcpp::stop("Unsupported  test design");
+          }
         }
         else
         {
