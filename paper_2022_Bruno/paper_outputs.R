@@ -8,7 +8,7 @@ params <- survey_parameters()
 scen <- survey_scenario()
 
 iters <- 1e4
-iters <- 1e3
+#iters <- 1e3
 
 system.time({
   results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=iters, cl=6L, output="summarised")
