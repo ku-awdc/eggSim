@@ -127,38 +127,35 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
         method == "fecpak" ~ 0.172
       ),
       time_demography = case_when(
-        method == "kk" ~ 12,
-        method == "miniflotac" ~ 12,
-        method == "fecpak" ~ 31
+        method == "kk" ~ 15,
+        method == "miniflotac" ~ 15,
+        method == "fecpak" ~ 34
       ),
-      time_prep_1 = case_when(
-        method == "kk" ~ 67,
-        method == "miniflotac" ~ 128,
-        method == "fecpak" ~ 590
+      time_prep_variable = case_when(
+        method == "kk" ~ 134-67,
+        method == "miniflotac" ~ 197-131,
+        method == "fecpak" ~ 1050-596
       ),
-      time_prep_2 = case_when(
-        method == "kk" ~ 133,
-        method == "miniflotac" ~ 192,
-        method == "fecpak" ~ 1004
+      time_prep_fixed = case_when(
+        method == "kk" ~ 67 - time_prep_variable,
+        method == "miniflotac" ~ 131 - time_prep_variable,
+        method == "fecpak" ~ 596 - time_prep_variable
       ),
       time_prep_screen = case_when(
         n_aliquot_screen == 0L ~ 0,
-        n_aliquot_screen == 1L ~ time_prep_1,
-        n_aliquot_screen == 2L ~ time_prep_2
+        TRUE ~ time_prep_fixed + time_prep_variable * n_aliquot_screen
       ),
       time_prep_pre = case_when(
         n_aliquot_pre == 0L ~ 0,
-        n_aliquot_pre == 1L ~ time_prep_1,
-        n_aliquot_pre == 2L ~ time_prep_2
+        TRUE ~ time_prep_fixed + time_prep_variable * n_aliquot_pre
       ),
       time_prep_post = case_when(
         n_aliquot_post == 0L ~ 0,
-        n_aliquot_post == 1L ~ time_prep_1,
-        n_aliquot_post == 2L ~ time_prep_2
+        TRUE ~ time_prep_fixed + time_prep_variable * n_aliquot_post
       ),
       time_record = case_when(
-        method == "kk" ~ 8,
-        method == "miniflotac" ~ 8,
+        method == "kk" ~ 9,
+        method == "miniflotac" ~ 9,
         method == "fecpak" ~ 0
       ),
       cost_sample = case_when(
@@ -166,30 +163,27 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
         method == "miniflotac" ~ 0.57,
         method == "fecpak" ~ 0.57
       ),
-      cost_aliquot_1 = case_when(
-        method == "kk" ~ 1.37,
-        method == "miniflotac" ~ 1.51,
-        method == "fecpak" ~ 1.69
+      cost_aliquot_variable = case_when(
+        method == "kk" ~ 1.51 - 1.37,
+        method == "miniflotac" ~ 1.87 - 1.51,
+        method == "fecpak" ~ 2.73 - 1.69
       ),
-      cost_aliquot_2 = case_when(
-        method == "kk" ~ 1.51,
-        method == "miniflotac" ~ 1.87,
-        method == "fecpak" ~ 2.73
+      cost_aliquot_fixed = case_when(
+        method == "kk" ~ 1.37 - cost_aliquot_variable,
+        method == "miniflotac" ~ 1.51 - cost_aliquot_variable,
+        method == "fecpak" ~ 1.69 - cost_aliquot_variable
       ),
       cost_aliquot_screen = case_when(
         n_aliquot_screen == 0L ~ 0,
-        n_aliquot_screen == 1L ~ cost_aliquot_1,
-        n_aliquot_screen == 2L ~ cost_aliquot_2
+        TRUE ~ cost_aliquot_fixed + cost_aliquot_variable * n_aliquot_screen
       ),
       cost_aliquot_pre = case_when(
         n_aliquot_pre == 0L ~ 0,
-        n_aliquot_pre == 1L ~ cost_aliquot_1,
-        n_aliquot_pre == 2L ~ cost_aliquot_2
+        TRUE ~ cost_aliquot_fixed + cost_aliquot_variable * n_aliquot_pre
       ),
       cost_aliquot_post = case_when(
         n_aliquot_post == 0L ~ 0,
-        n_aliquot_post == 1L ~ cost_aliquot_1,
-        n_aliquot_post == 2L ~ cost_aliquot_2
+        TRUE ~ cost_aliquot_fixed + cost_aliquot_variable * n_aliquot_post
       ),
       cost_salary = case_when(
         TRUE ~ 22.50
@@ -206,7 +200,7 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
       )
     ) |>
     mutate(design = template) |>
-    select(-template, -variant, -cost_aliquot_1, -cost_aliquot_2, -time_prep_1, -time_prep_2) |>
+    select(-template, -variant, -cost_aliquot_fixed, -cost_aliquot_variable, -time_prep_fixed, -time_prep_variable) |>
     group_by(design, parasite, method, parameter_set) |>
     group_split() ->
     parameters

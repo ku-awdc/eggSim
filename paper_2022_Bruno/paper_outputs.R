@@ -40,6 +40,27 @@ with(allmcost, stopifnot(all(maxcost_dmsp >= maxcost)))
 if(!grepl("paper_2022_Bruno", getwd())) setwd("paper_2022_Bruno")
 
 theme_set(theme_light())
+
+ggplot(results |> filter(parasite=="trichuris"), aes(x=-cost_mean, y=proportion_below, col=design, group=design)) +
+  geom_line() +
+  #  geom_point() +
+  facet_grid(mean_epg ~ method) +
+  labs(col=pp) +
+  xlim(-maxcost, 0)
+
+pdf("figure2.pdf")
+for(pp in unique(scen$parasite)){
+  pt <- ggplot(results |> filter(parasite==pp), aes(x=-cost_mean, y=proportion_below, col=design, group=design)) +
+    geom_line() +
+    #  geom_point() +
+    facet_grid(mean_epg ~ method) +
+    labs(col=pp) +
+    xlim(-maxcost, 0)
+  print(pt)
+}
+dev.off()
+
+
 pdf("graph_failure_rate.pdf")
 for(pp in unique(scen$parasite)){
   pt <- ggplot(results |> filter(parasite==pp), aes(x=n_individ, y=(failure_n/total_n), col=design, group=design)) +
