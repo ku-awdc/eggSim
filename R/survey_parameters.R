@@ -6,6 +6,11 @@
 #' @param method method(s) to use - must be one of the standard options
 #'
 #' @rdname survey_parameters
+#'
+#' @examples
+#' pars <- survey_parameters(design=c("SSR_11","SSR_12"), parasite="ascaris", method="kk")
+#' pars
+#'
 #' @export
 survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11","SSR_12"),
                               parasite = c("ascaris","trichuris","hookworm"),

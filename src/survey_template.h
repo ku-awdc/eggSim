@@ -298,7 +298,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::NumericVector mean_post(ol);
   	Rcpp::NumericVector imean_pre(ol);
   	Rcpp::NumericVector imean_post(ol);
-    
+
   	Rcpp::NumericVector time_screen(ol);
   	Rcpp::NumericVector time_pre(ol);
   	Rcpp::NumericVector time_post(ol);
@@ -327,7 +327,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   			const double cons_cost = n_screen[ind] * cost_consumables_screen[p] +
   										n_pre[ind] * cost_consumables_pre[p] +
   										n_post[ind] * cost_consumables_post[p];
-        
+
         time_screen[ind] = n_screen[ind] * time_consumables_screen[p];
         time_pre[ind] = n_pre[ind] * time_consumables_pre[p];
         time_post[ind] = n_post[ind] * time_consumables_post[p];
@@ -361,17 +361,25 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::IntegerVector nind = repmean[0L];
   	Rcpp::IntegerVector repID = repmean[1L];
 
-    // Note: this method is limited to 20 columns, but I could work around that using a list
-  	df = Rcpp::DataFrame::create( 	Rcpp::_["replicateID"] = repID, Rcpp::_["n_individ"] = nind,
+    // Note: Rcpp::DataFrame::create is limited to 20 columns
+  	Rcpp::DataFrame df1 = Rcpp::DataFrame::create(
+                            Rcpp::_["replicateID"] = repID, Rcpp::_["n_individ"] = nind,
   													Rcpp::_["result"] = result, Rcpp::_["efficacy"] = efficacy,
   													Rcpp::_["pre_mean"] = mean_pre, Rcpp::_["post_mean"] = mean_post,
-//  													Rcpp::_["pre_imean"] = imean_pre, Rcpp::_["post_imean"] = imean_post,
-                            Rcpp::_["n_screen"] = n_screen, Rcpp::_["n_pre"] = n_pre,	Rcpp::_["n_post"] = n_post,
+  													Rcpp::_["pre_imean"] = imean_pre, Rcpp::_["post_imean"] = imean_post,
+                            Rcpp::_["n_screen"] = n_screen, Rcpp::_["n_pre"] = n_pre,	Rcpp::_["n_post"] = n_post);
+
+  	Rcpp::DataFrame df2 = Rcpp::DataFrame::create(
                             Rcpp::_["time_screen"] = time_screen, Rcpp::_["time_screen_count"] = time_screen_count,
                             Rcpp::_["time_pre"] = time_pre, Rcpp::_["time_pre_count"] = time_pre_count,
                             Rcpp::_["time_post"] = time_post, Rcpp::_["time_post_count"] = time_post_count,
   													Rcpp::_["consumables_cost"] = consumables_cost, Rcpp::_["salary_cost"] = salary_cost,
   													Rcpp::_["travel_cost"] = travel_cost, Rcpp::_["total_cost"] = total_cost);
+
+    Rcpp::Environment pkg = Rcpp::Environment::namespace_env("dplyr");
+    Rcpp::Function bcol = pkg["bind_cols"];
+    // Rcpp::Function bcol("cbind");
+    df = bcol(df1, df2);
 	}
 
 	return df;

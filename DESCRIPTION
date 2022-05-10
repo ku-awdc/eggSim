@@ -1,7 +1,7 @@
 Package: eggSim
 Title: Simulating Datasets Representing Egg Reduction Rate Data
-Version: 0.9.4-3
-Date: 2022-04-14
+Version: 0.9.4-5
+Date: 2022-05-10
 Authors@R:  
     c(person(given = "Matt",
            family = "Denwood",

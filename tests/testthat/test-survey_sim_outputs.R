@@ -52,3 +52,4 @@ for(cc in seq_len(ncol(r3))){
     expect_equal(r3[[cn]], r4[[cn]])
   })
 }
+

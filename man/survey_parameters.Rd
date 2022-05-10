@@ -23,3 +23,8 @@ survey_scenario(parasite = c("ascaris", "trichuris", "hookworm"))
 \description{
 Parameter sets for survey simulations
 }
+\examples{
+pars <- survey_parameters(design=c("SSR_11","SSR_12"), parasite="ascaris", method="kk")
+pars
+
+}
