@@ -20,13 +20,18 @@ TODO: tidy up and expand
 
 ## Installation
 
-The eggSim package is hosted via a public repository at (https://github.com/ku-awdc/eggSim), so you can install it directly from there using remotes::install_github().  However, this installation from source requires C++ compilers etc.
-
-We therefore recommend that you install a pre-compiled stable/release version from our drat repository using the following command:
+The eggSim package is hosted via a public repository at (https://github.com/ku-awdc/eggSim), so you can install it directly from there using remotes::install_github().  However, this requires rebuilding of vignettes and always requires C++ compilers. We therefore recommend that you install from our drat repository using the following command:
 
 ```{r eval=FALSE}
-install.packages('eggSim', repos=c(CRAN="https://cran.rstudio.com/", "ku-awdc"="https://ku-awdc.github.io/drat/"))
+install.packages('eggSim', repos=c(CRAN="https://cran.rstudio.com/", 
+                                   "ku-awdc"="https://ku-awdc.github.io/drat/"))
 ```
+
+This will install a pre-compiled stable/release version where this is available for your system and R version, but may still ask for installation from source if there is a newer source version compared to the pre-built binary that is available for your platform.  To be able to install these you need to do one of the following:
+
+- On macOS run the following command from the terminal:  sudo xcode-select --install
+
+- On Windows download and install Rtools (make sure to pick the version that matches your R installation) from:  https://cran.r-project.org/bin/windows/Rtools/
 
 
 ## Introduction
@@ -42,14 +47,21 @@ library("tidyverse")
 
 ## Scenarios
 
-First define the scenarios to test.  This should be a data frame with columns parasite, scenario, mean_epg, true_efficacy and cutoff.
+First define the scenarios to test.  This should be a data frame with columns parasite, scenario, mean_epg, true_efficacy and cutoff. It is most convenient to use the provided helper function to generate a data frame in the correct format:
 
 ```{r}
 scenarios <- survey_scenario(parasite = c("ascaris","trichuris","hookworm"))
 scenarios
 ```
 
-Then define the parameters, either as a data frame for a single parameter set, or a list of data frames for multiple parameter sets.  Each data frame can either have 1 row, or multiple rows corresponding to iterations where uncertainty in parameter estimates will be integrated over by the simulation.
+If needed, you can then modify this e.g.:
+
+```{r}
+scenarios$mean_epg[1] <- 20
+scenarios
+```
+
+Then you need to define the parameters, either as a data frame for a single parameter set, or a list of data frames for multiple parameter sets.  Each data frame can either have 1 row, or multiple rows corresponding to iterations where uncertainty in parameter estimates will be integrated over by the simulation. Again, it is convinient to use the provided helper function:
 
 ```{r}
 par_1 <- survey_parameters(design = c("NS_11"), parasite = c("ascaris"), method = c("kk"))
@@ -59,12 +71,24 @@ par_all <- survey_parameters(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11"
 length(par_all)
 par_all[[1]]
 ```
-If you need to change the parameter values then it is probably easiest to do so by first generating parameter values from survey_parameters() and then modifying the data frame afterwards.
 
-Then run the simulation, specifying a vector of number of individuals, number of iterations, and optionally the number of parallel cores to use:
+Again, the values can be changed e.g.:
 
 ```{r}
-results <- survey_sim(n_individ = seq(100,1000,by=10), scenario = scenarios, parameters = par_all, iterations = 1e3, cl=2L, output="summarised")
+par_all[[1]]$reduction_cv <- 1
+```
+
+Or if you want to integrate over uncertainty in one or more parameter estimate, you can alter the data frame so that it has as many rows as iterations, with each row of the data frame reflecting uncertainty in one or more of the parameter estimates (which is most likely to apply to the cv estimates).  For example:
+
+```{r}
+par_all[[2]] <- par_all[[2]] |> slice(rep(1, 1e3)) |> mutate(reduction_cv = rgamma(n(), 1, 1))
+nrow(par_all[[2]])
+```
+
+Then you can run the simulation, specifying a vector of number of individuals, number of iterations, and optionally the number of parallel cores to use. Here I select only the first 5 parameter sets to speed up processing of the vignette:
+
+```{r}
+results <- survey_sim(n_individ = seq(100,1000,by=10), scenario = scenarios, parameters = par_all[1:5], iterations = 1e3, cl=2L, output="summarised")
 ```
 
 Note that the default option for the output is to pre-summarise (in order to reduce memory usage).  If you prefer, then you can ask for either full output or extended output, which return results at the level of iteration:

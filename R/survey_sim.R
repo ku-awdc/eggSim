@@ -143,7 +143,8 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       # Replicate the parameters over iterations (if necessary),
       # and then inner_join with scenario and add replicate ID:
       if(nrow(x)>1L){
-        stopifnot("iteration" %in% names(x))
+        if(nrow(x)!=iterations) stop(paste0("The number of rows of the parameter data frame (", nrow(x), ") does not match the number of iterations (", iterations, ")"))
+        if(!"iteration" %in% names(x)) x$iteration <- 1:iterations
         x <- x |> arrange(iteration)
         stopifnot(all(x$iteration == 1:iterations))
       }else{

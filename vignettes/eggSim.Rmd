@@ -67,10 +67,10 @@ second_slide_cost <- 0.621
 
 ## Running a simulation
 
-The main interface for running simulations is via the eggSim function. We can run 1000 simulated FECRT as follows:
+The main interface for running simulations is via the eggSim function. We can run 100 simulated FECRT as follows:
 
 ```{r}
-efficacies <- eggSim(R=1e3, summarise=FALSE, reduction=reduction, budget=budget, second_slide_cost=second_slide_cost, community_mean=community_mean, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction)
+efficacies <- eggSim(R=1e2, summarise=FALSE, reduction=reduction, budget=budget, second_slide_cost=second_slide_cost, community_mean=community_mean, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction)
 ```
 
 This gives us a data frame of 1000 observed arithmetic (and geometric) mean efficacies for each of the default survey designs, along with other parameter values that do not vary between iterations:
@@ -98,7 +98,7 @@ reduction <- 1 - c(0.95, 0.8)
 And then run the simulations on 2 cores to improve speed of computation:
 
 ```{r}
-biases <- eggSim(R=1e3, summarise=TRUE, parallelise=2, reduction=reduction, budget=budget, second_slide_cost=second_slide_cost, community_mean=community_mean, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction)
+biases <- eggSim(R=1e2, summarise=TRUE, parallelise=2, reduction=reduction, budget=budget, second_slide_cost=second_slide_cost, community_mean=community_mean, cv_between=cv_between, cv_within=cv_within, cv_slide=cv_slide, cv_reduction=cv_reduction)
 ```
 
 This time we asked eggSim to summarise the iterations, so we end up with a smaller data frame with summary statistics over the 1000 iterations per parameter value set. We can extract the most relevant columns like so:

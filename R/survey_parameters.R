@@ -262,8 +262,11 @@ check_parameters <- function(pp, iters=1L){
     stopifnot(all(!is.na(x)))
     stopifnot(nrow(x) %in% c(1L, iters))
   })
-  ps <- sapply(pp, function(x) x$parameter_set)
-  stopifnot(all(table(ps)==1L))
+  ps <- lapply(pp, function(x){
+    if(!length(unique(x$parameter_set))==1L){
+      stop("Invalid parameters:  parameter_set must be consistent", call.=FALSE)
+    }
+  })
   invisible(pp)
 }
 
