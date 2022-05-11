@@ -47,12 +47,102 @@ theme_set(theme_light())
 
 # Fig 1: Pipelines of analysis for one STH  (HK) and test (KK)  mean = 3.7; (failure rate; number of individuals vs. power; number of individuals vs. cost; cost vs. power). All the others in supplementary figures. Also use this example for the sensitivity analysis.
 
+fig1data <- results |>
+  filter(parasite=="hookworm", method=="kk", scenario==1L) |>
+  mutate(nclass = case_when(n_individ > nmax ~ "over1k", TRUE ~ "under1k"))
 
+fig1a <- ggplot(fig1data |> filter(n_individ <= nmax), aes(x=n_individ, y=failure_n/total_n, col=design)) +
+  geom_line() +
+  scale_y_continuous(labels=scales::percent) +
+  ylab("Failure Rate") +
+  scale_x_continuous() +
+  xlab("Total Individuals") +
+  theme(legend.pos="none")
+fig1a
+fig1b <- ggplot(fig1data |> filter(n_individ <= nmax), aes(x=n_individ, y=below_cutoff/total_n, col=design)) +
+  geom_line() +
+  scale_y_continuous(labels=scales::percent) +
+  ylab("Proportion Below Threshold") +
+  scale_x_continuous() +
+  xlab("Total Individuals") +
+  theme(legend.pos="none")
+fig1b
+fig1c <- ggplot(fig1data |> filter(n_individ <= nmax), aes(x=n_individ, y=cost_mean/1e3, col=design)) +
+  geom_line() +
+  scale_y_continuous() +
+  ylab("Mean Cost ($k)") +
+  scale_x_continuous() +
+  xlab("Total Individuals") +
+  theme(legend.pos="none")
+fig1c
+fig1d <- ggplot(fig1data, aes(x=cost_mean/1e3, y=below_cutoff/total_n, col=design, lty=nclass)) +
+  geom_line() +
+  scale_y_continuous(labels=scales::percent) +
+  ylab("Proportion Below Threshold") +
+  scale_x_continuous(trans="reverse") +
+  xlab("Mean Cost ($k)") +
+  theme(legend.pos="none") +
+  scale_linetype_manual(values=c(under1k="solid", over1k="dotted"))
+fig1d
+
+# From http://www.sthda.com/english/wiki/wiki.php?id_contents=7930
+library(gridExtra)
+get_legend<-function(myggplot){
+  tmp <- ggplot_gtable(ggplot_build(myggplot))
+  leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+  legend <- tmp$grobs[[leg]]
+  return(legend)
+}
+legend <- get_legend(fig1a + theme(legend.pos="bottom", legend.title=element_blank()))
+
+fig1 <- grid.arrange(fig1a, fig1b, fig1c, fig1d, fig1e, ncol=2, nrow = 3,
+             layout_matrix = rbind(c(1,2), c(3,4), c(5,5)),
+             widths = c(2.7, 2.7), heights = c(2.5, 2.5, 0.5))
+ggsave("Figure_1.pdf", fig1, height=7, width=6)
 
 # Fig 2: KK best options to reduce the number (Hookworm: lowest value; 6 panels each representing one survey design and 3 methods (lines); cost. Vs power
+
+fig2data <- results |>
+  filter(parasite=="hookworm", scenario==1L) |>
+  mutate(nclass = case_when(n_individ > nmax ~ "over1k", TRUE ~ "under1k")) |>
+  mutate(design = factor(design, levels=c("SS_11","NS_11","SSR_11","SS_12","NS_12","SSR_12")))
+
+fig2 <- ggplot(fig2data, aes(x=cost_mean/1e3, y=below_cutoff/total_n, col=method, lty=nclass)) +
+  geom_line() +
+  scale_y_continuous(labels=scales::percent) +
+  ylab("Proportion Below Threshold") +
+  scale_x_continuous(trans="reverse") +
+  xlab("Mean Cost ($k)") +
+  facet_wrap(~design, scales="fixed") +
+  theme(legend.pos="bottom") +
+  scale_linetype_manual(values=c(under1k="solid", over1k="dotted")) +
+  guides(linetype="none", col=guide_legend(""))
+fig2
+ggsave("Figure_2.pdf", fig2, height=6, width=7)
+
 # Fig 3: Cost vs. power for KK only across all scenarios of survey design and endmicity. Figures complete range of values. Dashed lines from where it becomes not feasible
 
+fig3data <- results |>
+  filter(method=="kk") |>
+  mutate(nclass = case_when(n_individ > nmax ~ "over1k", TRUE ~ "under1k")) |>
+  mutate(scenario = str_c("Scenario ", scenario))
 
+fig3 <- ggplot(fig3data, aes(x=cost_mean/1e3, y=below_cutoff/total_n, col=design, lty=nclass)) +
+  geom_line() +
+  scale_y_continuous(labels=scales::percent) +
+  ylab("Proportion Below Threshold") +
+  scale_x_continuous(trans="reverse") +
+  xlab("Mean Cost ($k)") +
+  facet_grid(scenario ~ parasite) +
+  theme(legend.pos="bottom") +
+  scale_linetype_manual(values=c(under1k="solid", over1k="dotted")) +
+  guides(linetype="none", col=guide_legend(""))
+fig3
+ggsave("Figure_3.pdf", fig3, height=7, width=6)
+
+
+
+stop("Older graphs below here")
 
 ggplot(results |> filter(parasite=="trichuris"), aes(x=-cost_mean, y=proportion_below, col=design, group=design)) +
   geom_line() +
