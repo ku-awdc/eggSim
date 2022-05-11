@@ -3,24 +3,26 @@
 library("tidyverse")
 library("eggSim")
 
+# Get default parameter values for all scenarios:
 n_individ_us <- seq(100,5000,by=5)
 params <- survey_parameters()
 scen <- survey_scenario()
 
+# Set iterations (1e3 for testing, 1e4 for final results):
 iters <- 1e4
 #iters <- 1e3
 
-system.time({
-  results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=iters, cl=6L, output="summarised")
-})
+# Get all results using 6 parallel cores:
+results <- survey_sim(n_individ = n_individ_us, scenario=scen, parameters = params, iterations=iters, cl=6L, output="summarised")
 
+# Remove estimates for means and efficacies where these are based on fewer than 50 successful iterations:
 results <- results |>
-  mutate(across(c(pre_mean, post_mean, efficacy_mean, efficacy_variance), ~ case_when((total_n-failure_n) >= 10L ~.x, TRUE ~ NA_real_)))
+  mutate(across(c(pre_mean, post_mean, efficacy_mean, efficacy_variance), ~ case_when((total_n-failure_n) >= 50L ~.x, TRUE ~ NA_real_)))
 
-# Maximum N to show:
+# Maximum N to show on graphs:
 nmax <- 1000
 
-# Max cost defined by NS11 with sample size of 1000:
+# Max cost is defined by NS11 with sample size of 1000:
 results |>
   filter(design=="NS_11", n_individ==nmax) |>
   group_by(parasite) |>
@@ -37,9 +39,20 @@ results |>
 allmcost
 with(allmcost, stopifnot(all(maxcost_dmsp >= maxcost)))
 
+# Change working directory if needed:
 if(!grepl("paper_2022_Bruno", getwd())) setwd("paper_2022_Bruno")
 
+# Make graphs:
 theme_set(theme_light())
+
+# Fig 1: Pipelines of analysis for one STH  (HK) and test (KK)  mean = 3.7; (failure rate; number of individuals vs. power; number of individuals vs. cost; cost vs. power). All the others in supplementary figures. Also use this example for the sensitivity analysis.
+
+
+
+# Fig 2: KK best options to reduce the number (Hookworm: lowest value; 6 panels each representing one survey design and 3 methods (lines); cost. Vs power
+# Fig 3: Cost vs. power for KK only across all scenarios of survey design and endmicity. Figures complete range of values. Dashed lines from where it becomes not feasible
+
+
 
 ggplot(results |> filter(parasite=="trichuris"), aes(x=-cost_mean, y=proportion_below, col=design, group=design)) +
   geom_line() +

@@ -33,6 +33,12 @@ This will install a pre-compiled stable/release version where this is available 
 
 - On Windows download and install Rtools (make sure to pick the version that matches your R installation) from:  https://cran.r-project.org/bin/windows/Rtools/
 
+Running the code shown in this vignette requires at least version 0.9.4-6:
+
+```{r}
+stopifnot(packageVersion("eggSim") >= "0.9.4-6")
+```
+
 
 ## Introduction
 
