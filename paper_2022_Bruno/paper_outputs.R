@@ -75,7 +75,7 @@ fig1c <- ggplot(fig1data |> filter(n_individ <= nmax), aes(x=n_individ, y=cost_m
   xlab("Total Individuals") +
   theme(legend.pos="none")
 fig1c
-fig1d <- ggplot(fig1data, aes(x=cost_mean/1e3, y=below_cutoff/total_n, col=design, lty=nclass)) +
+fig1d <- ggplot(fig1data |> filter(cost_mean <= maxcost), aes(x=cost_mean/1e3, y=below_cutoff/total_n, col=design, lty=nclass)) +
   geom_line() +
   scale_y_continuous(labels=scales::percent) +
   ylab("Proportion Below Threshold") +
@@ -107,7 +107,7 @@ fig2data <- results |>
   mutate(nclass = case_when(n_individ > nmax ~ "over1k", TRUE ~ "under1k")) |>
   mutate(design = factor(design, levels=c("SS_11","NS_11","SSR_11","SS_12","NS_12","SSR_12")))
 
-fig2 <- ggplot(fig2data, aes(x=cost_mean/1e3, y=below_cutoff/total_n, col=method, lty=nclass)) +
+fig2 <- ggplot(fig2data |> filter(cost_mean <= maxcost), aes(x=cost_mean/1e3, y=below_cutoff/total_n, col=method, lty=nclass)) +
   geom_line() +
   scale_y_continuous(labels=scales::percent) +
   ylab("Proportion Below Threshold") +
@@ -127,7 +127,7 @@ fig3data <- results |>
   mutate(nclass = case_when(n_individ > nmax ~ "over1k", TRUE ~ "under1k")) |>
   mutate(scenario = str_c("Scenario ", scenario))
 
-fig3 <- ggplot(fig3data, aes(x=cost_mean/1e3, y=below_cutoff/total_n, col=design, lty=nclass)) +
+fig3 <- ggplot(fig3data |> filter(cost_mean <= maxcost), aes(x=cost_mean/1e3, y=below_cutoff/total_n, col=design, lty=nclass)) +
   geom_line() +
   scale_y_continuous(labels=scales::percent) +
   ylab("Proportion Below Threshold") +
@@ -139,6 +139,8 @@ fig3 <- ggplot(fig3data, aes(x=cost_mean/1e3, y=below_cutoff/total_n, col=design
   guides(linetype="none", col=guide_legend(""))
 fig3
 ggsave("Figure_3.pdf", fig3, height=7, width=6)
+
+## TODO: work out how to shade the area under the pareto front??
 
 
 
