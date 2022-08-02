@@ -8,6 +8,12 @@ n_individ_us <- seq(100,5000,by=5)
 params <- survey_parameters()
 scen <- survey_scenario()
 
+## To modify parameters you could do:
+write_excel_csv(params %>% bind_rows(), "parameters.csv")
+# And then edit by hand .. before re-reading:
+new_params <- read_csv("parameters.csv") %>% group_by(parameter_set) %>% group_split()
+
+
 # Set iterations (1e3 for testing, 1e4 for final results):
 iters <- 1e4
 #iters <- 1e3
