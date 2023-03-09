@@ -82,6 +82,8 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	//Rcpp::NumericVector time_pre(ol);
   	//Rcpp::NumericVector time_post(ol);
 
+  	Rcpp::NumericVector mean_days(ol);
+
   	//Rcpp::NumericVector consumables_cost(ol);
   	//Rcpp::NumericVector salary_cost(ol);
   	//Rcpp::NumericVector travel_cost(ol);
@@ -203,6 +205,8 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
         const double cdelta = tot_cost - mean_cost[ind];
         mean_cost[ind] += cdelta / n_total[ind];
         var_cost[ind] += cdelta * (tot_cost - mean_cost[ind]);
+        
+        mean_days[ind] += (static_cast<double>(ndays) - mean_days[ind]) / n_total[ind];
 
         if(result_ll[i] > 3L || result_ll[i] < 0L) Rcpp::stop("Unhandled result_ll");
         n_result_0[ind] += static_cast<int>(result_ll[i] == 0L);
@@ -273,16 +277,22 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
       var_cost[ind] /= static_cast<double>(n_total[ind] - 1L);
     }
 
-  	df = Rcpp::DataFrame::create( 	Rcpp::_["scenario_int"] = scenario_int_out, Rcpp::_["n_individ"] = n_individ_out,
+  	Rcpp::DataFrame df1 = Rcpp::DataFrame::create( 	Rcpp::_["scenario_int"] = scenario_int_out, Rcpp::_["n_individ"] = n_individ_out,
                             Rcpp::_["mean_efficacy"] = efficacy, Rcpp::_["var_efficacy"] = efficacy_var,
                             Rcpp::_["n_below_cutoff"] = n_below_cutoff, Rcpp::_["n_above_cutoff"] = n_above_cutoff,
                             Rcpp::_["mean_pre"] = mean_pre, Rcpp::_["mean_post"] = mean_post,
-                            Rcpp::_["imean_pre"] = imean_pre, Rcpp::_["imean_post"] = imean_post,
-                            Rcpp::_["mean_n_screen"] = n_screen, Rcpp::_["mean_n_pre"] = n_pre,	Rcpp::_["mean_n_post"] = n_post,
+                            Rcpp::_["imean_pre"] = imean_pre, Rcpp::_["imean_post"] = imean_post );
+    Rcpp::DataFrame df2 = Rcpp::DataFrame::create( 	Rcpp::_["mean_n_screen"] = n_screen, 
+                            Rcpp::_["mean_n_pre"] = n_pre,	Rcpp::_["mean_n_post"] = n_post,
                             Rcpp::_["n_result_0"] = n_result_0, Rcpp::_["n_result_1"] = n_result_1,
                             Rcpp::_["n_result_2"] = n_result_2, Rcpp::_["n_result_3"] = n_result_3,
-                            Rcpp::_["n_total"] = n_total,
-  													Rcpp::_["mean_cost"] = mean_cost, Rcpp::_["var_cost"] = var_cost);
+                            Rcpp::_["n_total"] = n_total, Rcpp::_["mean_days"] = mean_days,
+  													Rcpp::_["mean_cost"] = mean_cost, Rcpp::_["var_cost"] = var_cost );
+                            
+    Rcpp::Environment pkg = Rcpp::Environment::namespace_env("dplyr");
+    Rcpp::Function bcol = pkg["bind_cols"];
+    // Rcpp::Function bcol("cbind");
+    df = bcol(df1, df2);
   }
   else
   {
@@ -306,6 +316,8 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::NumericVector time_pre_count(ol);
   	Rcpp::NumericVector time_post_count(ol);
 
+  	Rcpp::NumericVector total_days(ol);
+    
   	Rcpp::NumericVector consumables_cost(ol);
   	Rcpp::NumericVector salary_cost(ol);
   	Rcpp::NumericVector travel_cost(ol);
@@ -343,6 +355,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 
   			const double tra_cost = ndays * cost_travel[p];
 
+        total_days[ind] = ndays;
   			consumables_cost[ind] = cons_cost;
   			salary_cost[ind] = sal_cost;
   			travel_cost[ind] = tra_cost;
@@ -370,6 +383,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
                             Rcpp::_["n_screen"] = n_screen, Rcpp::_["n_pre"] = n_pre,	Rcpp::_["n_post"] = n_post);
 
   	Rcpp::DataFrame df2 = Rcpp::DataFrame::create(
+                            Rcpp::_["total_days"] = total_days, 
                             Rcpp::_["time_screen"] = time_screen, Rcpp::_["time_screen_count"] = time_screen_count,
                             Rcpp::_["time_pre"] = time_pre, Rcpp::_["time_pre_count"] = time_pre_count,
                             Rcpp::_["time_post"] = time_post, Rcpp::_["time_post_count"] = time_post_count,

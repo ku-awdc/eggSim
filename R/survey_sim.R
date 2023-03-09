@@ -168,7 +168,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
           select(-replicateID, -scenario_int) |>
           mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre"))) |>
           select(-reduction) |>
-          select(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set, iteration, result, efficacy, total_cost, everything())
+          select(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set, iteration, result, efficacy, total_days, total_cost, everything())
         stopifnot(nrow(rv)==nrow(y))
 
       }else if(output=="full"){
@@ -178,7 +178,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                         by="replicateID"
           ) |>
           mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre"))) |>
-          select(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set, iteration, result, efficacy, total_cost)
+          select(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set, iteration, result, efficacy, total_days, total_cost)
         stopifnot(nrow(rv)==nrow(y))
 
       }else if(output=="rsummarised"){
@@ -209,7 +209,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
           select(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set,
                  below_cutoff = n_below_cutoff, above_cutoff = n_above_cutoff, failure_n, total_n,
                  pre_mean = mean_pre, post_mean = mean_post, pre_imean = imean_pre, post_imean = imean_post,
-                 efficacy_mean = mean_efficacy, efficacy_variance, proportion_below, cost_mean = mean_cost, cost_variance = var_cost)
+                 efficacy_mean = mean_efficacy, efficacy_variance, proportion_below, days_mean = mean_days, cost_mean = mean_cost, cost_variance = var_cost)
         stopifnot(nrow(y)==nrow(rv), nrow(rv)==(nrow(tscenario)*length(n_individ)))
         with(rv, stopifnot(all((below_cutoff+above_cutoff+failure_n) == total_n)))
       }

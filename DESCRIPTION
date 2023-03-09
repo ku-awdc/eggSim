@@ -1,8 +1,8 @@
 Package: eggSim
 Title: Simulating Datasets Representing Egg Reduction Rate Data
-Version: 0.9.4-6
-Date: 2022-05-11
-Authors@R:  
+Version: 0.9.5-1
+Date: 2023-03-09
+Authors@R: 
     c(person(given = "Matt",
            family = "Denwood",
            role = c("aut", "cre"),
@@ -31,7 +31,7 @@ Imports:
     ggplot2,
     Rcpp
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.1.2
+RoxygenNote: 7.2.3
 Suggests:
     tidyverse,
     testthat (>= 2.1.0),
