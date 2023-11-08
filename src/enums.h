@@ -2,7 +2,7 @@
 #define ENUMS_H
 
 enum class designs { NS, SS, SSR };
-enum class methods { custom };
+enum class methods { custom, delta };
 enum class dists { rgamma, rbeta, rnbinom, rpois, identity, rlnorm };
 
 // For testing costs with fixed data:
