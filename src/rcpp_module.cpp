@@ -2,6 +2,7 @@
 
 #include "survey_sim.h"
 #include "utilities.h"
+#include "CountSummariseTest.h"
 
 RCPP_MODULE(eggSimModule){
 
@@ -13,5 +14,17 @@ RCPP_MODULE(eggSimModule){
 	function("Rcpp_count_time", &count_time);
 
 	function("Rcpp_survey_sim", &survey_sim);
+
+	class_<CountSummariseTest>("CountSummariseTest")
+
+    .constructor("Default constructor")
+      
+		.method("show", &CountSummariseTest::show, "The show method")
+		.method("add_counts", &CountSummariseTest::add_counts, "Add counts")
+
+		.property("means", &CountSummariseTest::get_means, "Get means")
+		.property("result", &CountSummariseTest::get_result, "Get result")
+
+	;
 
 }
