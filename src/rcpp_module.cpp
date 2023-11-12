@@ -7,7 +7,7 @@
 RCPP_MODULE(eggSimModule){
 
 	using namespace Rcpp;
-	
+
 	function("Rcpp_rgamma_cv", &rgamma_cv);
 	function("Rcpp_rnbinom_cv", &rnbinom_cv);
 	function("Rcpp_rbeta_cv", &rbeta_cv);
@@ -18,11 +18,9 @@ RCPP_MODULE(eggSimModule){
 	class_<CountSummariseTest>("CountSummariseTest")
 
     .constructor("Default constructor")
-      
+
 		.method("show", &CountSummariseTest::show, "The show method")
 		.method("add_counts", &CountSummariseTest::add_counts, "Add counts")
-
-		.property("means", &CountSummariseTest::get_means, "Get means")
 		.property("result", &CountSummariseTest::get_result, "Get result")
 
 	;

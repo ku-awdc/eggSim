@@ -9,21 +9,29 @@
 class CountSummariseTest
 {
 
-  static const size_t m_tp = 3L;
-
-  // template<methods method, bool t_use_screen, bool t_testing>
-  CountSummarise<methods::delta, m_tp==3L ? true : false, true> m_cs;
+  // template<methods method, bool t_use_screen, bool t_paired, bool t_testing>
+  CountSummarise<methods::delta, false, true, true> m_cs;
 
   // CountSummariseTest() = delete;
-  
-  Rcpp::NumericVector arr2rcpp(std::array<double, m_tp> arr) const
+
+  Rcpp::NumericVector arr2rcpp(std::array<double, 2L> arr) const
   {
-    Rcpp::NumericVector rv(m_tp);
-    for(size_t i=0; i<m_tp; ++i)
+    Rcpp::NumericVector rv(arr.size());
+    for(size_t i=0; i<arr.size(); ++i)
     {
       rv[i] = arr[i];
     }
-    return rv;    
+    return rv;
+  }
+
+  Rcpp::IntegerVector arr2rcpp(std::array<int, 2L> arr) const
+  {
+    Rcpp::IntegerVector rv(arr.size());
+    for(size_t i=0; i<arr.size(); ++i)
+    {
+      rv[i] = arr[i];
+    }
+    return rv;
   }
 
 public:
@@ -34,11 +42,11 @@ public:
           0.066, // count_coefficient,
           0.0, // count_add,
           1.0, // count_mult,
-          50L,
-          50L,
+          50L, // min_pos_screen,
+          50L, // min_pos_pre,
           0.025, // double tail;
-          0.7, // double Te;
-          0.5  // double Tl;
+          0.7, // double Teff;
+          0.5  // double Tlow;
         }
       )
   {
@@ -48,7 +56,7 @@ public:
   void add_counts(const Rcpp::IntegerVector& pre, const Rcpp::IntegerVector& post)
   {
     const size_t n = std::max(pre.size(), post.size());
-    
+
     for(size_t i=0; i<n; ++i)
     {
       if(pre.size() > i)
@@ -60,24 +68,35 @@ public:
       {
         m_cs.add_count_post(post[i]);
       }
-      
+
       m_cs.next_ind();
     }
   }
 
-  Rcpp::NumericVector get_means() const
+  Rcpp::List get_result() const
   {
-    return arr2rcpp(m_cs.get_means());
-  }
-  
-  Rcpp::CharacterVector get_result() const
-  {
-    return ResultToString(m_cs.get_result());
+    Rcpp::CharacterVector result = ResultToString(m_cs.get_result());
+    Rcpp::NumericVector means = arr2rcpp(m_cs.get_means());
+    Rcpp::NumericVector total_time = arr2rcpp(m_cs.get_total_time());
+    Rcpp::IntegerVector total_obs = arr2rcpp(m_cs.get_total_obs());
+    Rcpp::IntegerVector total_ind = arr2rcpp(m_cs.get_total_ind());
+    Rcpp::IntegerVector total_pos = arr2rcpp(m_cs.get_total_pos());
+
+    Rcpp::List rv = Rcpp::List::create(
+      Rcpp::Named("result") = result,
+      Rcpp::Named("means") = means,
+      Rcpp::Named("total_time") = total_time,
+      Rcpp::Named("total_observations") = total_obs,
+      Rcpp::Named("total_individuals") = total_ind,
+      Rcpp::Named("total_positive") = total_pos
+    );
+
+    return rv;
   }
 
   void show() const
   {
-    Rcpp::Rcout << "hello" << std::endl;
+    Rcpp::Rcout << ResultToString(m_cs.get_result()) << std::endl;
   }
 
 };

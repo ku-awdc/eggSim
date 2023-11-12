@@ -14,78 +14,122 @@
   - Generating a result classification for the desired method
   - Tracking time spent in the lab
   - Counting number of pre-treatment positive individuals
-
-  It does not do some things including:
-  - Tracking imeans i.e. mean of child means
   - Counting number of included individuals/samples
 
+  But not;
+  - Tracking imeans i.e. mean of child means
 */
 
-
-struct CountParams
-{
-  double intercept;
-  double coefficient;
-  double add;
-  double mult;
-  int min_pos_screen;
-  int min_pos_pre;
-  double tail;
-  double Te;
-  double Tl;
-};
-
-
-template<methods method, bool t_use_screen, bool t_testing>
+template<methods t_method, bool t_use_screen, bool t_paired, bool t_testing>
 class CountSummarise;
 
-template<bool t_use_screen, bool t_testing>
-class CountSummarise<methods::delta, t_use_screen, t_testing>
+/*
+
+template<bool t_use_screen, bool t_paired, bool t_testing>
+class CountSummarise<methods::delta, t_use_screen, t_paired, t_testing>
+{
+*/
+
+template<methods t_method, bool t_use_screen, bool t_paired, bool t_testing>
+class CountSummarise
 {
 private:
   // All relevant input parameters:
   const CountParams m_count_params;
 
-  static const size_t m_tp = (t_use_screen ? 3L : 2L);
-  static const size_t m_tscreen = (t_use_screen ? 0L : NA_REAL);
-  static const size_t m_tpre = (t_use_screen ? 1L : 0L);
-  static const size_t m_tpost = (t_use_screen ? 2L : 1L);
+  static constexpr size_t m_tp = (t_use_screen ? 3L : 2L);
+  static constexpr size_t m_tscreen = (t_use_screen ? 0L : -1L);
+  static constexpr size_t m_tpre = (t_use_screen ? 1L : 0L);
+  static constexpr size_t m_tpost = (t_use_screen ? 2L : 1L);
 
+  // Note: can't be static or constexpr because NA_REAL isn't
+  const std::array<double, 2L> missing = { NA_REAL, NA_REAL };
+
+  // Stats for separate screen/pre/post:
   // Total times:
   std::array<double, m_tp> m_total_time = {};  // Zero-initialise
+  // Number of individuals with one or more count (may differ screen/pre/post):
+  std::array<int, m_tp> m_total_ind = {};  // Zero-initialise
+  // Number of counts (may differ screen/pre/post):
+  std::array<int, m_tp> m_total_count = {};  // Zero-initialise
+  // Total number of non-zero individuals:
+  std::array<int, m_tp> m_total_pos = {};  // Zero-initialise
 
-  // Number of individuals with one or more count:
-  std::array<int, m_tp> m_num_ind = {};  // Zero-initialise
-
-  // Running stats for ALL individuals with one or more count:
-  std::array<double, m_tp> m_means = {};  // Zero-initialise
-  std::array<double, m_tp> m_varn = {};  // Zero-initialise
-
+  // Stats for pre&post (i.e. only individuals with both):
   // Number of individuals with pre- AND post-treatment counts:
   int m_num_pp = 0L;
-
   // Running stats for individuals with pre- AND post-treatment counts:
   std::array<double, 2L> m_means_pp = {};  // Zero-initialise
   std::array<double, 2L> m_varn_pp = {};  // Zero-initialise
   double m_covn_pp = 0.0;
 
-  // Total number of positive individuals:
-  std::array<int, m_tp> m_num_pos = {};  // Zero-initialise
-
+  // Stats for use within individual (calculating individual means):
   // Is this individual positive?
   std::array<bool, m_tp> m_is_pos = {};  // Zero-initialise
-
   // Number of counts within individual:
   std::array<int, m_tp> m_num_count = {};  // Zero-initialise
-
   // Mean counts within individual:
   std::array<double, m_tp> m_mean_count = {};  // Zero-initialise
 
-  void add_time(const double count, const int time_point) noexcept
+
+  void add_time(const double count, const size_t time_point) noexcept
   {
+    if constexpr (t_testing) {
+      if (time_point >= m_tp) Rcpp::stop("Invalid time_point for add_time");
+    }
+
     const double effcount = (count + m_count_params.add) * m_count_params.mult;
 	  // log10(time to read in sec) = int + coef*log10(egg counts+1)^2 - these are raw egg counts (not in EPG)
     m_total_time[time_point] += std::pow(10.0, m_count_params.intercept + m_count_params.coefficient*std::pow(std::log10(effcount+1.0), 2.0));
+  }
+
+  // Utility function for squaring (faster than pow with some compilers):
+  double square(const double x) const
+  {
+    return x*x;
+  }
+
+  // Underlying functions for the delta methods of obtaining CI:
+  std::array<double, 2L> levecke_ci() const
+  {
+    const double mu1 = m_means_pp[0L];
+    const double mu2 = m_means_pp[1L];
+    const double n = static_cast<double>(m_num_pp-1L);
+    const double var1 = m_varn_pp[0L] / n;
+    const double var2 = m_varn_pp[1L] / n;
+    const double cov12 = m_covn_pp / n;
+
+    std::array<double, 2L> rv;
+    if constexpr (t_paired)
+    {
+      //  From Levecke et al:  Assessment of Anthelmintic Efficacy of Mebendazole inSchool Children in Six Countries Where Soil-TransmittedHelminths Are Endemic
+
+      // const double cor12 = cov12 / std::sqrt(var1 * var2);
+      // double varred = std::pow(mu2/mu1, 2) * (var1/std::pow(mu1,2) + var2/std::pow(mu2,2) - 2.0 * cor12 * std::sqrt(var1 * var2) / (mu1 * mu2));
+    	// Equivalent:
+    	const double varred = square(mu2/mu1) * (var1/square(mu1) + var2/square(mu2) - 2.0 * cov12 / (mu1 * mu2));
+    	const double r = mu2/mu1;
+    	const double shape = (square(r) * n) / varred;
+    	const double scale = varred / (r * n);
+
+    	// Signature of qgamma is:  qgamma(double p, double alpha, double scale, int lower_tail, int log_p)
+      rv[0L] = 1.0 - R::qgamma(1.0-m_count_params.tail, shape, scale, 1L, 0L);
+    	rv[1L]= 1.0 - R::qgamma(m_count_params.tail, shape, scale, 1L, 0L);
+
+    }else{
+
+      const double varred = square(mu2/mu1) * (var1/square(mu1) + var2/square(mu2));
+    	const double r = mu2/mu1;
+    	const double shape = (square(r) * n) / varred;
+    	const double scale = varred / (r * n);
+
+    	// Signature of qgamma is:  qgamma(double p, double alpha, double scale, int lower_tail, int log_p)
+      rv[0L] = 1.0 - R::qgamma(1.0-m_count_params.tail, shape, scale, 1L, 0L);
+    	rv[1L]= 1.0 - R::qgamma(m_count_params.tail, shape, scale, 1L, 0L);
+
+    }
+
+    return rv;
   }
 
 
@@ -99,17 +143,26 @@ public:
       is_pos = false;
     }
   }
-  
+
   void next_ind() noexcept
   {
     for(size_t i=0L; i<m_tp; ++i)
     {
-      // Only increment number of individuals and update means/vars if any counts were registered:
       if(m_num_count[i] > 0L)
       {
+        // Only increment number of individuals and update means/vars if any counts were registered:
+        m_total_ind[i]++;
+        m_total_count[i] += m_num_count[i];
+        if(m_is_pos[i])
+        {
+          m_total_pos[i]++;
+        }
+
+        /* Not needed unless we want to track mean of screening or mean of all pre (for SS):
   			const double delta = m_mean_count[i] - m_means[i];
-  			m_means[i] += delta / static_cast<double>(++m_num_ind[i]);
+  			m_means[i] += delta / static_cast<double>(m_num_ind[i]);
   			m_varn[i] += delta * (m_mean_count[i] - m_means[i]);
+        */
       }
     }
 
@@ -118,20 +171,20 @@ public:
     {
       const double num = static_cast<double>(++m_num_pp);
 
-      const double dpre = m_mean_count[m_tpre] - m_means[m_tpre];
-      const double dpost = m_mean_count[m_tpost] - m_means[m_tpost];
-      m_means[m_tpre] += dpre / num;
-      m_means[m_tpost] += dpost / num;
+      const double dpre = m_mean_count[m_tpre] - m_means_pp[m_tpre];
+      const double dpost = m_mean_count[m_tpost] - m_means_pp[m_tpost];
+      m_means_pp[m_tpre] += dpre / num;
+      m_means_pp[m_tpost] += dpost / num;
 
-      const double dpost_after = m_mean_count[m_tpost] - m_means[m_tpost];
-      m_varn[m_tpre] += dpre * (m_mean_count[m_tpre] - m_means[m_tpre]);
-      m_varn[m_tpost] += dpost * dpost_after;
+      const double dpost_after = m_mean_count[m_tpost] - m_means_pp[m_tpost];
+      m_varn_pp[m_tpre] += dpre * (m_mean_count[m_tpre] - m_means_pp[m_tpre]);
+      m_varn_pp[m_tpost] += dpost * dpost_after;
 
       m_covn_pp += dpre * dpost_after;
     }
 
     // Reset within-individual stuff:
-    for(size_t i=0L; i<3L; ++i)
+    for(size_t i=0L; i<m_tp; ++i)
     {
       m_num_count[i] = 0L;
       m_is_pos[i] = false;
@@ -146,6 +199,7 @@ public:
       Rcpp::stop("Logic error:  CountSummarise not set to use screening");
     }
 
+    if(count > 0L) m_total_pos[m_tscreen]++;
     const double dcount = static_cast<const double>(count);
     add_time(dcount, m_tscreen);
     m_mean_count[m_tscreen] -= (m_mean_count[m_tscreen] - dcount) / static_cast<double>(++m_num_count[m_tscreen]);
@@ -153,6 +207,7 @@ public:
 
   void add_count_pre(const int count) noexcept
   {
+    if(count > 0L) m_total_pos[m_tpre]++;
     const double dcount = static_cast<const double>(count);
     add_time(dcount, m_tpre);
     m_mean_count[m_tpre] -= (m_mean_count[m_tpre] - dcount) / static_cast<double>(++m_num_count[m_tpre]);
@@ -160,6 +215,7 @@ public:
 
   void add_count_post(const int count) noexcept
   {
+    if(count > 0L) m_total_pos[m_tpost]++;
     const double dcount = static_cast<const double>(count);
     add_time(dcount, m_tpost);
     m_mean_count[m_tpost] -= (m_mean_count[m_tpost] - dcount) / static_cast<double>(++m_num_count[m_tpost]);
@@ -180,20 +236,80 @@ public:
     return m_is_pos[m_tpost];
   }
 
-  Results get_result() const noexcept
+  Results get_result() const
   {
-    // Note:  divide m_varm_pp and m_covm_pp by (num-1l)
-		// rvar[i] = rmm[i] / (double) (_n - 1);
-
-
-    Rcpp::warning("FIXME");
     // results enum is defined in enums.h
-    return Results::success;
+    Results result;
+
+    if constexpr (t_method == methods::delta) {
+
+      if (t_use_screen && (m_total_pos[0L] < m_count_params.min_pos_screen)) {
+
+        result = Results::few_screen;
+
+      } else if (m_total_pos[m_tpre] < m_count_params.min_pos_pre) {
+
+        result = Results::few_pre;
+
+      } else if (m_total_pos[m_tpre] == 0L) {
+
+        result = Results::zero_pre;
+
+      } else if (m_total_pos[m_tpost] == 0L) {
+
+        result = Results::zero_post;
+
+      } else {
+
+        const std::array<double, 2L> ci = levecke_ci();
+
+        if (ci[1L] < m_count_params.Teff && ci[0L] < m_count_params.Tlow) {
+          result = Results::resistant;
+        } else if (ci[1L] < m_count_params.Teff && ci[0L] >= m_count_params.Tlow) {
+          result = Results::low_resistant;
+        } else if (ci[1L] >= m_count_params.Teff && ci[0L] < m_count_params.Tlow) {
+          result = Results::inconclusive;
+        } else if (ci[1L] >= m_count_params.Teff && ci[0L] >= m_count_params.Tlow) {
+          result = Results::susceptible;
+        } else {
+          Rcpp::stop("Unhandled result in CountSummarise");
+        }
+      }
+
+    } else if constexpr (t_method == methods::mean) {
+
+      if (t_use_screen && (m_total_pos[0L] < m_count_params.min_pos_screen)) {
+
+        result = Results::few_screen;
+
+      } else if (m_total_pos[m_tpre] < m_count_params.min_pos_pre) {
+
+        result = Results::few_pre;
+
+      } else if (m_total_pos[m_tpre] == 0L) {
+
+        result = Results::zero_pre;
+
+      } else {
+
+        result = Results::success;
+
+      }
+
+    } else {
+      Rcpp::stop("Unhandled method in CountSummarise");
+    }
+
+    return result;
   }
 
-  std::array<double, m_tp> get_means() const noexcept
+  std::array<double, 2L> get_means() const noexcept
   {
-    return m_means;
+    if (m_num_pp > 0L) {
+      return m_means_pp;
+    } else {
+      return missing;
+    }
   }
 
   std::array<double, m_tp> get_total_time() const noexcept
@@ -201,14 +317,19 @@ public:
     return m_total_time;
   }
 
-  std::array<int, m_tp> get_num_ind() const noexcept
+  std::array<int, m_tp> get_total_obs() const noexcept
   {
-    return m_num_ind;
+    return m_total_count;
   }
 
-  std::array<int, m_tp> get_num_pos() const noexcept
+  std::array<int, m_tp> get_total_ind() const noexcept
   {
-    return m_num_pos;
+    return m_total_ind;
+  }
+
+  std::array<int, m_tp> get_total_pos() const noexcept
+  {
+    return m_total_pos;
   }
 
 };

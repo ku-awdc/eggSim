@@ -8,43 +8,25 @@
 #include "CountSummarise.h"
 #include "distribution.h"
 
-#include "count_timer.h"
-
-
 
 template<bool t_fixed_n, int nd0, int na0, int nd1, int na1, int nd2, int na2,
         methods method, dists dist_individ, dists dist_day, dists dist_aliquot, dists dist_red>
 void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
                 const int N_day_pre_, const int N_aliquot_pre_,
                  const int N_day_post_, const int N_aliquot_post_,
-                 const int min_pos_screen, const int min_pos_pre,
-				 const Rcpp::IntegerVector& N_individ, const double mu_pre,
+                 const Rcpp::IntegerVector& N_individ, const double mu_pre,
                  const double reduction, const double individ_cv, const double day_cv,
-                 const double aliquot_cv, const double reduction_cv,
-				 const double count_intercept, const double count_coefficient,
-				 const double count_add, const double count_mult,
-				 int* result, double* n_screen, double* n_pre, double* n_post,
-				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
-				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset)
+                 const double aliquot_cv, const double reduction_cv, const CountParams& count_params,
+                 Results* result, double* n_screen, double* n_pre, double* n_post,
+                 double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
+                 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
+                 double* time_screen, double* time_pre, double* time_post, const ptrdiff_t offset)
 {
   // Defined in enums.h:
   TESTING();
 
-  const CountParams count_params{
-    count_intercept,
-    count_coefficient,
-    count_add,
-    count_mult,
-    min_pos_screen,
-    min_pos_pre,
-    0.025, // double tail;
-    0.7, // double Te;
-    0.5  // double Tl;
-  };
-
-
-  // template<methods method, bool t_use_screen, bool t_testing>
-  CountSummarise<methods::delta, true, true> count_summarise(count_params);
+  // template<methods method, bool t_use_screen, bool t_paired, bool t_testing>
+  CountSummarise<methods::delta, true, true, true> count_summarise(count_params);
 
   const int N_day_screen = t_fixed_n ? nd0 : N_day_screen_;
   const int N_aliquot_screen = t_fixed_n ? na0 : N_aliquot_screen_;
@@ -53,25 +35,15 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
   const int N_day_post = t_fixed_n ? nd2 : N_day_post_;
   const int N_aliquot_post = t_fixed_n ? na2 : N_aliquot_post_;
 
-  double pre_mean = 0.0;
-  double post_mean = 0.0;
-  double pre_imean = 0.0;
-  double post_imean = 0.0;
-  int screen_n=0L;
-  int pre_n=0L;
-  int post_n=0L;
-  int npos_screen=0L;
-  int npos_pre=0L;
-
-  count_timer<method> counter_screen(count_intercept, count_coefficient, count_add, count_mult);
-  count_timer<method> counter_pre(count_intercept, count_coefficient, count_add, count_mult);
-  count_timer<method> counter_post(count_intercept, count_coefficient, count_add, count_mult);
-
   distribution<dist_individ> rindivid(individ_cv);
   distribution<dist_day> rday(day_cv);
   distribution<dist_aliquot> raliquot(aliquot_cv);
   // For the beta distribution it is more efficient to know the mean in advance:
   distribution<dist_red> rred(reduction_cv, reduction);
+
+  double pre_imean = 0.0;
+  double post_imean = 0.0;
+  int npos = 0L;
 
   int outn = 0L;
   ptrdiff_t outoffset = 0L;
@@ -80,8 +52,7 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
   {
     double mu_ind = rindivid.draw(mu_pre);
 
-    bool included = false;
-    for(int day=0L; day<N_day_screen; ++day)
+    for (int day=0L; day<N_day_screen; ++day)
     {
       const double mu_day = rday.draw(mu_ind);
       for(int aliquot=0L; aliquot<N_aliquot_screen; ++aliquot)
@@ -89,35 +60,23 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
         // const int icount = raliquot.draw(mu_day);
 
         // Allow test scenarios:
-        int icount;
-        if constexpr(s_testing==0L)
-        {
-          icount = raliquot.draw(mu_day);
-        }
-        else if constexpr(s_testing==1L)
-        {
-          icount = 20L;
-        }
-        else if constexpr(s_testing==2L)
-        {
-          icount = ind+51L;
-        }
-        else
-        {
+        if constexpr (s_testing==0L) {
+          count_summarise.add_count_screen(raliquot.draw(mu_day));
+        } else if constexpr (s_testing==1L) {
+          count_summarise.add_count_screen(20L);
+        } else if constexpr (s_testing==2L) {
+          count_summarise.add_count_screen(ind+51L);
+        } else {
           Rcpp::stop("Unrecognised testing setting");
         }
 
-  	    included = included || icount > 0L;
-        counter_screen.add_count(static_cast<double>(icount));
-        screen_n++;
       }
     }
 
-    if(included){
-      npos_screen++;
-      pre_imean -= (pre_imean - mu_ind) / static_cast<double>(npos_screen);
+    if (count_summarise.is_pos_screen()) {
+      npos++;
+      pre_imean -= (pre_imean - mu_ind) / static_cast<double>(npos);
 
-      bool ispos = false;
       for(int day=0L; day<N_day_pre; ++day)
       {
         const double mu_day = rday.draw(mu_ind);
@@ -126,34 +85,21 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
           // const int icount = raliquot.draw(mu_day);
 
           // Allow test scenarios:
-          int icount;
-          if constexpr(s_testing==0L)
-          {
-            icount = raliquot.draw(mu_day);
-          }
-          else if constexpr(s_testing==1L)
-          {
-            icount = 20L;
-          }
-          else if constexpr(s_testing==2L)
-          {
-            icount = ind+51L;
-          }
-          else
-          {
+          if constexpr (s_testing==0L) {
+            count_summarise.add_count_pre(raliquot.draw(mu_day));
+          } else if constexpr (s_testing==1L) {
+            count_summarise.add_count_pre(20L);
+          } else if constexpr (s_testing==2L) {
+            count_summarise.add_count_pre(ind+51L);
+          } else {
             Rcpp::stop("Unrecognised testing setting");
           }
 
-  		    ispos = ispos || icount > 0L;
-  		    const double count = static_cast<double>(icount);
-          pre_mean -= (pre_mean - count) / static_cast<double>(++pre_n);
-  		    counter_pre.add_count(count);
         }
       }
-      npos_pre += static_cast<int>(ispos);
 
       mu_ind *= rred.draw();
-      post_imean -= (post_imean - mu_ind) / static_cast<double>(npos_screen);
+      post_imean -= (post_imean - mu_ind) / static_cast<double>(npos);
       for(int day=0L; day<N_day_post; ++day)
       {
         const double mu_day = rday.draw(mu_ind);
@@ -162,13 +108,11 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
           // const int icount = raliquot.draw(mu_day);
 
           // Allow test scenarios:
-          int icount;
-          if constexpr(s_testing==0L)
-          {
-            icount = raliquot.draw(mu_day);
-          }
-          else if constexpr(s_testing==1L)
-          {
+          if constexpr (s_testing==0L) {
+            count_summarise.add_count_post(raliquot.draw(mu_day));
+          } else if constexpr (s_testing==1L) {
+
+            int icount;
             if(N_aliquot_post == 1L)
             {
               icount = 1L;
@@ -186,9 +130,12 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
             {
               Rcpp::stop("Unsupported  test design");
             }
-          }
-          else if constexpr(s_testing==2L)
-          {
+
+            count_summarise.add_count_post(icount);
+
+          } else if constexpr (s_testing==2L) {
+
+            int icount;
             if(N_aliquot_post == 1L)
             {
               icount = ind % 5L;
@@ -206,15 +153,12 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
             {
               Rcpp::stop("Unsupported  test design");
             }
-          }
-          else
-          {
+            count_summarise.add_count_post(icount);
+
+          } else {
             Rcpp::stop("Unrecognised testing setting");
           }
 
-          const double count = static_cast<double>(icount);
-          post_mean -= (post_mean - count) / static_cast<double>(++post_n);
-    		  counter_post.add_count(count);
         }
       }
     }
@@ -222,75 +166,41 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
     // Save output:
     if((ind+1L) == N_individ[outn])
     {
-      if(npos_screen < min_pos_screen)
       {
-        *(result+outoffset) = 2L;  // Failure due to insufficient screening positive
-
-        *(n_screen+outoffset) = static_cast<double>(screen_n);
-        *(n_pre+outoffset) = 0.0;
-        *(n_post+outoffset) = 0.0;
-
-        *(mean_pre+outoffset) = NA_REAL;
-        *(mean_post+outoffset) = NA_REAL;
-        *(imean_pre+outoffset) = npos_screen == 0L ? NA_REAL : pre_imean;
-        *(imean_post+outoffset) = npos_screen == 0L ? NA_REAL : post_imean;
-
-        *(time_screen+outoffset) = counter_screen.get_total();
-        *(time_pre+outoffset) = 0.0;
-        *(time_post+outoffset) = 0.0;
+        const Results out_result = count_summarise.get_result();
+        *(result+outoffset) = out_result;
       }
-      else if(npos_pre < min_pos_pre)
+
       {
-        *(result+outoffset) = 1L;  // Failure due to insufficient pre-treatment positive
-
-        *(n_screen+outoffset) = static_cast<double>(screen_n);
-        *(n_pre+outoffset) = static_cast<double>(pre_n);
-        *(n_post+outoffset) = 0.0;
-
-        *(mean_pre+outoffset) = NA_REAL;
-        *(mean_post+outoffset) = NA_REAL;
-        *(imean_pre+outoffset) = npos_screen == 0L ? NA_REAL : pre_imean;
-        *(imean_post+outoffset) = npos_screen == 0L ? NA_REAL : post_imean;
-
-        *(time_screen+outoffset) = counter_screen.get_total();
-        *(time_pre+outoffset) = counter_pre.get_total();
-        *(time_post+outoffset) = 0.0;
-
+        const std::array<int, 3L> out_n = count_summarise.get_total_ind();
+        *(n_screen+outoffset) = out_n[0L];
+        *(n_pre+outoffset) = out_n[1L];
+        *(n_post+outoffset) = out_n[2L];
       }
-      // If zero eggs observed (safe float comparison: fewer than 0.5 eggs in total):
-      else if(pre_n == 0L || pre_mean < (0.5/(static_cast<double>((ind+1L)*N_day_pre*N_aliquot_pre))))
+
       {
-        *(result+outoffset) = 3L;  // Failure due to zero-mean pre-treatment
-
-        *(n_screen+outoffset) = static_cast<double>(screen_n);
-        *(n_pre+outoffset) = static_cast<double>(pre_n);
-        *(n_post+outoffset) = 0.0;
-
-        *(mean_pre+outoffset) = NA_REAL;
-        *(mean_post+outoffset) = NA_REAL;
-        *(imean_pre+outoffset) = npos_screen == 0L ? NA_REAL : pre_imean;
-        *(imean_post+outoffset) = npos_screen == 0L ? NA_REAL : post_imean;
-
-        *(time_screen+outoffset) = counter_screen.get_total();
-        *(time_pre+outoffset) = counter_pre.get_total();
-        *(time_post+outoffset) = 0.0;
+        const std::array<int, 3L> out_n_pos = count_summarise.get_total_pos();
+        *(n_pos_screen+outoffset) = out_n_pos[0L];
+        *(n_pos_pre+outoffset) = out_n_pos[1L];
+        *(n_pos_post+outoffset) = out_n_pos[2L];
       }
-      else
+
       {
-        *(result+outoffset) = 0L;  // Success!
+        const std::array<double, 2L> out_mean = count_summarise.get_means();
+        *(mean_pre+outoffset) = out_mean[0L];
+        *(mean_post+outoffset) = out_mean[1L];
+      }
 
-        *(n_screen+outoffset) = static_cast<double>(screen_n);
-        *(n_pre+outoffset) = static_cast<double>(pre_n);
-        *(n_post+outoffset) = static_cast<double>(post_n);
+      {
+        *(imean_pre+outoffset) = npos == 0L ? NA_REAL : pre_imean;
+        *(imean_post+outoffset) = npos == 0L ? NA_REAL : post_imean;
+      }
 
-        *(mean_pre+outoffset) = pre_mean;
-        *(mean_post+outoffset) = post_mean;
-        *(imean_pre+outoffset) = pre_imean;
-        *(imean_post+outoffset) = post_imean;
-
-        *(time_screen+outoffset) = counter_screen.get_total();
-        *(time_pre+outoffset) = counter_pre.get_total();
-        *(time_post+outoffset) = counter_post.get_total();
+      {
+        const std::array<double, 3L> out_time = count_summarise.get_total_time();
+        *(time_screen+outoffset) = out_time[0L];
+        *(time_pre+outoffset) = out_time[1L];
+        *(time_post+outoffset) = out_time[2L];
       }
 
       outn++;

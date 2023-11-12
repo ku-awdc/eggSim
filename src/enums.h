@@ -3,7 +3,7 @@
 
 // TODO: capitalise for consistency
 enum class designs { NS, SS, SSR };
-enum class methods { custom, delta };
+enum class methods { mean, delta };
 enum class dists { rgamma, rbeta, rnbinom, rpois, identity, rlnorm };
 
 enum class Results { 
@@ -38,5 +38,20 @@ constexpr const char* ResultToString(Results result)
 
 // For testing costs with fixed data:
 #define TESTING() constexpr int s_testing = 0L
+
+// For passing around:
+struct CountParams
+{
+  double intercept;
+  double coefficient;
+  double add;
+  double mult;
+  int min_pos_screen;
+  int min_pos_pre;
+  double tail;
+  double Teff;
+  double Tlow;
+};
+
 
 #endif // ENUMS_H

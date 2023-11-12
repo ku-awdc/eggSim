@@ -7,6 +7,7 @@
 template<bool t_summarise, designs design, bool t_fixed_n, int nd0, int na0, int nd1, int na1, int nd2, int na2,
           methods method, dists dist_individ, dists dist_day, dists dist_aliquot, dists dist_red>
 Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::DataFrame& parameters,
+                                const Rcpp::DataFrame& count_parameters,
 								                const Rcpp::IntegerVector& n_individ, const bool summarise)
 {
 	const Rcpp::IntegerVector scenario_int = parameters["scenario_int"];
@@ -25,8 +26,6 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 	const int n_aliquot_pre = all_ns["n_aliquot_pre"];
 	const int n_day_post = all_ns["n_day_post"];
 	const int n_aliquot_post = all_ns["n_aliquot_post"];
-  const int min_pos_screen = all_ns["min_positive_screen"];
-  const int min_pos_pre = all_ns["min_positive_pre"];
 
 	const Rcpp::NumericVector mu_pre = parameters["mu_pre"];
 	const Rcpp::NumericVector reduction = parameters["reduction"];
@@ -34,10 +33,6 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 	const Rcpp::NumericVector day_cv = parameters["day_cv"];
 	const Rcpp::NumericVector aliquot_cv = parameters["aliquot_cv"];
 	const Rcpp::NumericVector reduction_cv = parameters["reduction_cv"];
-	const Rcpp::NumericVector count_intercept = parameters["count_intercept"];
-	const Rcpp::NumericVector count_coefficient = parameters["count_coefficient"];
-	const Rcpp::NumericVector count_add = parameters["count_add"];
-	const Rcpp::NumericVector count_mult = parameters["count_mult"];
 
 	const Rcpp::NumericVector cost_consumables_screen = parameters["cost_consumables_screen"];
 	const Rcpp::NumericVector cost_consumables_pre = parameters["cost_consumables_pre"];
@@ -49,12 +44,36 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 	const Rcpp::NumericVector n_team = parameters["n_team"];
 	const Rcpp::NumericVector cost_salary = parameters["cost_salary"];
 	const Rcpp::NumericVector cost_travel = parameters["cost_travel"];
+  
+  if (count_parameters.nrow() != 1L ) Rcpp::stop("The count_parameters data frame must have precisely 1 row");
+	const double count_intercept = count_parameters["count_intercept"];
+	const double count_coefficient = count_parameters["count_coefficient"];
+	const double count_add = count_parameters["count_add"];
+	const double count_mult = count_parameters["count_mult"];
+  const int min_pos_screen = count_parameters["min_positive_screen"];
+  const int min_pos_pre = count_parameters["min_positive_pre"];
+	const double tail = count_parameters["tail"];
+	const double Teff = count_parameters["Teff"];
+	const double Tlow = count_parameters["Tlow"];
+
+  const CountParams count_params
+  {
+    count_intercept,
+    count_coefficient,
+    count_add,
+    count_mult,
+    min_pos_screen,
+    min_pos_pre,
+    tail, 
+    Teff,
+    Tlow
+  };
 
   // TODO: the parent function could check to see if e.g. aliquot_cv is always 0 and specify dist_aliquot as rpois
 
   // Create the survey class once:
   survey_class<design, t_fixed_n, nd0, na0, nd1, na1, nd2, na2, method, dist_individ, dist_day, dist_aliquot, dist_red>
-    survey(n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, min_pos_screen, min_pos_pre);
+    survey(n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, count_params);
 
 	// Memory offset for indexing results for different n_individ:
 	ptrdiff_t offset = 1L;
@@ -111,6 +130,9 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
     std::vector<double> n_screen_ll(ni);
     std::vector<double> n_pre_ll(ni);
     std::vector<double> n_post_ll(ni);
+    std::vector<double> n_pos_screen_ll(ni);
+    std::vector<double> n_pos_pre_ll(ni);
+    std::vector<double> n_pos_post_ll(ni);
     std::vector<double> mean_pre_ll(ni);
     std::vector<double> mean_post_ll(ni);
     std::vector<double> imean_pre_ll(ni);
@@ -168,11 +190,13 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 	  {
       // If summarising then pass a references to local vectors:
       survey.run(n_individ, mu_pre[p], reduction[p], individ_cv[p], day_cv[p], aliquot_cv[p], reduction_cv[p],
-            count_intercept[p], count_coefficient[p], count_add[p], count_mult[p],
             &result_ll[0L], &n_screen_ll[0L], &n_pre_ll[0L], &n_post_ll[0L],
+            &n_pos_screen_ll[0L], &n_pos_pre_ll[0L], &n_pos_post_ll[0L],
             &mean_pre_ll[0L], &mean_post_ll[0L], &imean_pre_ll[0L], &imean_post_ll[0L],
             &time_screen_ll[0L], &time_pre_ll[0L], &time_post_ll[0L], offset);
 
+      Rcpp::warning("Need to include n_pos_* in summary and fix Results stuff");
+      
   		// Do cost calculations and running means:
   		for(int i=0; i<ni; ++i)
   		{
@@ -303,6 +327,9 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::NumericVector n_screen(ol);
   	Rcpp::NumericVector n_pre(ol);
   	Rcpp::NumericVector n_post(ol);
+  	Rcpp::NumericVector n_pos_screen(ol);
+  	Rcpp::NumericVector n_pos_pre(ol);
+  	Rcpp::NumericVector n_pos_post(ol);
   	Rcpp::NumericVector efficacy(ol);
   	Rcpp::NumericVector mean_pre(ol);
   	Rcpp::NumericVector mean_post(ol);
@@ -328,8 +355,8 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
     {
       // Otherwise pass reference to the output vector:
       survey.run(n_individ, mu_pre[p], reduction[p], individ_cv[p], day_cv[p], aliquot_cv[p], reduction_cv[p],
-            count_intercept[p], count_coefficient[p], count_add[p], count_mult[p],
             &result[ind], &n_screen[ind], &n_pre[ind], &n_post[ind],
+            &n_pos_screen[ind], &n_pos_pre[ind], &n_pos_post[ind],
             &mean_pre[ind], &mean_post[ind], &imean_pre[ind], &imean_post[ind],
             &time_screen_count[ind], &time_pre_count[ind], &time_post_count[ind], offset);
 
@@ -380,7 +407,8 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   													Rcpp::_["result"] = result, Rcpp::_["efficacy"] = efficacy,
   													Rcpp::_["pre_mean"] = mean_pre, Rcpp::_["post_mean"] = mean_post,
   													Rcpp::_["pre_imean"] = imean_pre, Rcpp::_["post_imean"] = imean_post,
-                            Rcpp::_["n_screen"] = n_screen, Rcpp::_["n_pre"] = n_pre,	Rcpp::_["n_post"] = n_post);
+                            Rcpp::_["n_screen"] = n_screen, Rcpp::_["n_pre"] = n_pre,	Rcpp::_["n_post"] = n_post,
+                            Rcpp::_["n_pos_screen"] = n_pos_screen, Rcpp::_["n_pos_pre"] = n_pos_pre,	Rcpp::_["n_pos_post"] = n_pos_post);
 
   	Rcpp::DataFrame df2 = Rcpp::DataFrame::create(
                             Rcpp::_["total_days"] = total_days, 

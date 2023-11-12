@@ -20,23 +20,22 @@ private:
   const int m_aliquot_pre;
   const int m_day_post;
   const int m_aliquot_post;
-  static constexpr int m_min_pos_screen = 0L;
-  const int m_min_pos_pre;
+  const CountParams m_count_params;
 
 public:
   survey_class(const int day_screen, const int aliquot_screen,
                   const int day_pre, const int aliquot_pre,
                   const int day_post, const int aliquot_post,
-                  const int min_pos_screen, const int min_pos_pre) :
+                  const CountParams count_params) :
                   m_day_pre(day_pre), m_aliquot_pre(aliquot_pre),
                   m_day_post(day_post), m_aliquot_post(aliquot_post),
-                  m_min_pos_pre(min_pos_pre)
+                  m_count_params(count_params)
 
   {
     if(day_screen != m_day_screen) Rcpp::stop("Invalid N_day_screen");
     if(aliquot_screen != m_aliquot_screen) Rcpp::stop("Invalid N_aliquot_screen");
-    if(min_pos_screen != m_min_pos_screen) Rcpp::stop("Invalid min_positive_screen");
-    if(min_pos_pre <= 0L) Rcpp::stop("Invalid min_positive_pre <= 0L");
+    if(m_count_params.min_pos_screen != 0L) Rcpp::stop("Invalid min_positive_screen");
+    if(m_count_params.min_pos_pre <= 0L) Rcpp::stop("Invalid min_positive_pre <= 0L");
 
     // Note: if constexpr() requires C++17
     if constexpr(t_fixed_n)
@@ -60,19 +59,17 @@ public:
   void run(const Rcpp::IntegerVector& N_individ, const double mu_pre,
            const double reduction, const double individ_cv, const double day_cv,
            const double aliquot_cv, const double reduction_cv,
-           const double count_intercept, const double count_coefficient,
-           const double count_add, const double count_mult,
-           int* result, double* n_screen, double* n_pre, double* n_post,
+           Results* result, double* n_screen, double* n_pre, double* n_post,
+           double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
   				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
   				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset) const
   {
     survey_ns<t_fixed_n, nd1, na1, nd2, na2, method, dist_individ, dist_day, dist_aliquot, dist_red>(
       m_day_pre, m_aliquot_pre, m_day_post, m_aliquot_post,
-      m_min_pos_pre,
       N_individ, mu_pre, reduction,
-      individ_cv, day_cv, aliquot_cv, reduction_cv,
-      count_intercept, count_coefficient, count_add, count_mult,
+      individ_cv, day_cv, aliquot_cv, reduction_cv, m_count_params, 
 			result, n_screen, n_pre, n_post, 
+      n_pos_screen, n_pos_pre, n_pos_post,
       mean_pre, mean_post, imean_pre, imean_post, 
       time_screen, time_pre, time_post, offset);
   }
@@ -90,26 +87,24 @@ private:
   const int m_aliquot_pre;
   const int m_day_post;
   const int m_aliquot_post;
-  static constexpr int m_min_pos_screen = 0L;
-  const int m_min_pos_pre;
+  const CountParams m_count_params;
 
 public:
   survey_class(const int day_screen, const int aliquot_screen,
                   const int day_pre, const int aliquot_pre,
                   const int day_post, const int aliquot_post,
-                  const int min_pos_screen, const int min_pos_pre) :
+                  const CountParams count_params) :
                   m_day_pre(day_pre), m_aliquot_pre(aliquot_pre),
                   m_day_post(day_post), m_aliquot_post(aliquot_post),
-                  m_min_pos_pre(min_pos_pre)
+                  m_count_params(count_params)
 
   {
     if(day_screen != m_day_screen) Rcpp::stop("Invalid N_day_screen");
     if(aliquot_screen != m_aliquot_screen) Rcpp::stop("Invalid N_aliquot_screen");
-    if(min_pos_screen != m_min_pos_screen) Rcpp::stop("Invalid min_positive_screen");
-    if(min_pos_pre <= 0L) Rcpp::stop("Invalid min_positive_pre <= 0L");
+    if(m_count_params.min_pos_screen <= 0L) Rcpp::stop("Invalid min_positive_screen <= 0L");
+    if(m_count_params.min_pos_pre <= 0L) Rcpp::stop("Invalid min_positive_pre <= 0L");
 
-    // Note: if constexpr() requires C++17
-    if constexpr(t_fixed_n)
+    if constexpr (t_fixed_n)
     {
       if(day_screen != nd0) Rcpp::stop("Invalid N_day_screen (does not match template)");
       if(aliquot_screen != na0) Rcpp::stop("Invalid N_aliquot_screen (does not match template)");
@@ -129,20 +124,18 @@ public:
 
   void run(const Rcpp::IntegerVector& N_individ, const double mu_pre,
            const double reduction, const double individ_cv, const double day_cv,
-           const double aliquot_cv, const double reduction_cv,
-           const double count_intercept, const double count_coefficient,
-           const double count_add, const double count_mult,
-           int* result, double* n_screen, double* n_pre, double* n_post,
+           const double aliquot_cv, const double reduction_cv,           
+           Results* result, double* n_screen, double* n_pre, double* n_post,
+           double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
   				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
   				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset) const
   {
     survey_ss<t_fixed_n, nd1, na1, nd2, na2, method, dist_individ, dist_day, dist_aliquot, dist_red>(
       m_day_pre, m_aliquot_pre, m_day_post, m_aliquot_post,
-      m_min_pos_pre,
       N_individ, mu_pre, reduction,
-      individ_cv, day_cv, aliquot_cv, reduction_cv,
-      count_intercept, count_coefficient, count_add, count_mult,
+      individ_cv, day_cv, aliquot_cv, reduction_cv, m_count_params,
 			result, n_screen, n_pre, n_post, 
+      n_pos_screen, n_pos_pre, n_pos_post,
       mean_pre, mean_post, imean_pre, imean_post, 
       time_screen, time_pre, time_post, offset);
   }
@@ -161,22 +154,21 @@ private:
   const int m_aliquot_pre;
   const int m_day_post;
   const int m_aliquot_post;
-  const int m_min_pos_screen;
-  const int m_min_pos_pre;
+  const CountParams m_count_params;
 
 public:
   survey_class(const int day_screen, const int aliquot_screen,
                   const int day_pre, const int aliquot_pre,
                   const int day_post, const int aliquot_post,
-                  const int min_pos_screen, const int min_pos_pre) :
+                  const CountParams count_params) :
                   m_day_screen(day_screen), m_aliquot_screen(aliquot_screen),
                   m_day_pre(day_pre), m_aliquot_pre(aliquot_pre),
                   m_day_post(day_post), m_aliquot_post(aliquot_post),
-                  m_min_pos_screen(min_pos_screen), m_min_pos_pre(min_pos_pre)
+                  m_count_params(count_params)
 
   {
-    if(min_pos_screen <= 0L) Rcpp::stop("Invalid min_positive_screen <= 0L");
-    if(min_pos_pre <= 0L) Rcpp::stop("Invalid min_positive_pre <= 0L");
+    if(m_count_params.min_pos_screen <= 0L) Rcpp::stop("Invalid min_positive_screen <= 0L");
+    if(m_count_params.min_pos_pre <= 0L) Rcpp::stop("Invalid min_positive_pre <= 0L");
 
     // Note: if constexpr() requires C++17
     if constexpr(t_fixed_n)
@@ -202,19 +194,17 @@ public:
   void run(const Rcpp::IntegerVector& N_individ, const double mu_pre,
            const double reduction, const double individ_cv, const double day_cv,
            const double aliquot_cv, const double reduction_cv,
-           const double count_intercept, const double count_coefficient,
-           const double count_add, const double count_mult,
-           int* result, double* n_screen, double* n_pre, double* n_post,
+           Results* result, double* n_screen, double* n_pre, double* n_post,
+           double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
   				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
   				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset) const
   {
     survey_ssr<t_fixed_n, nd0, na0, nd1, na1, nd2, na2, method, dist_individ, dist_day, dist_aliquot, dist_red>(
       m_day_screen, m_aliquot_screen, m_day_pre, m_aliquot_pre, m_day_post, m_aliquot_post,
-      m_min_pos_screen, m_min_pos_pre,
       N_individ, mu_pre, reduction,
-      individ_cv, day_cv, aliquot_cv, reduction_cv,
-      count_intercept, count_coefficient, count_add, count_mult,
+      individ_cv, day_cv, aliquot_cv, reduction_cv, m_count_params,
 			result, n_screen, n_pre, n_post, 
+      n_pos_screen, n_pos_pre, n_pos_post,
       mean_pre, mean_post, imean_pre, imean_post, 
       time_screen, time_pre, time_post, offset);
   }

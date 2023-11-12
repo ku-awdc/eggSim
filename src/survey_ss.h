@@ -5,26 +5,28 @@
 
 #include "utilities.h"
 #include "enums.h"
-#include "count_timer.h"
+#include "CountSummarise.h"
 #include "distribution.h"
+
 
 template<bool t_fixed_n, int nd1, int na1, int nd2, int na2,
         methods method, dists dist_individ, dists dist_day, dists dist_aliquot, dists dist_red>
 void survey_ss(const int N_day_pre_, const int N_aliquot_pre_,
                  const int N_day_post_, const int N_aliquot_post_,
-                 const int min_pos_pre,
-				 const Rcpp::IntegerVector& N_individ, const double mu_pre,
+                 const Rcpp::IntegerVector& N_individ, const double mu_pre,
                  const double reduction, const double individ_cv, const double day_cv,
-                 const double aliquot_cv, const double reduction_cv,
-				 const double count_intercept, const double count_coefficient,
-				 const double count_add, const double count_mult,
-         int* result, double* n_screen, double* n_pre, double* n_post,
-				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
-				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset)
+                 const double aliquot_cv, const double reduction_cv, const CountParams& count_params,
+                 Results* result, double* n_screen, double* n_pre, double* n_post,
+                 double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
+                 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
+                 double* time_screen, double* time_pre, double* time_post, const ptrdiff_t offset)
 {
   // Defined in enums.h:
   TESTING();
 
+  // template<methods method, bool t_use_screen, bool t_paired, bool t_testing>
+  CountSummarise<methods::delta, true, true, true> count_summarise(count_params);
+  
   const int N_day_pre = t_fixed_n ? nd1 : N_day_pre_;
   const int N_aliquot_pre = t_fixed_n ? na1 : N_aliquot_pre_;
   const int N_day_post = t_fixed_n ? nd2 : N_day_post_;
