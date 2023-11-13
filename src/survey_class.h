@@ -26,7 +26,7 @@ public:
   survey_class(const int day_screen, const int aliquot_screen,
                   const int day_pre, const int aliquot_pre,
                   const int day_post, const int aliquot_post,
-                  const CountParams count_params) :
+                  const CountParams& count_params) :
                   m_day_pre(day_pre), m_aliquot_pre(aliquot_pre),
                   m_day_post(day_post), m_aliquot_post(aliquot_post),
                   m_count_params(count_params)
@@ -59,7 +59,7 @@ public:
   void run(const Rcpp::IntegerVector& N_individ, const double mu_pre,
            const double reduction, const double individ_cv, const double day_cv,
            const double aliquot_cv, const double reduction_cv,
-           Results* result, double* n_screen, double* n_pre, double* n_post,
+           int* result, double* n_screen, double* n_pre, double* n_post,
            double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
   				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
   				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset) const
@@ -93,7 +93,7 @@ public:
   survey_class(const int day_screen, const int aliquot_screen,
                   const int day_pre, const int aliquot_pre,
                   const int day_post, const int aliquot_post,
-                  const CountParams count_params) :
+                  const CountParams& count_params) :
                   m_day_pre(day_pre), m_aliquot_pre(aliquot_pre),
                   m_day_post(day_post), m_aliquot_post(aliquot_post),
                   m_count_params(count_params)
@@ -125,7 +125,7 @@ public:
   void run(const Rcpp::IntegerVector& N_individ, const double mu_pre,
            const double reduction, const double individ_cv, const double day_cv,
            const double aliquot_cv, const double reduction_cv,           
-           Results* result, double* n_screen, double* n_pre, double* n_post,
+           int* result, double* n_screen, double* n_pre, double* n_post,
            double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
   				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
   				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset) const
@@ -160,7 +160,7 @@ public:
   survey_class(const int day_screen, const int aliquot_screen,
                   const int day_pre, const int aliquot_pre,
                   const int day_post, const int aliquot_post,
-                  const CountParams count_params) :
+                  const CountParams& count_params) :
                   m_day_screen(day_screen), m_aliquot_screen(aliquot_screen),
                   m_day_pre(day_pre), m_aliquot_pre(aliquot_pre),
                   m_day_post(day_post), m_aliquot_post(aliquot_post),
@@ -194,7 +194,7 @@ public:
   void run(const Rcpp::IntegerVector& N_individ, const double mu_pre,
            const double reduction, const double individ_cv, const double day_cv,
            const double aliquot_cv, const double reduction_cv,
-           Results* result, double* n_screen, double* n_pre, double* n_post,
+           int* result, double* n_screen, double* n_pre, double* n_post,
            double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
   				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
   				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset) const

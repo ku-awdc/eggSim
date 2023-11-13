@@ -16,6 +16,15 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
                               parasite = c("ascaris","trichuris","hookworm"),
                               method = c("kk","miniflotac","fecpak")){
 
+  if(length(design)==1L && design=="CHECK"){
+    ## Hack to allow this to be used to get required parameter names from check_parameters:
+    is_check <- TRUE
+    design <- "SS_11"
+    parasite <- "ascaris"
+    method <- "kk"
+  }else{
+    is_check <- FALSE
+  }
   stopifnot(all(design %in% stddsgn))
 
   design <- check_design(design)
@@ -131,6 +140,17 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
         method == "miniflotac" ~ 0.066,
         method == "fecpak" ~ 0.172
       ),
+      tail = 0.025,
+      target_efficacy = case_when(
+        parasite == "ascaris" ~ 0.95,
+        parasite == "trichuris" ~ 0.5,
+        parasite == "hookworm" ~ 0.7
+      ),
+      target_lower = case_when(
+        parasite == "ascaris" ~ 0.9,
+        parasite == "trichuris" ~ 0.45,
+        parasite == "hookworm" ~ 0.65
+      ),
       time_demography = case_when(
         method == "kk" ~ 15,
         method == "miniflotac" ~ 15,
@@ -210,7 +230,7 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
     group_split() ->
     parameters
 
-  check_parameters(parameters, 1L)
+  if(!is_check) check_parameters(parameters, 1L)
   if(length(parameters)==1L) parameters <- parameters[[1]]
 
   return(parameters)
@@ -257,10 +277,14 @@ beta_to_mu <- function(a, b) (a/(a+b))
 beta_to_cv <- function(a, b) sqrt((a*b)/((a+b)^2 * (a+b+1))) / beta_to_mu(a,b)
 
 check_parameters <- function(pp, iters=1L){
+  parnames <- survey_parameters(design="CHECK") |> names()
   lapply(pp, function(x){
     stopifnot(is.data.frame(x))
     stopifnot(all(!is.na(x)))
     stopifnot(nrow(x) %in% c(1L, iters))
+    if(any(!parnames %in% names(x))){
+      stop("One or more missing parameters: ", str_c(parnames[!parnames %in% names(x)], collapse=", "))
+    }
   })
   ps <- lapply(pp, function(x){
     if(!length(unique(x$parameter_set))==1L){

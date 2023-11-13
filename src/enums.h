@@ -6,7 +6,7 @@ enum class designs { NS, SS, SSR };
 enum class methods { mean, delta };
 enum class dists { rgamma, rbeta, rnbinom, rpois, identity, rlnorm };
 
-enum class Results { 
+enum class Results {
   few_screen, // Failure due to insufficient screening positive
   few_pre, // Failure due to insufficient pre-treatment positive
   zero_pre, // Failure due to zero mean pre-treatment
@@ -36,8 +36,26 @@ constexpr const char* ResultToString(Results result)
     }
 }
 
+// Can't be a CharacterVector as this is not a literal type, so we have a separate conversion in utilities.h:
+constexpr std::array<const char*, 9L> ResultsLevels()
+{
+  constexpr std::array<const char*, 9L> rv = {
+    ResultToString(Results::few_screen),
+    ResultToString(Results::few_pre),
+    ResultToString(Results::zero_pre),
+    ResultToString(Results::success),
+    ResultToString(Results::zero_post),
+    ResultToString(Results::resistant),
+    ResultToString(Results::low_resistant),
+    ResultToString(Results::inconclusive),
+    ResultToString(Results::susceptible)
+  };
+
+  return rv;
+}
+
 // For testing costs with fixed data:
-#define TESTING() constexpr int s_testing = 0L
+#define TESTING() constexpr int s_testing = 0L; constexpr bool t_testing = true
 
 // For passing around:
 struct CountParams

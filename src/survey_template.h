@@ -44,7 +44,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 	const Rcpp::NumericVector n_team = parameters["n_team"];
 	const Rcpp::NumericVector cost_salary = parameters["cost_salary"];
 	const Rcpp::NumericVector cost_travel = parameters["cost_travel"];
-  
+
   if (count_parameters.nrow() != 1L ) Rcpp::stop("The count_parameters data frame must have precisely 1 row");
 	const double count_intercept = count_parameters["count_intercept"];
 	const double count_coefficient = count_parameters["count_coefficient"];
@@ -53,8 +53,8 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   const int min_pos_screen = count_parameters["min_positive_screen"];
   const int min_pos_pre = count_parameters["min_positive_pre"];
 	const double tail = count_parameters["tail"];
-	const double Teff = count_parameters["Teff"];
-	const double Tlow = count_parameters["Tlow"];
+	const double Teff = count_parameters["target_efficacy"];
+	const double Tlow = count_parameters["target_lower"];
 
   const CountParams count_params
   {
@@ -64,7 +64,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
     count_mult,
     min_pos_screen,
     min_pos_pre,
-    tail, 
+    tail,
     Teff,
     Tlow
   };
@@ -83,6 +83,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 
   if constexpr(t_summarise)
   {
+    if constexpr (method == methods::delta) Rcpp::stop("summarise=true for methods::delta not yet implemented");
   	const Rcpp::NumericVector cutoff = parameters["cutoff"];
 
   	// Create the output vectors:
@@ -196,7 +197,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
             &time_screen_ll[0L], &time_pre_ll[0L], &time_post_ll[0L], offset);
 
       Rcpp::warning("Need to include n_pos_* in summary and fix Results stuff");
-      
+
   		// Do cost calculations and running means:
   		for(int i=0; i<ni; ++i)
   		{
@@ -229,7 +230,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
         const double cdelta = tot_cost - mean_cost[ind];
         mean_cost[ind] += cdelta / n_total[ind];
         var_cost[ind] += cdelta * (tot_cost - mean_cost[ind]);
-        
+
         mean_days[ind] += (static_cast<double>(ndays) - mean_days[ind]) / n_total[ind];
 
         if(result_ll[i] > 3L || result_ll[i] < 0L) Rcpp::stop("Unhandled result_ll");
@@ -306,13 +307,13 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
                             Rcpp::_["n_below_cutoff"] = n_below_cutoff, Rcpp::_["n_above_cutoff"] = n_above_cutoff,
                             Rcpp::_["mean_pre"] = mean_pre, Rcpp::_["mean_post"] = mean_post,
                             Rcpp::_["imean_pre"] = imean_pre, Rcpp::_["imean_post"] = imean_post );
-    Rcpp::DataFrame df2 = Rcpp::DataFrame::create( 	Rcpp::_["mean_n_screen"] = n_screen, 
+    Rcpp::DataFrame df2 = Rcpp::DataFrame::create( 	Rcpp::_["mean_n_screen"] = n_screen,
                             Rcpp::_["mean_n_pre"] = n_pre,	Rcpp::_["mean_n_post"] = n_post,
                             Rcpp::_["n_result_0"] = n_result_0, Rcpp::_["n_result_1"] = n_result_1,
                             Rcpp::_["n_result_2"] = n_result_2, Rcpp::_["n_result_3"] = n_result_3,
                             Rcpp::_["n_total"] = n_total, Rcpp::_["mean_days"] = mean_days,
   													Rcpp::_["mean_cost"] = mean_cost, Rcpp::_["var_cost"] = var_cost );
-                            
+
     Rcpp::Environment pkg = Rcpp::Environment::namespace_env("dplyr");
     Rcpp::Function bcol = pkg["bind_cols"];
     // Rcpp::Function bcol("cbind");
@@ -344,7 +345,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::NumericVector time_post_count(ol);
 
   	Rcpp::NumericVector total_days(ol);
-    
+
   	Rcpp::NumericVector consumables_cost(ol);
   	Rcpp::NumericVector salary_cost(ol);
   	Rcpp::NumericVector travel_cost(ol);
@@ -400,6 +401,10 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::DataFrame repmean = expgrd(n_individ, replicateID);
   	Rcpp::IntegerVector nind = repmean[0L];
   	Rcpp::IntegerVector repID = repmean[1L];
+    
+    // Make result into a factor:
+    result.attr("class") = "factor";
+    result.attr("levels") = ResultsLevels();
 
     // Note: Rcpp::DataFrame::create is limited to 20 columns
   	Rcpp::DataFrame df1 = Rcpp::DataFrame::create(
@@ -411,7 +416,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
                             Rcpp::_["n_pos_screen"] = n_pos_screen, Rcpp::_["n_pos_pre"] = n_pos_pre,	Rcpp::_["n_pos_post"] = n_pos_post);
 
   	Rcpp::DataFrame df2 = Rcpp::DataFrame::create(
-                            Rcpp::_["total_days"] = total_days, 
+                            Rcpp::_["total_days"] = total_days,
                             Rcpp::_["time_screen"] = time_screen, Rcpp::_["time_screen_count"] = time_screen_count,
                             Rcpp::_["time_pre"] = time_pre, Rcpp::_["time_pre_count"] = time_pre_count,
                             Rcpp::_["time_post"] = time_post, Rcpp::_["time_post_count"] = time_post_count,

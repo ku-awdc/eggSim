@@ -272,6 +272,7 @@ public:
         } else if (ci[1L] >= m_count_params.Teff && ci[0L] >= m_count_params.Tlow) {
           result = Results::susceptible;
         } else {
+          Rcpp::Rcout << ci[0L] << "-" << ci[1L] << "(" << m_count_params.Teff << ", " << m_count_params.Tlow << std::endl;
           Rcpp::stop("Unhandled result in CountSummarise");
         }
       }

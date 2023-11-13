@@ -17,7 +17,7 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
                  const Rcpp::IntegerVector& N_individ, const double mu_pre,
                  const double reduction, const double individ_cv, const double day_cv,
                  const double aliquot_cv, const double reduction_cv, const CountParams& count_params,
-                 Results* result, double* n_screen, double* n_pre, double* n_post,
+                 int* result, double* n_screen, double* n_pre, double* n_post,
                  double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
                  double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
                  double* time_screen, double* time_pre, double* time_post, const ptrdiff_t offset)
@@ -26,7 +26,7 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
   TESTING();
 
   // template<methods method, bool t_use_screen, bool t_paired, bool t_testing>
-  CountSummarise<methods::delta, true, true, true> count_summarise(count_params);
+  CountSummarise<methods::delta, true, true, t_testing> count_summarise(count_params);
 
   const int N_day_screen = t_fixed_n ? nd0 : N_day_screen_;
   const int N_aliquot_screen = t_fixed_n ? na0 : N_aliquot_screen_;
@@ -45,6 +45,11 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
   double post_imean = 0.0;
   int npos = 0L;
 
+  static constexpr size_t total_tp = 3L;
+  static constexpr size_t screen_tp = 0L;
+  static constexpr size_t pre_tp = 1L;
+  static constexpr size_t post_tp = 2L;
+
   int outn = 0L;
   ptrdiff_t outoffset = 0L;
 
@@ -57,8 +62,6 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
       const double mu_day = rday.draw(mu_ind);
       for(int aliquot=0L; aliquot<N_aliquot_screen; ++aliquot)
       {
-        // const int icount = raliquot.draw(mu_day);
-
         // Allow test scenarios:
         if constexpr (s_testing==0L) {
           count_summarise.add_count_screen(raliquot.draw(mu_day));
@@ -105,8 +108,6 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
         const double mu_day = rday.draw(mu_ind);
         for(int aliquot=0L; aliquot<N_aliquot_post; ++aliquot)
         {
-          // const int icount = raliquot.draw(mu_day);
-
           // Allow test scenarios:
           if constexpr (s_testing==0L) {
             count_summarise.add_count_post(raliquot.draw(mu_day));
@@ -168,24 +169,25 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
     {
       {
         const Results out_result = count_summarise.get_result();
-        *(result+outoffset) = out_result;
+        *(result+outoffset) = static_cast<int>(out_result);
       }
 
       {
-        const std::array<int, 3L> out_n = count_summarise.get_total_ind();
-        *(n_screen+outoffset) = out_n[0L];
-        *(n_pre+outoffset) = out_n[1L];
-        *(n_post+outoffset) = out_n[2L];
+        const std::array<int, total_tp> out_n = count_summarise.get_total_ind();
+        *(n_screen+outoffset) = out_n[screen_tp];
+        *(n_pre+outoffset) = out_n[pre_tp];
+        *(n_post+outoffset) = out_n[post_tp];
       }
 
       {
-        const std::array<int, 3L> out_n_pos = count_summarise.get_total_pos();
-        *(n_pos_screen+outoffset) = out_n_pos[0L];
-        *(n_pos_pre+outoffset) = out_n_pos[1L];
-        *(n_pos_post+outoffset) = out_n_pos[2L];
+        const std::array<int, total_tp> out_n_pos = count_summarise.get_total_pos();
+        *(n_pos_screen+outoffset) = out_n_pos[screen_tp];
+        *(n_pos_pre+outoffset) = out_n_pos[pre_tp];
+        *(n_pos_post+outoffset) = out_n_pos[post_tp];
       }
 
       {
+        // Note: we never have screening here
         const std::array<double, 2L> out_mean = count_summarise.get_means();
         *(mean_pre+outoffset) = out_mean[0L];
         *(mean_post+outoffset) = out_mean[1L];
@@ -197,10 +199,10 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
       }
 
       {
-        const std::array<double, 3L> out_time = count_summarise.get_total_time();
-        *(time_screen+outoffset) = out_time[0L];
-        *(time_pre+outoffset) = out_time[1L];
-        *(time_post+outoffset) = out_time[2L];
+        const std::array<double, total_tp> out_time = count_summarise.get_total_time();
+        *(time_screen+outoffset) = out_time[screen_tp];
+        *(time_pre+outoffset) = out_time[pre_tp];
+        *(time_post+outoffset) = out_time[post_tp];
       }
 
       outn++;

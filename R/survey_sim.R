@@ -9,6 +9,7 @@
 #' @param iterations number of iterations per simulation
 #' @param cl option to specify either a number of cores or an existing cluster for parallel computation (passed to \code{\link[pbapply]{pblapply}})
 #' @param output type of output:  one of summarised, full or extended
+#' @param analysis type of ERR/FECRT analysis:  one of mean or delta
 #'
 #' @importFrom pbapply pblapply
 #' @importFrom parallel makeForkCluster makePSOCKcluster stopCluster clusterSetRNGStream clusterExport
@@ -26,12 +27,15 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                        n_individ = seq(100,1000,by=10),
                        scenario = survey_scenario(parasite),
                        parameters = survey_parameters(design, parasite, method),
-                       iterations = 1e3,
-                       cl=NULL, output="summarised"){
+                       iterations = 1e3, cl=NULL,
+                       output="summarised", analysis="mean"){
 
   # TODO: pmatching for string arguments
   stopifnot(length(output)==1L, output %in% c("rsummarised","summarised","full","extended"))
   summarise <- output == "summarised"
+
+  stopifnot(length(analysis)==1L, analysis %in% c("mean","delta"))
+  if(analysis=="delta" && output=="summarised") stop("Summarised output is not (yet) available with the delta analysis")
 
   design <- check_design(design)
   parasite <- check_parasite(parasite)
@@ -67,9 +71,16 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
   st <- Sys.time()
 
   parameters |>
+    # Potentially split different count_parameter sets (should be rare):
+    lapply(function(x){
+      x |>
+        group_split(min_positive_screen, min_positive_pre, count_add, count_mult,
+          count_intercept, count_coefficient,
+          tail, target_efficacy, target_lower)
+    }) |>
+    do.call("c", args=_) |>
     # Use of cl argument means we always should use pblapply:
     pblapply(function(x){
-
       # Remove the design and ns from the parameters:
       x |>
         count(design, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, min_positive_screen, min_positive_pre) |>
@@ -82,6 +93,15 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       all_ns |> select(-design) |> unlist() -> all_ns
       stopifnot(length(all_ns)==8L, all(all_ns>=0L), all(all_ns%%1L == 0L))
       # TODO: nicer error messages
+
+      # Remove count_parameters from the parameters:
+      x |>
+        count(min_positive_screen, min_positive_pre, count_add, count_mult,
+          count_intercept, count_coefficient,
+          tail, target_efficacy, target_lower) |>
+        select(-n) ->
+        count_parameters
+      stopifnot(nrow(count_parameters)==1L)
 
       # Ensure that parameter_set is consistent:
       stopifnot(all(x$parameter_set == x$parameter_set[1L]))
@@ -157,10 +177,17 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       n_individ <- sort(n_individ)
       stopifnot(all(n_individ > 0L), all(n_individ%%1 == 0))
 
-      dist_string <- "cs_ga_ga_nb_be"
-      if(all(x$aliquot_cv <= 0)) dist_string <- "cs_ga_ga_po_be"
+      if(analysis=="mean"){
+        dist_string <- "cs_ga_ga_nb_be_mean"
+        if(all(x$aliquot_cv <= 0)) dist_string <- "cs_ga_ga_po_be_mean"
+      }else if(analysis=="delta"){
+        dist_string <- "cs_ga_ga_nb_be_delta"
+        if(all(x$aliquot_cv <= 0)) dist_string <- "cs_ga_ga_po_be_delta"
+      }else{
+        stop("Unhandled analysis type")
+      }
 
-      y <- Rcpp_survey_sim(des, dist_string, all_ns, as.data.frame(x), n_individ, summarise)
+      y <- Rcpp_survey_sim(des, dist_string, all_ns, as.data.frame(x), as.data.frame(count_parameters), n_individ, summarise)
 
       if(output=="extended"){
 
