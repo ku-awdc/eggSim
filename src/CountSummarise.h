@@ -171,14 +171,14 @@ public:
     {
       const double num = static_cast<double>(++m_num_pp);
 
-      const double dpre = m_mean_count[m_tpre] - m_means_pp[m_tpre];
-      const double dpost = m_mean_count[m_tpost] - m_means_pp[m_tpost];
-      m_means_pp[m_tpre] += dpre / num;
-      m_means_pp[m_tpost] += dpost / num;
+      const double dpre = m_mean_count[m_tpre] - m_means_pp[0L];
+      const double dpost = m_mean_count[m_tpost] - m_means_pp[1L];
+      m_means_pp[0L] += dpre / num;
+      m_means_pp[1L] += dpost / num;
 
-      const double dpost_after = m_mean_count[m_tpost] - m_means_pp[m_tpost];
-      m_varn_pp[m_tpre] += dpre * (m_mean_count[m_tpre] - m_means_pp[m_tpre]);
-      m_varn_pp[m_tpost] += dpost * dpost_after;
+      const double dpost_after = m_mean_count[m_tpost] - m_means_pp[1L];
+      m_varn_pp[0L] += dpre * (m_mean_count[m_tpre] - m_means_pp[0L]);
+      m_varn_pp[1L] += dpost * dpost_after;
 
       m_covn_pp += dpre * dpost_after;
     }
@@ -202,6 +202,7 @@ public:
     if(count > 0L) m_total_pos[m_tscreen]++;
     const double dcount = static_cast<const double>(count);
     add_time(dcount, m_tscreen);
+    m_is_pos[m_tscreen] = m_is_pos[m_tscreen] || (count > 0L);
     m_mean_count[m_tscreen] -= (m_mean_count[m_tscreen] - dcount) / static_cast<double>(++m_num_count[m_tscreen]);
   }
 
@@ -210,6 +211,7 @@ public:
     if(count > 0L) m_total_pos[m_tpre]++;
     const double dcount = static_cast<const double>(count);
     add_time(dcount, m_tpre);
+    m_is_pos[m_tpre] = m_is_pos[m_tpre] || (count > 0L);
     m_mean_count[m_tpre] -= (m_mean_count[m_tpre] - dcount) / static_cast<double>(++m_num_count[m_tpre]);
   }
 
@@ -218,6 +220,7 @@ public:
     if(count > 0L) m_total_pos[m_tpost]++;
     const double dcount = static_cast<const double>(count);
     add_time(dcount, m_tpost);
+    m_is_pos[m_tpost] = m_is_pos[m_tpost] || (count > 0L);
     m_mean_count[m_tpost] -= (m_mean_count[m_tpost] - dcount) / static_cast<double>(++m_num_count[m_tpost]);
   }
 
@@ -272,7 +275,7 @@ public:
         } else if (ci[1L] >= m_count_params.Teff && ci[0L] >= m_count_params.Tlow) {
           result = Results::susceptible;
         } else {
-          Rcpp::Rcout << ci[0L] << "-" << ci[1L] << "(" << m_count_params.Teff << ", " << m_count_params.Tlow << std::endl;
+          Rcpp::Rcout << ci[0L] << "-" << ci[1L] << "(" << m_count_params.Teff << ", " << m_count_params.Tlow << ")" << std::endl;
           Rcpp::stop("Unhandled result in CountSummarise");
         }
       }

@@ -101,7 +101,7 @@ public:
   {
     if(day_screen != m_day_screen) Rcpp::stop("Invalid N_day_screen");
     if(aliquot_screen != m_aliquot_screen) Rcpp::stop("Invalid N_aliquot_screen");
-    if(m_count_params.min_pos_screen <= 0L) Rcpp::stop("Invalid min_positive_screen <= 0L");
+    if(m_count_params.min_pos_screen != 0L) Rcpp::stop("Invalid min_positive_screen");
     if(m_count_params.min_pos_pre <= 0L) Rcpp::stop("Invalid min_positive_pre <= 0L");
 
     if constexpr (t_fixed_n)

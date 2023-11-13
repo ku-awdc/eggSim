@@ -24,7 +24,7 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
   TESTING();
 
   // template<methods method, bool t_use_screen, bool t_paired, bool t_testing>
-  CountSummarise<methods::delta, false, true, t_testing> count_summarise(count_params);
+  CountSummarise<method, false, true, t_testing> count_summarise(count_params);
   
   const int N_day_pre = t_fixed_n ? nd1 : N_day_pre_;
   const int N_aliquot_pre = t_fixed_n ? na1 : N_aliquot_pre_;
@@ -39,7 +39,6 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
 
   double pre_imean = 0.0;
   double post_imean = 0.0;
-  int npos=0L;
 
   static constexpr size_t total_tp = 2L;
   // static constexpr size_t screen_tp = 0L;
@@ -134,6 +133,8 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
       }
     }
 
+    count_summarise.next_ind();
+    
     // Save output:
     if((ind+1L) == N_individ[outn])
     {
@@ -164,8 +165,8 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
       }
 
       {
-        *(imean_pre+outoffset) = npos == 0L ? NA_REAL : pre_imean;
-        *(imean_post+outoffset) = npos == 0L ? NA_REAL : post_imean;
+        *(imean_pre+outoffset) = pre_imean;
+        *(imean_post+outoffset) = post_imean;
       }
 
       {

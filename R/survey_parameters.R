@@ -142,14 +142,14 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
       ),
       tail = 0.025,
       target_efficacy = case_when(
-        parasite == "ascaris" ~ 0.95,
-        parasite == "trichuris" ~ 0.5,
-        parasite == "hookworm" ~ 0.7
+        parasite == "ascaris" ~ 0.85,
+        parasite == "trichuris" ~ 0.4,
+        parasite == "hookworm" ~ 0.8
       ),
       target_lower = case_when(
-        parasite == "ascaris" ~ 0.9,
-        parasite == "trichuris" ~ 0.45,
-        parasite == "hookworm" ~ 0.65
+        parasite == "ascaris" ~ 0.8,
+        parasite == "trichuris" ~ 0.35,
+        parasite == "hookworm" ~ 0.75
       ),
       time_demography = case_when(
         method == "kk" ~ 15,
@@ -264,12 +264,12 @@ survey_scenario <- function(parasite = c("ascaris","trichuris","hookworm")){
   )
 
   full_join(mean_epg, reduction, by="parasite") |>
-    filter(.data$parasite %in% parin) |>
-    mutate(cutoff = case_when(
-      parasite == "ascaris" ~ 0.85,
-      parasite == "trichuris" ~ 0.40,
-      parasite == "hookworm" ~ 0.80
-    ))
+    filter(.data$parasite %in% parin) #|>
+    #mutate(cutoff = case_when(
+    #  parasite == "ascaris" ~ 0.85,
+    #  parasite == "trichuris" ~ 0.40,
+    #  parasite == "hookworm" ~ 0.80
+    #))
 
 }
 
@@ -285,6 +285,7 @@ check_parameters <- function(pp, iters=1L){
     if(any(!parnames %in% names(x))){
       stop("One or more missing parameters: ", str_c(parnames[!parnames %in% names(x)], collapse=", "))
     }
+    stopifnot(all(x$target_efficacy > x$target_lower))
   })
   ps <- lapply(pp, function(x){
     if(!length(unique(x$parameter_set))==1L){
@@ -296,7 +297,7 @@ check_parameters <- function(pp, iters=1L){
 
 check_scenario <- function(scenario){
   stopifnot(is.data.frame(scenario))
-  stopifnot(all(c("parasite","scenario","mean_epg","true_efficacy","cutoff") %in% names(scenario)))
+  stopifnot(all(c("parasite","scenario","mean_epg","true_efficacy") %in% names(scenario)))
   scenario$parasite <- check_parasite(scenario$parasite)
   scenario
 }

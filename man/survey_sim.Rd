@@ -13,7 +13,8 @@ survey_sim(
   parameters = survey_parameters(design, parasite, method),
   iterations = 1000,
   cl = NULL,
-  output = "summarised"
+  output = "summarised",
+  analysis = "mean"
 )
 }
 \arguments{
@@ -34,6 +35,8 @@ survey_sim(
 \item{cl}{option to specify either a number of cores or an existing cluster for parallel computation (passed to \code{\link[pbapply]{pblapply}})}
 
 \item{output}{type of output:  one of summarised, full or extended}
+
+\item{analysis}{type of ERR/FECRT analysis:  one of mean or delta}
 }
 \description{
 Simulate one or more survey design

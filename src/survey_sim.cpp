@@ -43,8 +43,6 @@ Rcpp::DataFrame survey_sim(const std::string& design, const std::string& dist_st
 								const Rcpp::IntegerVector& n_individ, const bool summarise)
 {
 
-  Rcpp::warning("Allow methods both delta and means");
-
 	Rcpp::DataFrame rv;
   bool handled = false;
 

@@ -188,36 +188,39 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       }
 
       y <- Rcpp_survey_sim(des, dist_string, all_ns, as.data.frame(x), as.data.frame(count_parameters), n_individ, summarise)
+      reslevs <- Rcpp_results_levels()
 
       if(output=="extended"){
 
         rv <- full_join(y, x, by="replicateID") |>
           select(-replicateID, -scenario_int) |>
-          mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre"))) |>
+          mutate(result = results_to_factor(result)) |>
           select(-reduction) |>
-          select(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set, iteration, result, efficacy, total_days, total_cost, everything())
+          select(design, parasite, scenario, mean_epg, true_efficacy, target_efficacy, target_lower, method, n_individ, parameter_set, iteration, result, efficacy, total_days, total_cost, everything())
         stopifnot(nrow(rv)==nrow(y))
 
       }else if(output=="full"){
 
         rv <- full_join(y,
-                        x |> select(design, parasite, cutoff, method, parameter_set, iteration, scenario, mean_epg, true_efficacy, replicateID),
+                        x |> select(design, parasite, target_efficacy, target_lower, method, parameter_set, iteration, scenario, mean_epg, true_efficacy, replicateID),
                         by="replicateID"
           ) |>
-          mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre"))) |>
-          select(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set, iteration, result, efficacy, total_days, total_cost)
+          mutate(result = results_to_factor(result)) |>
+          select(design, parasite, scenario, mean_epg, true_efficacy, target_efficacy, target_lower, method, n_individ, parameter_set, iteration, result, efficacy, total_days, total_cost)
         stopifnot(nrow(rv)==nrow(y))
 
       }else if(output=="rsummarised"){
 
+        stop("The rsummarised method is temporarily disabled")
+
         rv <- full_join(y,
-                        x |> select(design, parasite, cutoff, method, parameter_set, iteration, scenario, mean_epg, true_efficacy, replicateID),
+                        x |> select(design, parasite, target_efficacy, target_lower, method, parameter_set, iteration, scenario, mean_epg, true_efficacy, replicateID),
                         by="replicateID"
           ) |>
-          mutate(result = factor(result, levels=c(0,1,2,3), labels=c("Success","FailPositivePre","FailPositiveScreen","ZeroMeanPre"))) |>
-          group_by(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set) |>
+          mutate(result = results_to_factor(result)) |>
+          group_by(design, parasite, scenario, mean_epg, true_efficacy, target_efficacy, target_lower, method, n_individ, parameter_set) |>
 
-          summarise(below_cutoff = sum(efficacy < cutoff, na.rm=TRUE), above_cutoff = sum(efficacy >= cutoff, na.rm=TRUE), failure_n = sum(result!="Success"), total_n = n(),
+          summarise(below_cutoff = sum(efficacy < target_efficacy, na.rm=TRUE), above_cutoff = sum(efficacy >= target_efficacy, na.rm=TRUE), failure_n = sum(result!="Success"), total_n = n(),
             pre_mean = mean(pre_mean, na.rm=TRUE), post_mean = mean(post_mean, na.rm=TRUE),
             pre_imean = mean(pre_imean, na.rm=TRUE), post_imean = mean(post_imean, na.rm=TRUE),
             efficacy_mean = mean(efficacy, na.rm=TRUE), efficacy_variance = var(efficacy, na.rm=TRUE),
@@ -228,12 +231,12 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       }else if(output=="summarised"){
 
         rv <- x |>
-          count(design, parasite, method, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, min_positive_screen, min_positive_pre, scenario, cutoff, mean_epg, true_efficacy, parameter_set, scenario_int) |>
+          count(design, parasite, method, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, min_positive_screen, min_positive_pre, scenario, target_efficacy, target_lower, mean_epg, true_efficacy, parameter_set, scenario_int) |>
           full_join(y, by="scenario_int") |>
-          mutate(efficacy_variance = var_efficacy, failure_n = n_result_1+n_result_2+n_result_3,
+          mutate(efficacy_variance = var_efficacy, failure_n = n_result_0+n_result_1+n_result_2,
                  total_n = n_total, proportion_below = n_below_cutoff/total_n) |>
           select(-scenario_int) |>
-          select(design, parasite, scenario, mean_epg, true_efficacy, cutoff, method, n_individ, parameter_set,
+          select(design, parasite, scenario, mean_epg, true_efficacy, target_efficacy, target_lower, method, n_individ, parameter_set,
                  below_cutoff = n_below_cutoff, above_cutoff = n_above_cutoff, failure_n, total_n,
                  pre_mean = mean_pre, post_mean = mean_post, pre_imean = imean_pre, post_imean = imean_post,
                  efficacy_mean = mean_efficacy, efficacy_variance, proportion_below, days_mean = mean_days, cost_mean = mean_cost, cost_variance = var_cost)
@@ -249,4 +252,12 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
   cat("Done in ", round(as.numeric(Sys.time()-st, units='mins'), 1), " minutes\n", sep="")
 
   return(as_tibble(results))
+}
+
+results_to_factor <- function(x){
+  if(any(is.na(x))) warning("One or more missing values in results")
+  reslevs <- Rcpp_results_levels()
+  x <- factor(x, levels=0:(length(reslevs)-1L), labels=reslevs)
+  if(any(is.na(x))) warning("One or more missing values in results after factorising")
+  return(x)
 }

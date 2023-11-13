@@ -84,7 +84,8 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   if constexpr(t_summarise)
   {
     if constexpr (method == methods::delta) Rcpp::stop("summarise=true for methods::delta not yet implemented");
-  	const Rcpp::NumericVector cutoff = parameters["cutoff"];
+  	// TODO: rationalise this!
+    const double cutoff = Teff;
 
   	// Create the output vectors:
     // Rcpp::IntegerVector result(ol);
@@ -196,8 +197,6 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
             &mean_pre_ll[0L], &mean_post_ll[0L], &imean_pre_ll[0L], &imean_post_ll[0L],
             &time_screen_ll[0L], &time_pre_ll[0L], &time_post_ll[0L], offset);
 
-      Rcpp::warning("Need to include n_pos_* in summary and fix Results stuff");
-
   		// Do cost calculations and running means:
   		for(int i=0; i<ni; ++i)
   		{
@@ -233,19 +232,21 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 
         mean_days[ind] += (static_cast<double>(ndays) - mean_days[ind]) / n_total[ind];
 
+        // TODO: cleanup somehow
         if(result_ll[i] > 3L || result_ll[i] < 0L) Rcpp::stop("Unhandled result_ll");
         n_result_0[ind] += static_cast<int>(result_ll[i] == 0L);
         n_result_1[ind] += static_cast<int>(result_ll[i] == 1L);
         n_result_2[ind] += static_cast<int>(result_ll[i] == 2L);
-        n_result_3[ind] += static_cast<int>(result_ll[i] == 3L);
+        n_result_3[ind] += static_cast<int>(result_ll[i] == 3L); // Success
 
         // Only use these if the scenario was successful:
-        if(result_ll[i] == 0L)
+        // TODO: cleanup
+        if(result_ll[i] == 3L) // Success
         {
-          const int nmi = n_result_0[ind];
+          const int nmi = n_result_3[ind];
           const double eff = 1.0 - mean_post_ll[i] / mean_pre_ll[i];
 
-          const int blc = static_cast<int>(eff < cutoff[p]);
+          const int blc = static_cast<int>(eff < cutoff);
           n_below_cutoff[ind] += blc;
           n_above_cutoff[ind] += (1L-blc);
 
@@ -278,7 +279,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
     // Set means to NA where all elements were NA:
     for(int ind=0L; ind<ol; ++ind)
     {
-      if(n_result_0[ind] == 0L)
+      if(n_result_3[ind] == 0L)
       {
         efficacy[ind] = NA_REAL;
         efficacy_var[ind] = NA_REAL;
@@ -288,7 +289,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
       else
       {
         // Also calculate variance:
-        efficacy_var[ind] /= static_cast<double>(n_result_0[ind] - 1L);
+        efficacy_var[ind] /= static_cast<double>(n_result_3[ind] - 1L);
       }
       if(imean_pre_nn[ind] == 0L)
       {
@@ -402,10 +403,6 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::IntegerVector nind = repmean[0L];
   	Rcpp::IntegerVector repID = repmean[1L];
     
-    // Make result into a factor:
-    result.attr("class") = "factor";
-    result.attr("levels") = ResultsLevels();
-
     // Note: Rcpp::DataFrame::create is limited to 20 columns
   	Rcpp::DataFrame df1 = Rcpp::DataFrame::create(
                             Rcpp::_["replicateID"] = repID, Rcpp::_["n_individ"] = nind,

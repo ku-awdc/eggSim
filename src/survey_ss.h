@@ -25,7 +25,7 @@ void survey_ss(const int N_day_pre_, const int N_aliquot_pre_,
   TESTING();
 
   // template<methods method, bool t_use_screen, bool t_paired, bool t_testing>
-  CountSummarise<methods::delta, false, true, t_testing> count_summarise(count_params);
+  CountSummarise<method, false, true, t_testing> count_summarise(count_params);
   
   const int N_day_pre = t_fixed_n ? nd1 : N_day_pre_;
   const int N_aliquot_pre = t_fixed_n ? na1 : N_aliquot_pre_;
@@ -137,6 +137,8 @@ void survey_ss(const int N_day_pre_, const int N_aliquot_pre_,
         }
       }
 	  }
+
+    count_summarise.next_ind();
 
     // Save output:
     if((ind+1L) == N_individ[outn])

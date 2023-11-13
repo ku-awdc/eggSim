@@ -23,15 +23,15 @@ constexpr const char* ResultToString(Results result)
 {
     switch (result)
     {
-        case Results::few_screen: return "Failure due to insufficient screening positive";
-        case Results::few_pre: return "Failure due to insufficient pre-treatment positive";
-        case Results::zero_pre: return "Failure due to zero mean pre-treatment";
-        case Results::success: return "Successful result (no classification)";
-        case Results::zero_post: return "Unable to classify due to 100% reduction";
-        case Results::resistant: return "Resistant classification";
-        case Results::low_resistant: return "Low Resistant classification";
-        case Results::inconclusive: return "Inconclusive classification";
-        case Results::susceptible: return "Susceptible classification";
+        case Results::few_screen: return "FailPositiveScreen";
+        case Results::few_pre: return "FailPositivePre";
+        case Results::zero_pre: return "ZeroMeanPre";
+        case Results::success: return "Success"; // Only for mean method
+        case Results::zero_post: return "ZeroMeanPost"; // This and below only for delta method
+        case Results::resistant: return "Resistant";
+        case Results::low_resistant: return "LowResistant";
+        case Results::inconclusive: return "Inconclusive";
+        case Results::susceptible: return "Susceptible";
         default: Rcpp::stop("Unimplemented result in ResultToString");
     }
 }

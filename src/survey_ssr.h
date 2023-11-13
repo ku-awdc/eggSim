@@ -26,7 +26,7 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
   TESTING();
 
   // template<methods method, bool t_use_screen, bool t_paired, bool t_testing>
-  CountSummarise<methods::delta, true, true, t_testing> count_summarise(count_params);
+  CountSummarise<method, true, true, t_testing> count_summarise(count_params);
 
   const int N_day_screen = t_fixed_n ? nd0 : N_day_screen_;
   const int N_aliquot_screen = t_fixed_n ? na0 : N_aliquot_screen_;
@@ -163,6 +163,8 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
         }
       }
     }
+    
+    count_summarise.next_ind();
 
     // Save output:
     if((ind+1L) == N_individ[outn])
