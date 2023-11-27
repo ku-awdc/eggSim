@@ -36,10 +36,9 @@ constexpr const char* ResultToString(Results result)
     }
 }
 
-// Can't be a CharacterVector as this is not a literal type, so we have a separate conversion in utilities.h:
-constexpr std::array<const char*, 9L> ResultsLevels()
-{
-  constexpr std::array<const char*, 9L> rv = {
+
+// Note: constexpr std::array<const char*, 9L> works on arm64 but not x86_64 ?!?
+static const std::vector<const std::string> ResultsLevels = {
     ResultToString(Results::few_screen),
     ResultToString(Results::few_pre),
     ResultToString(Results::zero_pre),
@@ -51,8 +50,6 @@ constexpr std::array<const char*, 9L> ResultsLevels()
     ResultToString(Results::susceptible)
   };
 
-  return rv;
-}
 
 // For testing costs with fixed data:
 #define TESTING() constexpr int s_testing = 0L; constexpr bool t_testing = true

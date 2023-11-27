@@ -199,7 +199,6 @@ public:
       Rcpp::stop("Logic error:  CountSummarise not set to use screening");
     }
 
-    if(count > 0L) m_total_pos[m_tscreen]++;
     const double dcount = static_cast<const double>(count);
     add_time(dcount, m_tscreen);
     m_is_pos[m_tscreen] = m_is_pos[m_tscreen] || (count > 0L);
@@ -208,7 +207,6 @@ public:
 
   void add_count_pre(const int count) noexcept
   {
-    if(count > 0L) m_total_pos[m_tpre]++;
     const double dcount = static_cast<const double>(count);
     add_time(dcount, m_tpre);
     m_is_pos[m_tpre] = m_is_pos[m_tpre] || (count > 0L);
@@ -217,7 +215,6 @@ public:
 
   void add_count_post(const int count) noexcept
   {
-    if(count > 0L) m_total_pos[m_tpost]++;
     const double dcount = static_cast<const double>(count);
     add_time(dcount, m_tpost);
     m_is_pos[m_tpost] = m_is_pos[m_tpost] || (count > 0L);

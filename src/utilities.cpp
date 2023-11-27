@@ -55,10 +55,10 @@ double count_time(const Rcpp::IntegerVector& count, const double intercept,
 
 Rcpp::CharacterVector results_levels()
 {
-  constexpr std::array<const char*, 9L> reslevs = ResultsLevels();
-  Rcpp::CharacterVector rv(reslevs.size());
+  //const std::vector<const std::string> reslevs = ResultsLevels();
+  Rcpp::CharacterVector rv(ResultsLevels.size());
   for (size_t i=0L; i<rv.size(); ++i) {
-    rv[i] = reslevs[i];
+    rv[i] = ResultsLevels[i];
   }
   return rv;
 }
