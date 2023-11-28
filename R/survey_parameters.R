@@ -140,7 +140,7 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
         method == "miniflotac" ~ 0.066,
         method == "fecpak" ~ 0.172
       ),
-      tail = 0.025,
+      tail = 0.05,
       target_efficacy = case_when(
         parasite == "ascaris" ~ 0.85,
         parasite == "trichuris" ~ 0.4,

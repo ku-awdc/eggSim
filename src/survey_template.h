@@ -209,7 +209,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   										n_post_ll[i] * cost_consumables_post[p];
 
   			const double days_screen = (n_screen_ll[i] * time_consumables_screen[p] + time_screen_ll[i]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
-  			const double days_pre = (n_pre_ll[i] * time_consumables_pre[p] +time_pre_ll[i]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
+  			const double days_pre = (n_pre_ll[i] * time_consumables_pre[p] + time_pre_ll[i]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
   			const double days_post = (n_post_ll[i] * time_consumables_post[p] + time_post_ll[i]) / (n_technicians[p] * 4.0 * 60.0 * 60.0);
 
         const double ndays =  (n_screen_ll[i]<0.5 ? 0.0 : ceil(days_screen)) +
