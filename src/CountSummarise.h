@@ -87,12 +87,12 @@ private:
       if (m_total_pos[m_tscreen] < m_count_params.min_pos_screen ||
           m_total_pos[m_tpre] < m_count_params.min_pos_pre)
       {
-        arr[m_tpre] = replacement;
-        arr[m_tpost] = replacement;
+        arr[0L] = replacement;
+        arr[1L] = replacement;
       }
     } else if constexpr (!t_use_screen && N == 2L) {  // Not using screening and output vector is pre/post only
       if (m_total_pos[m_tpre] < m_count_params.min_pos_pre) {
-        arr[m_tpost] = replacement;
+        arr[1L] = replacement;
       }
     } else {
       Rcpp::stop("Unhandled use of template apply_minimums");
