@@ -78,9 +78,9 @@ public:
     Rcpp::CharacterVector result = ResultToString(m_cs.get_result());
     Rcpp::NumericVector means = arr2rcpp(m_cs.get_means());
     Rcpp::NumericVector total_time = arr2rcpp(m_cs.get_total_time());
-    Rcpp::IntegerVector total_obs = arr2rcpp(m_cs.get_total_obs());
-    Rcpp::IntegerVector total_ind = arr2rcpp(m_cs.get_total_ind());
-    Rcpp::IntegerVector total_pos = arr2rcpp(m_cs.get_total_pos());
+    Rcpp::NumericVector total_obs = arr2rcpp(m_cs.get_total_obs());
+    Rcpp::NumericVector total_ind = arr2rcpp(m_cs.get_total_ind());
+    Rcpp::NumericVector total_pos = arr2rcpp(m_cs.get_total_pos());
 
     Rcpp::List rv = Rcpp::List::create(
       Rcpp::Named("result") = result,

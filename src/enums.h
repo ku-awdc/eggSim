@@ -52,7 +52,7 @@ static const std::vector<const std::string> ResultsLevels = {
 
 
 // For testing costs with fixed data:
-#define TESTING() constexpr int s_testing = 0L; constexpr bool t_testing = true
+#define TESTING() constexpr int s_testing = 0L; constexpr bool t_testing = false
 
 // For passing around:
 struct CountParams

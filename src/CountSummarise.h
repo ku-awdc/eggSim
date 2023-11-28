@@ -42,9 +42,6 @@ private:
   static constexpr size_t m_tpre = (t_use_screen ? 1L : 0L);
   static constexpr size_t m_tpost = (t_use_screen ? 2L : 1L);
 
-  // Note: can't be static or constexpr because NA_REAL isn't
-  const std::array<double, 2L> missing = { NA_REAL, NA_REAL };
-
   // Stats for separate screen/pre/post:
   // Total times:
   std::array<double, m_tp> m_total_time = {};  // Zero-initialise
@@ -71,6 +68,37 @@ private:
   // Mean counts within individual:
   std::array<double, m_tp> m_mean_count = {};  // Zero-initialise
 
+  // Allow extraction of int/double stats when we haven't yet hit the thresholds:
+  template <typename T, size_t N>
+  const std::array<double, N> apply_minimums(const std::array<T, N> input, const double replacement) const noexcept
+  {
+    std::array<double, N> arr;
+    for (size_t i=0L; i<N; ++i) {
+      arr[i] = static_cast<double>(input[i]);
+    }
+    if constexpr (t_use_screen && N == 3L) {   // Must be using screening
+      if (m_total_pos[m_tscreen] < m_count_params.min_pos_screen ||
+          m_total_pos[m_tpre] < m_count_params.min_pos_pre)
+      {
+        arr[m_tpre] = replacement;
+        arr[m_tpost] = replacement;
+      }
+    } else if constexpr (t_use_screen && N == 2L) {  // Using screening but output vector is pre/post only
+      if (m_total_pos[m_tscreen] < m_count_params.min_pos_screen ||
+          m_total_pos[m_tpre] < m_count_params.min_pos_pre)
+      {
+        arr[m_tpre] = replacement;
+        arr[m_tpost] = replacement;
+      }
+    } else if constexpr (!t_use_screen && N == 2L) {  // Not using screening and output vector is pre/post only
+      if (m_total_pos[m_tpre] < m_count_params.min_pos_pre) {
+        arr[m_tpost] = replacement;
+      }
+    } else {
+      Rcpp::stop("Unhandled use of template apply_minimums");
+    }
+    return arr;
+  }
 
   void add_time(const double count, const size_t time_point) noexcept
   {
@@ -304,34 +332,45 @@ public:
     return result;
   }
 
+  // total time and total obs are used for costs, so replacement is 0
+  std::array<double, m_tp> get_total_time() const noexcept
+  {
+    const std::array<double, m_tp> rv = apply_minimums<double, m_tp>(m_total_time, 0.0);
+    return rv;
+  }
+
+  std::array<double, m_tp> get_total_obs() const noexcept
+  {
+    const std::array<double, m_tp> rv = apply_minimums<int, m_tp>(m_total_count, 0.0);
+    return rv;
+  }
+
+  // means, total ind and total pos are not used for costs, so make replacement NA
+  // so that summaries are for successful surveys only
+  std::array<double, m_tp> get_total_ind() const noexcept
+  {
+    const std::array<double, m_tp> rv = apply_minimums<int, m_tp>(m_total_ind, NA_REAL);
+    return rv;
+  }
+
+  std::array<double, m_tp> get_total_pos() const noexcept
+  {
+    const std::array<double, m_tp> rv = apply_minimums<int, m_tp>(m_total_pos, NA_REAL);
+    return rv;
+  }
+
   std::array<double, 2L> get_means() const noexcept
   {
     if (m_num_pp > 0L) {
-      return m_means_pp;
+      const std::array<double, 2L> rv = apply_minimums<double, 2L>(m_means_pp, NA_REAL);
+      return rv;      
     } else {
-      return missing;
+      // Note: can't be static or constexpr because NA_REAL isn't
+      const std::array<double, 2L> rv = { NA_REAL, NA_REAL };
+      return rv;
     }
   }
-
-  std::array<double, m_tp> get_total_time() const noexcept
-  {
-    return m_total_time;
-  }
-
-  std::array<int, m_tp> get_total_obs() const noexcept
-  {
-    return m_total_count;
-  }
-
-  std::array<int, m_tp> get_total_ind() const noexcept
-  {
-    return m_total_ind;
-  }
-
-  std::array<int, m_tp> get_total_pos() const noexcept
-  {
-    return m_total_pos;
-  }
+  
 
 };
 

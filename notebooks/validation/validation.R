@@ -14,6 +14,13 @@ si <- sessionInfo()
 
 stop()
 
+rl <- survey_sim(scenario=ss[1,], parameters=sp[[5]], output="extended")
+rl |> View()
+
+
+env <- new.env()
+(load("notebooks/validation/validation_results_0.9.5-1.rda", envir=env))
+results_old <- env$results
 
 cc <- "parameter_set"
 identical(results[[cc]], results_old[[cc]])

@@ -149,15 +149,15 @@ void survey_ss(const int N_day_pre_, const int N_aliquot_pre_,
       }
 
       {
-        const std::array<int, total_tp> out_n = count_summarise.get_total_obs();
-        *(n_screen+outoffset) = 0L;
+        const std::array<double, total_tp> out_n = count_summarise.get_total_obs();
+        *(n_screen+outoffset) = 0.0;
         *(n_pre+outoffset) = out_n[pre_tp];
         *(n_post+outoffset) = out_n[post_tp];
       }
 
       {
-        const std::array<int, total_tp> out_n_pos = count_summarise.get_total_pos();
-        *(n_pos_screen+outoffset) = 0L;
+        const std::array<double, total_tp> out_n_pos = count_summarise.get_total_pos();
+        *(n_pos_screen+outoffset) = 0.0;
         *(n_pos_pre+outoffset) = out_n_pos[pre_tp];
         *(n_pos_post+outoffset) = out_n_pos[post_tp];
       }
@@ -176,7 +176,7 @@ void survey_ss(const int N_day_pre_, const int N_aliquot_pre_,
 
       {
         const std::array<double, total_tp> out_time = count_summarise.get_total_time();
-        *(time_screen+outoffset) = 0L;
+        *(time_screen+outoffset) = 0.0;
         *(time_pre+outoffset) = out_time[pre_tp];
         *(time_post+outoffset) = out_time[post_tp];
       }
