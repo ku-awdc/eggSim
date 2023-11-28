@@ -144,7 +144,7 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
       }
 
       {
-        const std::array<int, total_tp> out_n = count_summarise.get_total_ind();
+        const std::array<int, total_tp> out_n = count_summarise.get_total_obs();
         *(n_screen+outoffset) = 0L;
         *(n_pre+outoffset) = out_n[pre_tp];
         *(n_post+outoffset) = out_n[post_tp];
