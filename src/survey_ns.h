@@ -139,7 +139,8 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
     if((ind+1L) == N_individ[outn])
     {
       {
-        const Results out_result = count_summarise.get_result();
+        const CountReturn crv = count_summarise.get_result();
+        const Results out_result = crv.result;
         *(result+outoffset) = static_cast<int>(out_result);
       }
 

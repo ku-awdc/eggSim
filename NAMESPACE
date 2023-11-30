@@ -2,6 +2,7 @@
 
 export(ERRparameters)
 export(cgpDataSim)
+export(classify_result)
 export(clpDataSim)
 export(combined_k)
 export(design_means)

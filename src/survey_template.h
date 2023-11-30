@@ -52,9 +52,9 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 	const double count_mult = count_parameters["count_mult"];
   const int min_pos_screen = count_parameters["min_positive_screen"];
   const int min_pos_pre = count_parameters["min_positive_pre"];
-	const double tail = count_parameters["tail"];
-	const double Teff = count_parameters["target_efficacy"];
-	const double Tlow = count_parameters["target_lower"];
+	const double tail = count_parameters["alpha"]; // NB: name of parameter is changed
+	const double Teff = count_parameters["efficacy_expected"];
+	const double Tlow = count_parameters["efficacy_lower_target"];
 
   const CountParams count_params
   {
@@ -84,8 +84,6 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   if constexpr(t_summarise)
   {
     if constexpr (method == methods::delta) Rcpp::stop("summarise=true for methods::delta not yet implemented");
-  	// TODO: rationalise this!
-    const double cutoff = Teff;
 
   	// Create the output vectors:
     // Rcpp::IntegerVector result(ol);
@@ -111,14 +109,22 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::NumericVector mean_cost(ol);
   	Rcpp::NumericVector var_cost(ol);
 
+    Rcpp::IntegerVector n_success(ol);
     Rcpp::IntegerVector n_result_0(ol);
     Rcpp::IntegerVector n_result_1(ol);
     Rcpp::IntegerVector n_result_2(ol);
     Rcpp::IntegerVector n_result_3(ol);
+    Rcpp::IntegerVector n_result_4(ol);
+    Rcpp::IntegerVector n_result_5(ol);
+    Rcpp::IntegerVector n_result_6(ol);
+    Rcpp::IntegerVector n_result_7(ol);
+    Rcpp::IntegerVector n_result_8(ol);
+    Rcpp::IntegerVector n_result_9(ol);
     Rcpp::IntegerVector n_total(ol);
 
-    Rcpp::IntegerVector n_above_cutoff(ol);
-    Rcpp::IntegerVector n_below_cutoff(ol);
+    Rcpp::IntegerVector n_below_cutoffs(ol);
+    Rcpp::IntegerVector n_between_cutoffs(ol);
+    Rcpp::IntegerVector n_above_cutoffs(ol);
 
     Rcpp::IntegerVector n_individ_out(ol);
     Rcpp::IntegerVector scenario_int_out(ol);
@@ -233,22 +239,33 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
         mean_days[ind] += (static_cast<double>(ndays) - mean_days[ind]) / n_total[ind];
 
         // TODO: cleanup somehow
-        if(result_ll[i] > 3L || result_ll[i] < 0L) Rcpp::stop("Unhandled result_ll");
+        if(result_ll[i] > 9L || result_ll[i] < 0L) Rcpp::stop("Unhandled result_ll");
         n_result_0[ind] += static_cast<int>(result_ll[i] == 0L);
         n_result_1[ind] += static_cast<int>(result_ll[i] == 1L);
         n_result_2[ind] += static_cast<int>(result_ll[i] == 2L);
-        n_result_3[ind] += static_cast<int>(result_ll[i] == 3L); // Success
+        n_result_3[ind] += static_cast<int>(result_ll[i] == 3L);
+        n_result_4[ind] += static_cast<int>(result_ll[i] == 4L);
+        n_result_5[ind] += static_cast<int>(result_ll[i] == 5L);
+        n_result_6[ind] += static_cast<int>(result_ll[i] == 6L);
+        n_result_7[ind] += static_cast<int>(result_ll[i] == 7L);
+        n_result_8[ind] += static_cast<int>(result_ll[i] == 8L);
+        n_result_9[ind] += static_cast<int>(result_ll[i] == 9L);
 
         // Only use these if the scenario was successful:
-        // TODO: cleanup
-        if(result_ll[i] == 3L) // Success
+        if (ResultIsSuccess(result_ll[i]))
         {
+          n_success[ind]++;
+
           const int nmi = n_result_3[ind];
           const double eff = 1.0 - mean_post_ll[i] / mean_pre_ll[i];
 
-          const int blc = static_cast<int>(eff < cutoff);
-          n_below_cutoff[ind] += blc;
-          n_above_cutoff[ind] += (1L-blc);
+          if (eff < Tlow) {
+            n_below_cutoffs[ind]++;
+          } else if (eff < Teff) {
+            n_between_cutoffs[ind]++;
+          } else {
+            n_above_cutoffs[ind]++;
+          }
 
       		const double edelta = eff - efficacy[ind];
           efficacy[ind] += edelta / nmi;
@@ -262,6 +279,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
           mean_post[ind] -= (mean_post[ind] - mean_post_ll[i]) / nmi;
         }
 
+        /* NO LONGER RETURNING imean
         // Only use these if there was a non-missing imean_pre/imean_post:
         if(!Rcpp::NumericVector::is_na(imean_pre_ll[i]))
         {
@@ -273,13 +291,14 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
           imean_post_nn[ind]++;
           imean_post[ind] -= (imean_post[ind] - imean_post_ll[i]) / imean_post_nn[ind];
         }
+        */
   		}
     }
 
     // Set means to NA where all elements were NA:
     for(int ind=0L; ind<ol; ++ind)
     {
-      if(n_result_3[ind] == 0L)
+      if(n_success[ind] == 0L)
       {
         efficacy[ind] = NA_REAL;
         efficacy_var[ind] = NA_REAL;
@@ -291,6 +310,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
         // Also calculate variance:
         efficacy_var[ind] /= static_cast<double>(n_result_3[ind] - 1L);
       }
+      /*
       if(imean_pre_nn[ind] == 0L)
       {
         imean_pre[ind] = NA_REAL;
@@ -299,21 +319,24 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
       {
         imean_post_nn[ind] = NA_REAL;
       }
+      */
       // And cost variance:
       var_cost[ind] /= static_cast<double>(n_total[ind] - 1L);
     }
 
   	Rcpp::DataFrame df1 = Rcpp::DataFrame::create( 	Rcpp::_["scenario_int"] = scenario_int_out, Rcpp::_["n_individ"] = n_individ_out,
                             Rcpp::_["mean_efficacy"] = efficacy, Rcpp::_["var_efficacy"] = efficacy_var,
-                            Rcpp::_["n_below_cutoff"] = n_below_cutoff, Rcpp::_["n_above_cutoff"] = n_above_cutoff,
-                            Rcpp::_["mean_pre"] = mean_pre, Rcpp::_["mean_post"] = mean_post,
-                            Rcpp::_["imean_pre"] = imean_pre, Rcpp::_["imean_post"] = imean_post );
-    Rcpp::DataFrame df2 = Rcpp::DataFrame::create( 	Rcpp::_["mean_n_screen"] = n_screen,
-                            Rcpp::_["mean_n_pre"] = n_pre,	Rcpp::_["mean_n_post"] = n_post,
+                            Rcpp::_["n_below_cutoffs"] = n_below_cutoffs, Rcpp::_["n_between_cutoffs"] = n_between_cutoffs,
+                            Rcpp::_["n_above_cutoffs"] = n_above_cutoffs,
+                            Rcpp::_["mean_pre"] = mean_pre, Rcpp::_["mean_post"] = mean_post, Rcpp::_["mean_days"] = mean_days,
+  													Rcpp::_["mean_cost"] = mean_cost, Rcpp::_["var_cost"] = var_cost );
+    Rcpp::DataFrame df2 = Rcpp::DataFrame::create(
                             Rcpp::_["n_result_0"] = n_result_0, Rcpp::_["n_result_1"] = n_result_1,
                             Rcpp::_["n_result_2"] = n_result_2, Rcpp::_["n_result_3"] = n_result_3,
-                            Rcpp::_["n_total"] = n_total, Rcpp::_["mean_days"] = mean_days,
-  													Rcpp::_["mean_cost"] = mean_cost, Rcpp::_["var_cost"] = var_cost );
+                            Rcpp::_["n_result_4"] = n_result_4, Rcpp::_["n_result_5"] = n_result_5,
+                            Rcpp::_["n_result_6"] = n_result_6, Rcpp::_["n_result_7"] = n_result_7,
+                            Rcpp::_["n_result_8"] = n_result_8, Rcpp::_["n_result_9"] = n_result_9,
+                            Rcpp::_["n_success"] = n_success, Rcpp::_["n_total"] = n_total );
 
     Rcpp::Environment pkg = Rcpp::Environment::namespace_env("dplyr");
     Rcpp::Function bcol = pkg["bind_cols"];
@@ -402,7 +425,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::DataFrame repmean = expgrd(n_individ, replicateID);
   	Rcpp::IntegerVector nind = repmean[0L];
   	Rcpp::IntegerVector repID = repmean[1L];
-    
+
     // Note: Rcpp::DataFrame::create is limited to 20 columns
   	Rcpp::DataFrame df1 = Rcpp::DataFrame::create(
                             Rcpp::_["replicateID"] = repID, Rcpp::_["n_individ"] = nind,

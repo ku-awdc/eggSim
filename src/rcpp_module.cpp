@@ -17,11 +17,11 @@ RCPP_MODULE(eggSimModule){
 
 	class_<CountSummariseTest>("CountSummariseTest")
 
-    .constructor("Default constructor")
+    .constructor<double, double, double>("Default constructor")
 
 		.method("show", &CountSummariseTest::show, "The show method")
 		.method("add_counts", &CountSummariseTest::add_counts, "Add counts")
-		.property("result", &CountSummariseTest::get_result, "Get result")
+		.property("result_delta", &CountSummariseTest::get_result_delta, "Get result (delta method)")
 
 	;
 

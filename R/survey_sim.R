@@ -76,7 +76,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       x |>
         group_split(min_positive_screen, min_positive_pre, count_add, count_mult,
           count_intercept, count_coefficient,
-          tail, target_efficacy, target_lower)
+          alpha, efficacy_expected, efficacy_lower_target)
     }) |>
     do.call("c", args=_) |>
     # Use of cl argument means we always should use pblapply:
@@ -98,7 +98,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       x |>
         count(min_positive_screen, min_positive_pre, count_add, count_mult,
           count_intercept, count_coefficient,
-          tail, target_efficacy, target_lower) |>
+          alpha, efficacy_expected, efficacy_lower_target) |>
         select(-n) ->
         count_parameters
       stopifnot(nrow(count_parameters)==1L)
@@ -194,54 +194,37 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
 
         rv <- full_join(y, x, by="replicateID") |>
           select(-replicateID, -scenario_int) |>
-          mutate(result = results_to_factor(result)) |>
+          mutate(analysis = analysis, result = results_to_factor(result)) |>
           select(-reduction) |>
-          select(design, parasite, scenario, mean_epg, true_efficacy, target_efficacy, target_lower, method, n_individ, parameter_set, iteration, result, efficacy, total_days, total_cost, everything())
+          select(design, parasite, scenario, mean_epg, analysis, true_efficacy, efficacy_expected, efficacy_lower_target, method, n_individ, parameter_set, iteration, result, efficacy, total_days, total_cost, everything())
         stopifnot(nrow(rv)==nrow(y))
 
       }else if(output=="full"){
 
         rv <- full_join(y,
-                        x |> select(design, parasite, target_efficacy, target_lower, method, parameter_set, iteration, scenario, mean_epg, true_efficacy, replicateID),
+                        x |> select(design, parasite, efficacy_expected, efficacy_lower_target, method, parameter_set, iteration, scenario, mean_epg, true_efficacy, replicateID),
                         by="replicateID"
           ) |>
-          mutate(result = results_to_factor(result)) |>
-          select(design, parasite, scenario, mean_epg, true_efficacy, target_efficacy, target_lower, method, n_individ, parameter_set, iteration, result, efficacy, total_days, total_cost)
+          mutate(analysis = analysis, result = results_to_factor(result)) |>
+          select(design, parasite, scenario, mean_epg, analysis, true_efficacy, efficacy_expected, efficacy_lower_target, method, n_individ, parameter_set, iteration, result, efficacy, total_days, total_cost)
         stopifnot(nrow(rv)==nrow(y))
-
-      }else if(output=="rsummarised"){
-
-        stop("The rsummarised method is temporarily disabled")
-
-        rv <- full_join(y,
-                        x |> select(design, parasite, target_efficacy, target_lower, method, parameter_set, iteration, scenario, mean_epg, true_efficacy, replicateID),
-                        by="replicateID"
-          ) |>
-          mutate(result = results_to_factor(result)) |>
-          group_by(design, parasite, scenario, mean_epg, true_efficacy, target_efficacy, target_lower, method, n_individ, parameter_set) |>
-
-          summarise(below_cutoff = sum(efficacy < target_efficacy, na.rm=TRUE), above_cutoff = sum(efficacy >= target_efficacy, na.rm=TRUE), failure_n = sum(result!="Success"), total_n = n(),
-            pre_mean = mean(pre_mean, na.rm=TRUE), post_mean = mean(post_mean, na.rm=TRUE),
-            pre_imean = mean(pre_imean, na.rm=TRUE), post_imean = mean(post_imean, na.rm=TRUE),
-            efficacy_mean = mean(efficacy, na.rm=TRUE), efficacy_variance = var(efficacy, na.rm=TRUE),
-            proportion_below = below_cutoff/total_n, cost_mean = mean(total_cost), cost_variance = var(total_cost), .groups="drop") |>
-          replace_na(list(below_cutoff = 0L, above_cutoff = 0L))
-        with(rv, stopifnot(all((below_cutoff+above_cutoff+failure_n) == total_n)))
 
       }else if(output=="summarised"){
 
         rv <- x |>
-          count(design, parasite, method, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, min_positive_screen, min_positive_pre, scenario, target_efficacy, target_lower, mean_epg, true_efficacy, parameter_set, scenario_int) |>
+          count(design, parasite, method, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, min_positive_screen, min_positive_pre, scenario, efficacy_expected, efficacy_lower_target, mean_epg, true_efficacy, parameter_set, scenario_int) |>
           full_join(y, by="scenario_int") |>
-          mutate(efficacy_variance = var_efficacy, failure_n = n_result_0+n_result_1+n_result_2,
+          mutate(analysis = analysis, efficacy_variance = var_efficacy, failure_n = n_result_0+n_result_1+n_result_2,
                  total_n = n_total, proportion_below = n_below_cutoff/total_n) |>
           select(-scenario_int) |>
-          select(design, parasite, scenario, mean_epg, true_efficacy, target_efficacy, target_lower, method, n_individ, parameter_set,
+          select(design, parasite, scenario, mean_epg, analysis, true_efficacy, efficacy_expected, efficacy_lower_target, method, n_individ, parameter_set,
                  below_cutoff = n_below_cutoff, above_cutoff = n_above_cutoff, failure_n, total_n,
                  pre_mean = mean_pre, post_mean = mean_post, pre_imean = imean_pre, post_imean = imean_post,
                  efficacy_mean = mean_efficacy, efficacy_variance, proportion_below, days_mean = mean_days, cost_mean = mean_cost, cost_variance = var_cost)
         stopifnot(nrow(y)==nrow(rv), nrow(rv)==(nrow(tscenario)*length(n_individ)))
         with(rv, stopifnot(all((below_cutoff+above_cutoff+failure_n) == total_n)))
+      }else{
+        stop("Unrecognised output type")
       }
 
       return(rv)

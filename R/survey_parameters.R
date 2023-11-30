@@ -140,16 +140,16 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
         method == "miniflotac" ~ 0.066,
         method == "fecpak" ~ 0.172
       ),
-      tail = 0.05,
-      target_efficacy = case_when(
+      alpha = 0.05,
+      efficacy_expected = case_when(
+        parasite == "ascaris" ~ 0.95,
+        parasite == "trichuris" ~ 0.50,
+        parasite == "hookworm" ~ 0.90
+      ),
+      efficacy_lower_target = case_when(
         parasite == "ascaris" ~ 0.85,
         parasite == "trichuris" ~ 0.4,
-        parasite == "hookworm" ~ 0.8
-      ),
-      target_lower = case_when(
-        parasite == "ascaris" ~ 0.8,
-        parasite == "trichuris" ~ 0.35,
-        parasite == "hookworm" ~ 0.75
+        parasite == "hookworm" ~ 0.80
       ),
       time_demography = case_when(
         method == "kk" ~ 15,
@@ -285,7 +285,7 @@ check_parameters <- function(pp, iters=1L){
     if(any(!parnames %in% names(x))){
       stop("One or more missing parameters: ", str_c(parnames[!parnames %in% names(x)], collapse=", "))
     }
-    stopifnot(all(x$target_efficacy > x$target_lower))
+    stopifnot(all(x$efficacy_expected > x$efficacy_lower_target))
   })
   ps <- lapply(pp, function(x){
     if(!length(unique(x$parameter_set))==1L){

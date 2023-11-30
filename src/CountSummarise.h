@@ -20,6 +20,13 @@
   - Tracking imeans i.e. mean of child means
 */
 
+struct CountReturn {
+  // Results enum is defined in enums.h
+  Results result;
+  double target_stat = NA_REAL;
+  double lower_stat = NA_REAL;
+};
+
 template<methods t_method, bool t_use_screen, bool t_paired, bool t_testing>
 class CountSummarise;
 
@@ -77,20 +84,31 @@ private:
       arr[i] = static_cast<double>(input[i]);
     }
     if constexpr (t_use_screen && N == 3L) {   // Must be using screening
-      if (m_total_pos[m_tscreen] < m_count_params.min_pos_screen ||
-          m_total_pos[m_tpre] < m_count_params.min_pos_pre)
+      // Remove pre and post if screening failed:
+      if (m_total_pos[m_tscreen] < m_count_params.min_pos_screen)
       {
         arr[m_tpre] = replacement;
         arr[m_tpost] = replacement;
       }
+      // Remove post only if pre failed:
+      if (m_total_pos[m_tpre] < m_count_params.min_pos_pre)
+      {
+        arr[m_tpost] = replacement;
+      }
     } else if constexpr (t_use_screen && N == 2L) {  // Using screening but output vector is pre/post only
-      if (m_total_pos[m_tscreen] < m_count_params.min_pos_screen ||
-          m_total_pos[m_tpre] < m_count_params.min_pos_pre)
+      // Remove pre and post if screening failed:
+      if (m_total_pos[m_tscreen] < m_count_params.min_pos_screen)
       {
         arr[0L] = replacement;
         arr[1L] = replacement;
       }
+      // Remove post only if pre failed:
+      if (m_total_pos[m_tpre] < m_count_params.min_pos_pre)
+      {
+        arr[1L] = replacement;
+      }
     } else if constexpr (!t_use_screen && N == 2L) {  // Not using screening and output vector is pre/post only
+      // Only remove post:
       if (m_total_pos[m_tpre] < m_count_params.min_pos_pre) {
         arr[1L] = replacement;
       }
@@ -264,41 +282,44 @@ public:
     return m_is_pos[m_tpost];
   }
 
-  Results get_result() const
+  CountReturn get_result() const
   {
-    // results enum is defined in enums.h
-    Results result;
+    CountReturn rv;
 
     if constexpr (t_method == methods::delta) {
 
-      if (t_use_screen && (m_total_pos[0L] < m_count_params.min_pos_screen)) {
+      if (m_total_pos[m_tpre] == 0L) {
 
-        result = Results::few_screen;
+        rv.result = Results::zero_pre;
+
+      } else if (t_use_screen && (m_total_pos[0L] < m_count_params.min_pos_screen)) {
+
+        rv.result = Results::few_screen;
 
       } else if (m_total_pos[m_tpre] < m_count_params.min_pos_pre) {
 
-        result = Results::few_pre;
-
-      } else if (m_total_pos[m_tpre] == 0L) {
-
-        result = Results::zero_pre;
+        rv.result = Results::few_pre;
 
       } else if (m_total_pos[m_tpost] == 0L) {
 
-        result = Results::zero_post;
+        rv.result = Results::class_fail;
 
       } else {
 
         const std::array<double, 2L> ci = levecke_ci();
+        rv.target_stat = ci[1L];
+        rv.lower_stat = ci[0L];
 
-        if (ci[1L] < m_count_params.Teff && ci[0L] < m_count_params.Tlow) {
-          result = Results::resistant;
+        if ( Rcpp::NumericVector::is_na(ci[0L]) || Rcpp::NumericVector::is_na(ci[1L]) ) {
+          rv.result = Results::class_fail;  // Can happen due to zero variance or 100% covariance
+        } else if (ci[1L] < m_count_params.Teff && ci[0L] < m_count_params.Tlow) {
+          rv.result = Results::resistant;
         } else if (ci[1L] < m_count_params.Teff && ci[0L] >= m_count_params.Tlow) {
-          result = Results::low_resistant;
+          rv.result = Results::low_resistant;
         } else if (ci[1L] >= m_count_params.Teff && ci[0L] < m_count_params.Tlow) {
-          result = Results::inconclusive;
+          rv.result = Results::inconclusive;
         } else if (ci[1L] >= m_count_params.Teff && ci[0L] >= m_count_params.Tlow) {
-          result = Results::susceptible;
+          rv.result = Results::susceptible;
         } else {
           Rcpp::Rcout << ci[0L] << "-" << ci[1L] << "(" << m_count_params.Teff << ", " << m_count_params.Tlow << ")" << std::endl;
           Rcpp::stop("Unhandled result in CountSummarise");
@@ -307,29 +328,35 @@ public:
 
     } else if constexpr (t_method == methods::mean) {
 
-      if (t_use_screen && (m_total_pos[0L] < m_count_params.min_pos_screen)) {
+      if (m_total_pos[m_tpre] == 0L) {
 
-        result = Results::few_screen;
+        rv.result = Results::zero_pre;
+
+      } else if (t_use_screen && (m_total_pos[0L] < m_count_params.min_pos_screen)) {
+
+        rv.result = Results::few_screen;
 
       } else if (m_total_pos[m_tpre] < m_count_params.min_pos_pre) {
 
-        result = Results::few_pre;
-
-      } else if (m_total_pos[m_tpre] == 0L) {
-
-        result = Results::zero_pre;
+        rv.result = Results::few_pre;
 
       } else {
 
-        result = Results::success;
-
+        const std::array<double, 2L> mus = get_means();
+        const double eff = 1.0 - (mus[1L]/mus[0L]);
+      
+        if (eff < m_count_params.Tlow) {
+          rv.result = Results::efficacy_below;
+        } else {        
+          rv.result = Results::efficacy_above;
+        }
       }
 
     } else {
       Rcpp::stop("Unhandled method in CountSummarise");
     }
 
-    return result;
+    return rv;
   }
 
   // total time and total obs are used for costs, so replacement is 0
