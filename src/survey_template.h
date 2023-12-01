@@ -83,7 +83,6 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 
   if constexpr(t_summarise)
   {
-    if constexpr (method == methods::delta) Rcpp::stop("summarise=true for methods::delta not yet implemented");
 
   	// Create the output vectors:
     // Rcpp::IntegerVector result(ol);
@@ -200,7 +199,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 	  {
       // If summarising then pass a references to local vectors:
       survey.run(n_individ, mu_pre[p], reduction[p], individ_cv[p], day_cv[p], aliquot_cv[p], reduction_cv[p],
-            &result_ll[0L], &target_stat_ll[0L], &lower_stat_ll[0L], 
+            &result_ll[0L], &target_stat_ll[0L], &lower_stat_ll[0L],
             &n_screen_ll[0L], &n_pre_ll[0L], &n_post_ll[0L],
             &n_pos_screen_ll[0L], &n_pos_pre_ll[0L], &n_pos_post_ll[0L],
             &mean_pre_ll[0L], &mean_post_ll[0L], &imean_pre_ll[0L], &imean_post_ll[0L],
@@ -354,7 +353,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
   	Rcpp::IntegerVector result(ol);
   	Rcpp::NumericVector target_stat(ol);
   	Rcpp::NumericVector lower_stat(ol);
-    
+
   	Rcpp::NumericVector n_screen(ol);
   	Rcpp::NumericVector n_pre(ol);
   	Rcpp::NumericVector n_post(ol);
@@ -386,7 +385,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
     {
       // Otherwise pass reference to the output vector:
       survey.run(n_individ, mu_pre[p], reduction[p], individ_cv[p], day_cv[p], aliquot_cv[p], reduction_cv[p],
-            &result[ind], &target_stat[ind], &lower_stat[ind], 
+            &result[ind], &target_stat[ind], &lower_stat[ind],
             &n_screen[ind], &n_pre[ind], &n_post[ind],
             &n_pos_screen[ind], &n_pos_pre[ind], &n_pos_post[ind],
             &mean_pre[ind], &mean_post[ind], &imean_pre[ind], &imean_post[ind],
@@ -436,7 +435,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
     // Note: Rcpp::DataFrame::create is limited to 20 columns
   	Rcpp::DataFrame df1 = Rcpp::DataFrame::create(
                             Rcpp::_["replicateID"] = repID, Rcpp::_["n_individ"] = nind,
-  													Rcpp::_["result"] = result, Rcpp::_["lower_stat"] = lower_stat, 
+  													Rcpp::_["result"] = result, Rcpp::_["lower_stat"] = lower_stat,
                             Rcpp::_["upper_stat"] = target_stat, Rcpp::_["efficacy"] = efficacy,
   													Rcpp::_["pre_mean"] = mean_pre, Rcpp::_["post_mean"] = mean_post,
   													Rcpp::_["pre_imean"] = imean_pre, Rcpp::_["post_imean"] = imean_post,

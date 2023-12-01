@@ -14,7 +14,8 @@ survey_sim(
   iterations = 1000,
   cl = NULL,
   output = "summarised",
-  analysis = "mean"
+  analysis = "mean",
+  check_memory = TRUE
 )
 }
 \arguments{
@@ -37,6 +38,8 @@ survey_sim(
 \item{output}{type of output:  one of summarised, full or extended}
 
 \item{analysis}{type of ERR/FECRT analysis:  one of mean or delta}
+
+\item{check_memory}{should the expected memory allocation be checked before proceeding?  Does not apply to output type summarised.}
 }
 \description{
 Simulate one or more survey design

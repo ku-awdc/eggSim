@@ -10,6 +10,7 @@
 #' @param cl option to specify either a number of cores or an existing cluster for parallel computation (passed to \code{\link[pbapply]{pblapply}})
 #' @param output type of output:  one of summarised, full or extended
 #' @param analysis type of ERR/FECRT analysis:  one of mean or delta
+#' @param check_memory should the expected memory allocation be checked before proceeding?  Does not apply to output type summarised.
 #'
 #' @importFrom pbapply pblapply
 #' @importFrom parallel makeForkCluster makePSOCKcluster stopCluster clusterSetRNGStream clusterExport
@@ -28,14 +29,14 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                        scenario = survey_scenario(parasite),
                        parameters = survey_parameters(design, parasite, method),
                        iterations = 1e3, cl=NULL,
-                       output="summarised", analysis="mean"){
+                       output="summarised", analysis="mean", check_memory=TRUE)
+{
 
   # TODO: pmatching for string arguments
   stopifnot(length(output)==1L, output %in% c("summarised","full","extended"))
   summarise <- output == "summarised"
 
   stopifnot(length(analysis)==1L, analysis %in% c("mean","delta"))
-  if(analysis=="delta" && output=="summarised") stop("Summarised output is not (yet) available with the delta analysis")
 
   design <- check_design(design)
   parasite <- check_parasite(parasite)
@@ -50,6 +51,25 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
   check_parameters(parameters, iterations)
 
   scenario <- check_scenario(scenario)
+
+  # Check that we are not requesting too big a vector
+  if(check_memory && !summarise){
+    parameters |>
+      lapply(function(x) x |> select("parasite", "parameter_set") |> slice(1L)) |>
+      bind_rows() |>
+      full_join(scenario, by="parasite") |>
+      nrow() ->
+      nsims
+    ntot <- nsims * length(n_individ) * iterations
+
+    ## Memory footprint is around 550 bytes per row for extended and 125 bytes per row for full
+    memreq_gb <- (ntot * if(output=="extended") 550 else 125) / 1e9
+
+    ## Set a limit of 10GB:
+    if(memreq_gb > 10){
+      stop(str_c("You have requested an output data frame that would consume around ", round(memreq_gb, 1), "GB of RAM - you should use the summarise method instead (set check_memory=FALSE to override)"))
+    }
+  }
 
   ## If cl is an int then set up a cluster:
   if(!is.null(cl) && is.numeric(cl)){
@@ -196,7 +216,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
           select(-replicateID, -scenario_int) |>
           mutate(analysis = analysis, result = results_to_factor(result)) |>
           select(-reduction) |>
-          select(design, parasite, scenario, mean_epg, analysis, true_efficacy, efficacy_expected, efficacy_lower_target, method, n_individ, parameter_set, iteration, result, efficacy, total_days, total_cost, everything())
+          select(design, parasite, scenario, mean_epg, true_efficacy, efficacy_expected, efficacy_lower_target, method, n_individ, parameter_set, iteration, analysis, result, efficacy, lower_stat, upper_stat, total_days, total_cost, everything())
         stopifnot(nrow(rv)==nrow(y))
 
       }else if(output=="full"){
@@ -206,7 +226,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                         by="replicateID"
           ) |>
           mutate(analysis = analysis, result = results_to_factor(result)) |>
-          select(design, parasite, scenario, mean_epg, analysis, true_efficacy, efficacy_expected, efficacy_lower_target, method, n_individ, parameter_set, iteration, result, efficacy, lower_stat, upper_stat, total_days, total_cost)
+          select(design, parasite, scenario, mean_epg, true_efficacy, efficacy_expected, efficacy_lower_target, method, n_individ, parameter_set, iteration, analysis, result, efficacy, lower_stat, upper_stat, total_days, total_cost)
         stopifnot(nrow(rv)==nrow(y))
 
       }else if(output=="summarised"){
@@ -214,15 +234,16 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
         rv <- x |>
           count(design, parasite, method, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, min_positive_screen, min_positive_pre, scenario, efficacy_expected, efficacy_lower_target, mean_epg, true_efficacy, parameter_set, scenario_int) |>
           full_join(y, by="scenario_int") |>
-          mutate(analysis = analysis, efficacy_variance = var_efficacy, failure_n = n_result_0+n_result_1+n_result_2,
-                 total_n = n_total, proportion_below = n_below_cutoff/total_n) |>
+          mutate(analysis = analysis, efficacy_variance = var_efficacy, n_failure = n_total - n_success) |>
           select(-scenario_int) |>
-          select(design, parasite, scenario, mean_epg, analysis, true_efficacy, efficacy_expected, efficacy_lower_target, method, n_individ, parameter_set,
-                 below_cutoff = n_below_cutoff, above_cutoff = n_above_cutoff, failure_n, total_n,
-                 pre_mean = mean_pre, post_mean = mean_post, pre_imean = imean_pre, post_imean = imean_post,
-                 efficacy_mean = mean_efficacy, efficacy_variance, proportion_below, days_mean = mean_days, cost_mean = mean_cost, cost_variance = var_cost)
+          select(design, parasite, scenario, mean_epg, true_efficacy, efficacy_expected, efficacy_lower_target, method, n_individ, parameter_set, analysis,
+            efficacy_mean = mean_efficacy, efficacy_variance, days_mean = mean_days,
+            cost_mean = mean_cost, cost_variance = var_cost,
+            n_below_cutoffs, n_between_cutoffs, n_above_cutoffs,
+            n_total, n_success, n_failure, starts_with("n_result_")
+)
+        names(rv)[str_detect(names(rv), "n_result_")] <- str_c("n_", survey_results_levels()[["LevelName"]])
         stopifnot(nrow(y)==nrow(rv), nrow(rv)==(nrow(tscenario)*length(n_individ)))
-        with(rv, stopifnot(all((below_cutoff+above_cutoff+failure_n) == total_n)))
       }else{
         stop("Unrecognised output type")
       }
@@ -235,12 +256,4 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
   cat("Done in ", round(as.numeric(Sys.time()-st, units='mins'), 1), " minutes\n", sep="")
 
   return(as_tibble(results))
-}
-
-results_to_factor <- function(x){
-  if(any(is.na(x))) warning("One or more missing values in results")
-  reslevs <- Rcpp_results_levels()
-  x <- factor(x, levels=0:(length(reslevs)-1L), labels=reslevs)
-  if(any(is.na(x))) warning("One or more missing values in results after factorising")
-  return(x)
 }

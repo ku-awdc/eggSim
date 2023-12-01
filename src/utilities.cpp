@@ -57,8 +57,18 @@ Rcpp::CharacterVector results_levels()
 {
   //const std::vector<const std::string> reslevs = ResultsLevels();
   Rcpp::CharacterVector rv(ResultsLevels.size());
-  for (size_t i=0L; i<rv.size(); ++i) {
+  for (uint_fast8_t i=0L; i<rv.size(); ++i) {
     rv[i] = ResultsLevels[i];
+  }
+  return rv;
+}
+
+Rcpp::LogicalVector results_success()
+{
+  //const std::vector<const std::string> reslevs = ResultsLevels();
+  Rcpp::LogicalVector rv(ResultsLevels.size());
+  for (int i=0L; i<rv.size(); ++i) {
+    rv[i] = ResultIsSuccess(i);
   }
   return rv;
 }

@@ -7,7 +7,7 @@
 #' @param efficacy_lower_target desired lower efficacy target (proportion, not %)
 #'
 #' @export
-classify_result <- function(pre, post, efficacy_expected=0.95, efficacy_lower_target=0.85, alpha=0.025){
+classify_reduction <- function(pre, post, efficacy_expected=0.95, efficacy_lower_target=0.85, alpha=0.025){
 
   stopifnot(length(efficacy_expected)==1, length(efficacy_lower_target)==1, length(alpha)==1, alpha>0, alpha<1)
   stopifnot(is.numeric(pre), is.numeric(post), !is.na(pre), !is.na(post), length(pre)==length(post), (pre %% 1)==0L, (post %% 1)==0L)

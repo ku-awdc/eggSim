@@ -12,6 +12,7 @@ RCPP_MODULE(eggSimModule){
 	function("Rcpp_rnbinom_cv", &rnbinom_cv);
 	function("Rcpp_rbeta_cv", &rbeta_cv);
 	function("Rcpp_results_levels", &results_levels);
+	function("Rcpp_results_success", &results_success);
 
 	function("Rcpp_survey_sim", &survey_sim);
 
