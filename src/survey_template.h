@@ -258,7 +258,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
         {
           n_success[ind]++;
 
-          const int nmi = n_result_3[ind];
+          const int nmi = n_success[ind];
           const double eff = 1.0 - mean_post_ll[i] / mean_pre_ll[i];
 
           if (eff < Tlow) {
@@ -310,7 +310,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
       else
       {
         // Also calculate variance:
-        efficacy_var[ind] /= static_cast<double>(n_result_3[ind] - 1L);
+        efficacy_var[ind] /= static_cast<double>(n_success[ind] - 1L);
       }
       /*
       if(imean_pre_nn[ind] == 0L)
