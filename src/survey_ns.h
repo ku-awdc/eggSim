@@ -15,7 +15,8 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
                  const Rcpp::IntegerVector& N_individ, const double mu_pre,
                  const double reduction, const double individ_cv, const double day_cv,
                  const double aliquot_cv, const double reduction_cv, const CountParams& count_params,
-                 int* result, double* n_screen, double* n_pre, double* n_post,
+                 int* result, double* target_stat, double* lower_stat,
+                 double* n_screen, double* n_pre, double* n_post,
                  double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
                  double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
                  double* time_screen, double* time_pre, double* time_post, const ptrdiff_t offset)
@@ -140,8 +141,9 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
     {
       {
         const CountReturn crv = count_summarise.get_result();
-        const Results out_result = crv.result;
-        *(result+outoffset) = static_cast<int>(out_result);
+        *(result+outoffset) = static_cast<int>(crv.result);
+        *(target_stat+outoffset) = crv.target_stat;
+        *(lower_stat+outoffset) = crv.lower_stat;
       }
 
       {

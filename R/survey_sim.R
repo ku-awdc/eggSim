@@ -31,7 +31,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                        output="summarised", analysis="mean"){
 
   # TODO: pmatching for string arguments
-  stopifnot(length(output)==1L, output %in% c("rsummarised","summarised","full","extended"))
+  stopifnot(length(output)==1L, output %in% c("summarised","full","extended"))
   summarise <- output == "summarised"
 
   stopifnot(length(analysis)==1L, analysis %in% c("mean","delta"))
@@ -206,7 +206,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                         by="replicateID"
           ) |>
           mutate(analysis = analysis, result = results_to_factor(result)) |>
-          select(design, parasite, scenario, mean_epg, analysis, true_efficacy, efficacy_expected, efficacy_lower_target, method, n_individ, parameter_set, iteration, result, efficacy, total_days, total_cost)
+          select(design, parasite, scenario, mean_epg, analysis, true_efficacy, efficacy_expected, efficacy_lower_target, method, n_individ, parameter_set, iteration, result, efficacy, lower_stat, upper_stat, total_days, total_cost)
         stopifnot(nrow(rv)==nrow(y))
 
       }else if(output=="summarised"){

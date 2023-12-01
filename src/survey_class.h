@@ -59,7 +59,8 @@ public:
   void run(const Rcpp::IntegerVector& N_individ, const double mu_pre,
            const double reduction, const double individ_cv, const double day_cv,
            const double aliquot_cv, const double reduction_cv,
-           int* result, double* n_screen, double* n_pre, double* n_post,
+           int* result, double* target_stat, double* lower_stat,
+           double* n_screen, double* n_pre, double* n_post,
            double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
   				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
   				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset) const
@@ -68,7 +69,8 @@ public:
       m_day_pre, m_aliquot_pre, m_day_post, m_aliquot_post,
       N_individ, mu_pre, reduction,
       individ_cv, day_cv, aliquot_cv, reduction_cv, m_count_params, 
-			result, n_screen, n_pre, n_post, 
+			result, target_stat, lower_stat,
+      n_screen, n_pre, n_post, 
       n_pos_screen, n_pos_pre, n_pos_post,
       mean_pre, mean_post, imean_pre, imean_post, 
       time_screen, time_pre, time_post, offset);
@@ -125,7 +127,8 @@ public:
   void run(const Rcpp::IntegerVector& N_individ, const double mu_pre,
            const double reduction, const double individ_cv, const double day_cv,
            const double aliquot_cv, const double reduction_cv,           
-           int* result, double* n_screen, double* n_pre, double* n_post,
+           int* result, double* target_stat, double* lower_stat,
+           double* n_screen, double* n_pre, double* n_post,
            double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
   				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
   				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset) const
@@ -134,7 +137,8 @@ public:
       m_day_pre, m_aliquot_pre, m_day_post, m_aliquot_post,
       N_individ, mu_pre, reduction,
       individ_cv, day_cv, aliquot_cv, reduction_cv, m_count_params,
-			result, n_screen, n_pre, n_post, 
+			result, target_stat, lower_stat,
+      n_screen, n_pre, n_post, 
       n_pos_screen, n_pos_pre, n_pos_post,
       mean_pre, mean_post, imean_pre, imean_post, 
       time_screen, time_pre, time_post, offset);
@@ -194,7 +198,8 @@ public:
   void run(const Rcpp::IntegerVector& N_individ, const double mu_pre,
            const double reduction, const double individ_cv, const double day_cv,
            const double aliquot_cv, const double reduction_cv,
-           int* result, double* n_screen, double* n_pre, double* n_post,
+           int* result, double* target_stat, double* lower_stat,
+           double* n_screen, double* n_pre, double* n_post,
            double* n_pos_screen, double* n_pos_pre, double* n_pos_post,
   				 double* mean_pre, double* mean_post, double* imean_pre, double* imean_post,
   				 double* time_screen, double* time_pre, double* time_post, ptrdiff_t offset) const
@@ -203,7 +208,8 @@ public:
       m_day_screen, m_aliquot_screen, m_day_pre, m_aliquot_pre, m_day_post, m_aliquot_post,
       N_individ, mu_pre, reduction,
       individ_cv, day_cv, aliquot_cv, reduction_cv, m_count_params,
-			result, n_screen, n_pre, n_post, 
+			result, target_stat, lower_stat,
+      n_screen, n_pre, n_post, 
       n_pos_screen, n_pos_pre, n_pos_post,
       mean_pre, mean_post, imean_pre, imean_post, 
       time_screen, time_pre, time_post, offset);

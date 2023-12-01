@@ -328,6 +328,9 @@ public:
 
     } else if constexpr (t_method == methods::mean) {
 
+      rv.target_stat = NA_REAL;
+      rv.lower_stat = NA_REAL;
+      
       if (m_total_pos[m_tpre] == 0L) {
 
         rv.result = Results::zero_pre;
