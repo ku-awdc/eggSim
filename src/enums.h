@@ -106,7 +106,18 @@ struct CountParams
   double tail;
   double Teff;
   double Tlow;
+  double inclusion_prob = 1.0;
+  double retention_prob_ssr = 1.0;
+  double retention_prob_ss = 1.0;
+  double retention_prob_ns = 1.0;
 };
 
+template <typename T>
+T coin_toss(const double probability)
+{
+  const double res = R::rbinom(1.0, probability);
+  return static_cast<T>(res);
+}
+  
 
 #endif // ENUMS_H

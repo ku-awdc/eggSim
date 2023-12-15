@@ -96,7 +96,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       x |>
         group_split(min_positive_screen, min_positive_pre, count_add, count_mult,
           count_intercept, count_coefficient,
-          alpha, efficacy_expected, efficacy_lower_target)
+          alpha, efficacy_expected, efficacy_lower_target, force_inclusion_prob, dropout_screen, dropout_pre)
     }) |>
     do.call("c", args=_) |>
     # Use of cl argument means we always should use pblapply:
@@ -118,7 +118,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       x |>
         count(min_positive_screen, min_positive_pre, count_add, count_mult,
           count_intercept, count_coefficient,
-          alpha, efficacy_expected, efficacy_lower_target) |>
+          alpha, efficacy_expected, efficacy_lower_target, force_inclusion_prob, dropout_screen, dropout_pre) |>
         select(-n) ->
         count_parameters
       stopifnot(nrow(count_parameters)==1L)

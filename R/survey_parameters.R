@@ -151,6 +151,9 @@ survey_parameters <- function(design = c("SS_11","SS_12","NS_11","NS_12","SSR_11
         parasite == "trichuris" ~ 0.4,
         parasite == "hookworm" ~ 0.80
       ),
+      force_inclusion_prob = 0.0,
+      dropout_screen = 0.0,
+      dropout_pre = 0.0,
       time_demography = case_when(
         method == "kk" ~ 15,
         method == "miniflotac" ~ 15,

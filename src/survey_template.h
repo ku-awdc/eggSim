@@ -55,6 +55,12 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
 	const double tail = count_parameters["alpha"]; // NB: name of parameter is changed
 	const double Teff = count_parameters["efficacy_expected"];
 	const double Tlow = count_parameters["efficacy_lower_target"];
+	const double inclusion_prob = count_parameters["force_inclusion_prob"];
+  const double dropout_screen = count_parameters["dropout_screen"];
+  const double dropout_pre = count_parameters["dropout_pre"];
+	const double retention_prob_ssr = (1.0 - dropout_screen) * (1.0 - dropout_pre);
+	const double retention_prob_ss = (1.0 - dropout_pre);
+	const double retention_prob_ns = (1.0 - dropout_pre);
 
   const CountParams count_params
   {
@@ -66,7 +72,11 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
     min_pos_pre,
     tail,
     Teff,
-    Tlow
+    Tlow,
+    inclusion_prob,
+    retention_prob_ssr,
+    retention_prob_ss,
+    retention_prob_ns    
   };
 
   // TODO: the parent function could check to see if e.g. aliquot_cv is always 0 and specify dist_aliquot as rpois

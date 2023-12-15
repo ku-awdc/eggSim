@@ -72,7 +72,9 @@ void survey_ss(const int N_day_pre_, const int N_aliquot_pre_,
       }
     }
 
-    if (count_summarise.is_pos_pre()) {
+    // Inclusion is either due to a positive count for this parasite, or another parasite, minus dropout:
+    const bool include = (count_summarise.is_pos_pre() || coin_toss<bool>(count_params.inclusion_prob)) && coin_toss<bool>(count_params.retention_prob_ss);
+    if (include) {
       npos++;
       pre_imean -= (pre_imean - mu_ind) / static_cast<double>(npos);      
       
