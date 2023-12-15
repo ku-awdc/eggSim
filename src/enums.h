@@ -107,9 +107,8 @@ struct CountParams
   double Teff;
   double Tlow;
   double inclusion_prob = 1.0;
-  double retention_prob_ssr = 1.0;
-  double retention_prob_ss = 1.0;
-  double retention_prob_ns = 1.0;
+  double retention_prob_screen = 1.0;
+  double retention_prob_pre = 1.0;
 };
 
 template <typename T>

@@ -78,7 +78,7 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
     }
 
     // Inclusion is either due to a positive count for this parasite, or another parasite, minus dropout:
-    const bool include = (count_summarise.is_pos_screen() || coin_toss<bool>(count_params.inclusion_prob)) && coin_toss<bool>(count_params.retention_prob_ssr);
+    const bool include = (count_summarise.is_pos_screen() || coin_toss<bool>(count_params.inclusion_prob)) && coin_toss<bool>(count_params.retention_prob_screen);
     if (include) {
       npos++;
       pre_imean -= (pre_imean - mu_ind) / static_cast<double>(npos);
@@ -103,66 +103,67 @@ void survey_ssr(const int N_day_screen_, const int N_aliquot_screen_,
 
         }
       }
-
-      mu_ind *= rred.draw();
-      post_imean -= (post_imean - mu_ind) / static_cast<double>(npos);
-      for(int day=0L; day<N_day_post; ++day)
-      {
-        const double mu_day = rday.draw(mu_ind);
-        for(int aliquot=0L; aliquot<N_aliquot_post; ++aliquot)
+      
+      if (coin_toss<bool>(count_params.retention_prob_pre)) {
+        mu_ind *= rred.draw();
+        post_imean -= (post_imean - mu_ind) / static_cast<double>(npos);
+        for(int day=0L; day<N_day_post; ++day)
         {
-          // Allow test scenarios:
-          if constexpr (s_testing==0L) {
-            count_summarise.add_count_post(raliquot.draw(mu_day));
-          } else if constexpr (s_testing==1L) {
+          const double mu_day = rday.draw(mu_ind);
+          for(int aliquot=0L; aliquot<N_aliquot_post; ++aliquot)
+          {
+            // Allow test scenarios:
+            if constexpr (s_testing==0L) {
+              count_summarise.add_count_post(raliquot.draw(mu_day));
+            } else if constexpr (s_testing==1L) {
 
-            int icount;
-            if(N_aliquot_post == 1L)
-            {
-              icount = 1L;
-            }
-            // If this is SSR_12 then the counts come from scenarios 1 & 2, respectively:
-            else if(N_aliquot_post == 2L && aliquot == 0L)
-            {
-              icount = 1L;
-            }
-            else if(N_aliquot_post == 2L && aliquot == 1L)
-            {
-              icount = ind % 5L;
-            }
-            else
-            {
-              Rcpp::stop("Unsupported  test design");
-            }
+              int icount;
+              if(N_aliquot_post == 1L)
+              {
+                icount = 1L;
+              }
+              // If this is SSR_12 then the counts come from scenarios 1 & 2, respectively:
+              else if(N_aliquot_post == 2L && aliquot == 0L)
+              {
+                icount = 1L;
+              }
+              else if(N_aliquot_post == 2L && aliquot == 1L)
+              {
+                icount = ind % 5L;
+              }
+              else
+              {
+                Rcpp::stop("Unsupported  test design");
+              }
 
-            count_summarise.add_count_post(icount);
+              count_summarise.add_count_post(icount);
 
-          } else if constexpr (s_testing==2L) {
+            } else if constexpr (s_testing==2L) {
 
-            int icount;
-            if(N_aliquot_post == 1L)
-            {
-              icount = ind % 5L;
-            }
-            // If this is SSR_12 then the counts come from scenarios 1 & 2, respectively:
-            else if(N_aliquot_post == 2L && aliquot == 0L)
-            {
-              icount = 1L;
-            }
-            else if(N_aliquot_post == 2L && aliquot == 1L)
-            {
-              icount = ind % 5L;
-            }
-            else
-            {
-              Rcpp::stop("Unsupported  test design");
-            }
-            count_summarise.add_count_post(icount);
+              int icount;
+              if(N_aliquot_post == 1L)
+              {
+                icount = ind % 5L;
+              }
+              // If this is SSR_12 then the counts come from scenarios 1 & 2, respectively:
+              else if(N_aliquot_post == 2L && aliquot == 0L)
+              {
+                icount = 1L;
+              }
+              else if(N_aliquot_post == 2L && aliquot == 1L)
+              {
+                icount = ind % 5L;
+              }
+              else
+              {
+                Rcpp::stop("Unsupported  test design");
+              }
+              count_summarise.add_count_post(icount);
 
-          } else {
-            Rcpp::stop("Unrecognised testing setting");
+            } else {
+              Rcpp::stop("Unrecognised testing setting");
+            }
           }
-
         }
       }
     }

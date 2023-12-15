@@ -73,7 +73,7 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
     }
 
     // Inclusion is only affected by dropout:
-    const bool include = coin_toss<bool>(count_params.retention_prob_ns);
+    const bool include = coin_toss<bool>(count_params.retention_prob_pre);
     if (include) {
 
       mu_ind *= rred.draw();
