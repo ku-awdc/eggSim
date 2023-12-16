@@ -36,7 +36,7 @@ public:
     if(day_screen != m_day_screen) Rcpp::stop("Invalid N_day_screen");
     if(aliquot_screen != m_aliquot_screen) Rcpp::stop("Invalid N_aliquot_screen");
     if(min_pos_screen != m_min_pos_screen) Rcpp::stop("Invalid min_positive_screen");
-    if(min_pos_pre <= 0L) Rcpp::stop("Invalid min_positive_pre <= 0L");
+    if(min_pos_pre < 0L) Rcpp::stop("Invalid min_positive_pre < 0L");
 
     // Note: if constexpr() requires C++17
     if constexpr(t_fixed_n)
@@ -72,8 +72,8 @@ public:
       N_individ, mu_pre, reduction,
       individ_cv, day_cv, aliquot_cv, reduction_cv,
       count_intercept, count_coefficient, count_add, count_mult,
-			result, n_screen, n_pre, n_post, 
-      mean_pre, mean_post, imean_pre, imean_post, 
+			result, n_screen, n_pre, n_post,
+      mean_pre, mean_post, imean_pre, imean_post,
       time_screen, time_pre, time_post, offset);
   }
 
@@ -106,7 +106,7 @@ public:
     if(day_screen != m_day_screen) Rcpp::stop("Invalid N_day_screen");
     if(aliquot_screen != m_aliquot_screen) Rcpp::stop("Invalid N_aliquot_screen");
     if(min_pos_screen != m_min_pos_screen) Rcpp::stop("Invalid min_positive_screen");
-    if(min_pos_pre <= 0L) Rcpp::stop("Invalid min_positive_pre <= 0L");
+    if(min_pos_pre < 0L) Rcpp::stop("Invalid min_positive_pre < 0L");
 
     // Note: if constexpr() requires C++17
     if constexpr(t_fixed_n)
@@ -142,8 +142,8 @@ public:
       N_individ, mu_pre, reduction,
       individ_cv, day_cv, aliquot_cv, reduction_cv,
       count_intercept, count_coefficient, count_add, count_mult,
-			result, n_screen, n_pre, n_post, 
-      mean_pre, mean_post, imean_pre, imean_post, 
+			result, n_screen, n_pre, n_post,
+      mean_pre, mean_post, imean_pre, imean_post,
       time_screen, time_pre, time_post, offset);
   }
 
@@ -175,8 +175,8 @@ public:
                   m_min_pos_screen(min_pos_screen), m_min_pos_pre(min_pos_pre)
 
   {
-    if(min_pos_screen <= 0L) Rcpp::stop("Invalid min_positive_screen <= 0L");
-    if(min_pos_pre <= 0L) Rcpp::stop("Invalid min_positive_pre <= 0L");
+    if(min_pos_screen < 0L) Rcpp::stop("Invalid min_positive_screen < 0L");
+    if(min_pos_pre < 0L) Rcpp::stop("Invalid min_positive_pre < 0L");
 
     // Note: if constexpr() requires C++17
     if constexpr(t_fixed_n)
@@ -214,8 +214,8 @@ public:
       N_individ, mu_pre, reduction,
       individ_cv, day_cv, aliquot_cv, reduction_cv,
       count_intercept, count_coefficient, count_add, count_mult,
-			result, n_screen, n_pre, n_post, 
-      mean_pre, mean_post, imean_pre, imean_post, 
+			result, n_screen, n_pre, n_post,
+      mean_pre, mean_post, imean_pre, imean_post,
       time_screen, time_pre, time_post, offset);
   }
 
