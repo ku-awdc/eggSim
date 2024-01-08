@@ -53,9 +53,27 @@ double count_time(const Rcpp::IntegerVector& count, const double intercept,
 }
 */
 
+const std::vector<const std::string> GetResultsLevels()
+{
+  const std::vector<const std::string> ResultsLevels = {
+      ResultToString(Results::zero_pre),
+      ResultToString(Results::few_screen),
+      ResultToString(Results::few_pre),
+      ResultToString(Results::efficacy_below),
+      ResultToString(Results::efficacy_above),
+      ResultToString(Results::class_fail),
+      ResultToString(Results::resistant),
+      ResultToString(Results::low_resistant),
+      ResultToString(Results::inconclusive),
+      ResultToString(Results::susceptible)
+    };
+    return ResultsLevels;
+}
+
 Rcpp::CharacterVector results_levels()
 {
   //const std::vector<const std::string> reslevs = ResultsLevels();
+  const std::vector<const std::string> ResultsLevels = GetResultsLevels();
   Rcpp::CharacterVector rv(ResultsLevels.size());
   for (uint_fast8_t i=0L; i<rv.size(); ++i) {
     rv[i] = ResultsLevels[i];
@@ -65,7 +83,7 @@ Rcpp::CharacterVector results_levels()
 
 Rcpp::LogicalVector results_success()
 {
-  //const std::vector<const std::string> reslevs = ResultsLevels();
+  const std::vector<const std::string> ResultsLevels = GetResultsLevels();
   Rcpp::LogicalVector rv(ResultsLevels.size());
   for (int i=0L; i<rv.size(); ++i) {
     rv[i] = ResultIsSuccess(i);

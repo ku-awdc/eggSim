@@ -58,9 +58,10 @@ public:
 
   void add_counts(const Rcpp::IntegerVector& pre, const Rcpp::IntegerVector& post)
   {
-    const size_t n = std::max(pre.size(), post.size());
+    // NB:  IntegerVector.size() (R_xlen_t) is actually signed (on Windows at least)
+    const int n = std::max(pre.size(), post.size());
 
-    for(size_t i=0; i<n; ++i)
+    for(int i=0; i<n; ++i)
     {
       if(pre.size() > i)
       {

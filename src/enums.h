@@ -77,18 +77,25 @@ constexpr const bool ResultIsSuccess(const int result)
 
 
 // Note: constexpr std::array<const char*, 9L> works on arm64 but not x86_64 ?!?
-static const std::vector<const std::string> ResultsLevels = {
-    ResultToString(Results::zero_pre),
-    ResultToString(Results::few_screen),
-    ResultToString(Results::few_pre),
-    ResultToString(Results::efficacy_below),
-    ResultToString(Results::efficacy_above),
-    ResultToString(Results::class_fail),
-    ResultToString(Results::resistant),
-    ResultToString(Results::low_resistant),
-    ResultToString(Results::inconclusive),
-    ResultToString(Results::susceptible)
-  };
+// Note: std::string can't be const on Windows :(
+/*
+static const std::vector<const std::string> GetResultsLevels()
+{
+  const std::vector<const std::string> ResultsLevels = {
+      ResultToString(Results::zero_pre),
+      ResultToString(Results::few_screen),
+      ResultToString(Results::few_pre),
+      ResultToString(Results::efficacy_below),
+      ResultToString(Results::efficacy_above),
+      ResultToString(Results::class_fail),
+      ResultToString(Results::resistant),
+      ResultToString(Results::low_resistant),
+      ResultToString(Results::inconclusive),
+      ResultToString(Results::susceptible)
+    };
+    return ResultsLevels;
+}
+*/
 
 
 // For testing costs with fixed data:
@@ -117,6 +124,6 @@ T coin_toss(const double probability)
   const double res = R::rbinom(1.0, probability);
   return static_cast<T>(res);
 }
-  
+
 
 #endif // ENUMS_H
