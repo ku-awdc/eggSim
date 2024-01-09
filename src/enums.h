@@ -79,9 +79,9 @@ constexpr const bool ResultIsSuccess(const int result)
 // Note: constexpr std::array<const char*, 9L> works on arm64 but not x86_64 ?!?
 // Note: std::string can't be const on Windows :(
 /*
-static const std::vector<const std::string> GetResultsLevels()
+static const std::vector<std::string> GetResultsLevels()
 {
-  const std::vector<const std::string> ResultsLevels = {
+  const std::vector<std::string> ResultsLevels = {
       ResultToString(Results::zero_pre),
       ResultToString(Results::few_screen),
       ResultToString(Results::few_pre),
