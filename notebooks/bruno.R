@@ -7,6 +7,10 @@ library("tidyverse")
 # remotes::install_github("ku-awdc/eggSim")
 library("eggSim")
 
+full <- survey_sim(output="full", analysis="delta")
+agg <- survey_sim(analysis="delta")
+
+
 ## Adjust for your needs:
 mean <- 2200
 
