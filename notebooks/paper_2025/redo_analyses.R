@@ -7,9 +7,10 @@
 ##
 ############################################
 
-## The tidyverse and remotes packages are available from CRAN
+## The tidyverse, qs and remotes packages are available from CRAN
 library("tidyverse")
 theme_set(theme_light())
+library("qs")
 
 ## The eggSim package currently must be installed from github
 if(!requireNamespace("eggSim")){
@@ -22,10 +23,12 @@ library("eggSim")
 ## Parameter values
 ############################################
 
-## Survey and simulation parameters:
-iterations <- 1e3
+## General simulation parameters:
+iterations <- 1e4
+cl <- 10
 sample_size <- seq(100,2000,by=5)
-true_efficacy <- seq(50,100,by=0.25)
+
+fig1_n_individ <- 380
 
 expand_grid(
   parasite = c("ascaris","hookworm","trichuris"),
@@ -45,13 +48,13 @@ tribble(~parasite, ~intercept, ~slope, ~day_cv, ~reduction_cv,
 ## Parameters for dropout and assessing other parasites:
 tibble(
   dropout = c("baseline", "with dropouts"),
-  dropout_bl = c(0,10),
-  dropout_fu = c(0,20),
+  dropout_screen = c(0,10),
+  dropout_pre = c(0,20),
 ) |>
   expand_grid(
-    addition = c(0, 10, 20)
+    force_inclusion_prob = c(0, 10, 20)
   ) |>
-  filter(dropout=="baseline" | addition==0) ->
+  filter(dropout=="baseline" | force_inclusion_prob==0) ->
   parameters_dropadd
 
 ## Parameters for drug efficacy
@@ -65,8 +68,16 @@ tribble(~parasite, ~drug, ~WHO.efficacy_lower_target, ~WHO.efficacy_expected, ~F
 ) |>
   pivot_longer(cols=c(-parasite, -drug)) |>
   separate_wider_delim(name, delim=".", names=c("framework", "name")) |>
-  pivot_wider(names_from=name, values_from=value) ->
+  pivot_wider(names_from=name, values_from=value) |>
+  mutate(efficacy_lower_target = efficacy_lower_target / 100) |>
+  mutate(efficacy_expected = efficacy_expected / 100) ->
   parameters_thresholds
+
+## Parameters for analysis type
+parameters_analysis <- tibble(analysis_type = c("mean","delta"))
+
+## Parameters for simulated drug efficacy
+parameters_efficacy <- tibble(true_efficacy = seq(50,100,by=0.25)/100)
 
 ## Cost parameters:
 bind_rows(
@@ -111,9 +122,6 @@ tibble(
   ) ->
   parameters_fixed
 
-stop("INCREASE SAMPLE SIZE WHERE NEEDED!!!")
-warning("Improve mechanism of specifying parameter values")
-
 
 ############################################
 ## Estimating mean_epg and individual_cv
@@ -150,8 +158,149 @@ add_mean_and_cv <- function(x, mu_max=1e4){
     # mutate(total_cv = sqrt(day_cv^2 + individ_cv^2 + day_cv^2*individ_cv^2)) |>
     identity() ->
     new_df
-  left_join(x, new_df, by = join_by(parasite, endemicity, weight))
+  left_join(x, new_df, by = join_by(parasite, endemicity, weight)) |>
+    mutate(cost_aliquot_post = if_else(str_detect(design, "11"), cost_aliquot_post_11, cost_aliquot_post_12))
 }
+
+
+############################################
+## Utility functions
+############################################
+
+fix_n_analysis <- function(parameters, n_individ=fig1_n_individ, iterations=iterations, cl=NULL){
+
+  parameters |>
+    group_by(framework, analysis_type, parasite, endemicity, mean_epg) |>
+    group_split() ->
+    pars
+
+  seq_along(pars) |>
+    lapply(function(i){
+      cat("Parameter cluster ", i, " of ", length(pars), ": ", sep="")
+      pars[[i]] |>
+        distinct(parasite, mean_epg, true_efficacy, analysis_type) |>
+        mutate(scenario = row_number()) ->
+        scenario
+
+      pars[[i]] |>
+        select(parasite, !any_of(names(scenario))) |>
+        unique() |>
+        mutate(parameter_set = row_number()) |>
+        rowwise() |>
+        group_split() ->
+        pp
+
+      stopifnot(nrow(scenario)==1L || length(pp)==1L)
+
+      survey_sim(
+        n_individ = n_individ,
+        scenario = scenario,
+        parameters = pp,
+        iterations = iterations,
+        cl = cl,
+        output = "summarised",
+        analysis = scenario$analysis_type[1]
+      )
+    }) |>
+    bind_rows() |>
+    ungroup()
+}
+
+
+vary_n_analysis <- function(parameters, n_individ=fig1_n_individ, iterations=iterations, cl=NULL){
+
+  ## First do a small sample size run and then fit a logistic curve or similar to work out
+  ## sample size with 99.9% performance
+  ## Then increase iterations and re-do up to this maximum
+
+  #fix_n_analysis(parameters)
+
+  parameters |>
+    group_by(framework, analysis_type, parasite, endemicity, mean_epg) |>
+    group_split() ->
+    pars
+
+  seq_along(pars) |>
+    lapply(function(i){
+      cat("Parameter cluster ", i, " of ", length(pars), ": ", sep="")
+      pars[[i]] |>
+        distinct(parasite, mean_epg, true_efficacy, analysis_type) |>
+        mutate(scenario = row_number()) ->
+        scenario
+
+      pars[[i]] |>
+        select(parasite, !any_of(names(scenario))) |>
+        unique() |>
+        mutate(parameter_set = row_number()) |>
+        rowwise() |>
+        group_split() ->
+        pp
+
+      stopifnot(nrow(scenario)==1L || length(pp)==1L)
+
+      survey_sim(
+        n_individ = n_individ,
+        scenario = scenario,
+        parameters = pp,
+        iterations = iterations,
+        cl = cl,
+        output = "summarised",
+        analysis = scenario$analysis_type[1]
+      )
+    }) |>
+    bind_rows() |>
+    ungroup()
+}
+
+
+############################################
+## Recreate figure 1
+############################################
+
+set.seed(2025-03-05)
+
+expand_grid(
+  parameters_scenario |> filter(parasite=="hookworm", endemicity==15),
+  parameters_fixed |> filter(design == "NS_11"),
+  parameters_cost |> filter(setting == "Ethiopia"),
+  parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
+  parameters_analysis,
+  parameters_efficacy
+) |>
+  add_mean_and_cv() |>
+  left_join(
+    parameters_thresholds |> filter(drug=="ALB"),
+    by = "parasite", relationship="many-to-many"
+  ) |>
+  vary_n_analysis(n_individ = fig1_n_individ, iterations=iterations, cl=cl) ->
+  fig_1_data
+qsave(fig_1_data, "notebooks/paper_2025/fig_1_data.rqs")
+
+fig_1_data |>
+  mutate(
+    Failed = n_failure + n_FailZeroPre,
+    Adequate = n_above_cutoffs + n_Susceptible,
+    Reduced = n_below_cutoffs + n_Resistant + n_LowResistant,
+    Inconclusive = n_between_cutoffs + n_Inconclusive
+  ) |>
+  mutate(Total = Failed + Adequate + Reduced + Inconclusive) |>
+  select(true_efficacy, efficacy_expected, analysis, Failed, Adequate, Reduced, Inconclusive) |>
+  pivot_longer(Failed:Inconclusive, names_to="classification", values_to="tally") ->
+  plotdata
+
+## To insert into paper:
+summary((plotdata |> filter(classification=="Failed") |> pull(tally)) / iterations * 100)
+
+plotdata |>
+  filter(classification != "Failed") |>
+  mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
+  group_by(efficacy_expected, analysis, true_efficacy) |>
+  arrange(classification) |>
+  mutate(total = sum(tally), ymax = cumsum(tally/total), ymin = lag(ymax, default=0)) |>
+  ungroup() |>
+  ggplot(aes(x=true_efficacy, ymin=ymin, ymax=ymax, fill=classification)) +
+  geom_ribbon() +
+  facet_grid(efficacy_expected ~ analysis)
 
 
 ############################################
@@ -164,9 +313,16 @@ expand_grid(
   parameters_cost,
   parameters_dropadd,
 ) |>
+  mutate(parameter_set = row_number()) |>
   mutate(cost_aliquot_post = if_else(str_detect(design, "11"), cost_aliquot_post_11, cost_aliquot_post_12)) |>
   add_mean_and_cv() |>
-  full_join(parameters_thresholds, by = "parasite", relationship="many-to-many") |>
+  full_join(parameters_thresholds, by = "parasite", relationship="many-to-many") ->
+parameters
+
+
+
+
+  |>
   group_by(framework, parasite, endemicity, mean_epg) |>
   group_split() ->
   all_parameters
@@ -175,8 +331,12 @@ pp <- all_parameters[[1]]
 
 pp |>
   distinct(parasite, mean_epg) |>
-  mutate(true_efficacy = 80) ->
+  mutate(scenario = row_number(), true_efficacy = 80) ->
   scenario
+
+pp |>
+  select(parasite, !any_of(names(scenario))) ->
+  pp
 
 cl <- NULL
 survey_sim(
@@ -188,6 +348,13 @@ survey_sim(
   output = "summarised",
   analysis = "mean"
 )
+
+
+stop("INCREASE SAMPLE SIZE WHERE NEEDED!!!")
+warning("Improve mechanism of specifying parameter values")
+
+
+
 
 tibble(
   parasite = "hookworm",
