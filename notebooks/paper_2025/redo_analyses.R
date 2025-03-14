@@ -26,13 +26,14 @@ library("eggSim")
 ## General simulation parameters:
 iterations <- 1e4
 cl <- 10
-sample_size <- seq(100,2000,by=5)
-
-fig1_n_individ <- 380
+individ_min <- 100
+individ_increment <- 5
+performance_max <- 0.999
+individ_fig1 <- 380
 
 expand_grid(
   parasite = c("ascaris","hookworm","trichuris"),
-  endemicity = c(5,15,35,65)
+  endemicity = c(2,5,15,35,65)
 ) ->
   parameters_scenario
 
@@ -96,19 +97,25 @@ bind_rows(
 
 
 ## Fixed parameters:
-tibble(
-  design = c("NS_11","NS_12","SSR_11","SSR_12")
+expand_grid(
+  variant = c("NS_11","NS_12","SSR_11A","SSR_12A","SSR_11B","SSR_12B"),
+  min_positive = c(1, 10, 25, 50, 100)
 ) |>
   mutate(
+    design = str_sub(variant, 1, if_else(str_detect(variant, "NS"), 5, 6)),
     method = "kk",
+    min_positive_screen = if_else(str_detect(design, "NS"), 0, min_positive),
+    min_positive_pre = case_when(
+      str_detect(design, "NS") ~ min_positive,
+      str_detect(variant, "A") ~ min_positive,
+      str_detect(variant, "B") ~ 1,
+    ),
     n_day_screen = if_else(str_detect(design, "NS"), 0, 1),
     n_aliquot_screen = if_else(str_detect(design, "NS"), 0, 1),
     n_day_pre = 1,
     n_aliquot_pre = 1,
     n_day_post = 1,
     n_aliquot_post = if_else(str_detect(design, "11"), 1, 2),
-    min_positive_screen = if_else(str_detect(design, "NS"), 0, 1),
-    min_positive_pre = 50,
     aliquot_cv = 0,
     weight = 1/24,
     recovery = 1,
@@ -167,20 +174,21 @@ add_mean_and_cv <- function(x, mu_max=1e4){
 ## Utility functions
 ############################################
 
-fix_n_analysis <- function(parameters, n_individ=fig1_n_individ, iterations=iterations, cl=NULL){
+fix_n_analysis <- function(parameters, iters=iterations, cl=NULL){
 
   parameters |>
-    group_by(framework, analysis_type, parasite, endemicity, mean_epg) |>
+    group_by(framework, analysis_type, parasite, endemicity, mean_epg, min_positive, variant) |>
     group_split() ->
     pars
 
   seq_along(pars) |>
     lapply(function(i){
-      cat("Parameter cluster ", i, " of ", length(pars), ": ", sep="")
       pars[[i]] |>
-        distinct(parasite, mean_epg, true_efficacy, analysis_type) |>
+        distinct(parasite, mean_epg, true_efficacy, endemicity, framework, analysis_type, individ_min, individ_max, min_positive, variant) |>
         mutate(scenario = row_number()) ->
         scenario
+
+      stopifnot(nrow(scenario |> distinct(individ_min, individ_max))==1L)
 
       pars[[i]] |>
         select(parasite, !any_of(names(scenario))) |>
@@ -193,63 +201,98 @@ fix_n_analysis <- function(parameters, n_individ=fig1_n_individ, iterations=iter
       stopifnot(nrow(scenario)==1L || length(pp)==1L)
 
       survey_sim(
-        n_individ = n_individ,
+        n_individ = seq(scenario$individ_min, scenario$individ_max, by=individ_increment),
         scenario = scenario,
         parameters = pp,
-        iterations = iterations,
+        iterations = iters,
         cl = cl,
         output = "summarised",
         analysis = scenario$analysis_type[1]
-      )
+      ) |>
+        left_join(
+          scenario |> select(scenario, framework, analysis_type, endemicity, min_positive, variant),
+          by="scenario"
+        ) |>
+        mutate(Positive = (n_Susceptible+n_LowResistant+n_ClassifyFail), Negative = iters-Positive, Performance = Positive/iters)
     }) |>
     bind_rows() |>
     ungroup()
 }
 
 
-vary_n_analysis <- function(parameters, n_individ=fig1_n_individ, iterations=iterations, cl=NULL){
-
-  ## First do a small sample size run and then fit a logistic curve or similar to work out
-  ## sample size with 99.9% performance
-  ## Then increase iterations and re-do up to this maximum
-
-  #fix_n_analysis(parameters)
+vary_n_analysis <- function(parameters, iters=iterations, cl=NULL){
 
   parameters |>
-    group_by(framework, analysis_type, parasite, endemicity, mean_epg) |>
+    rowwise() |>
     group_split() ->
     pars
 
   seq_along(pars) |>
-    lapply(function(i){
-      cat("Parameter cluster ", i, " of ", length(pars), ": ", sep="")
+    pbapply::pblapply(function(i){
+    #lapply(function(i){
+
+      if(is.null(cl)) cat("Parameter cluster ", i, " of ", length(pars), "...\n", sep="")
+
+      capture.output({
       pars[[i]] |>
-        distinct(parasite, mean_epg, true_efficacy, analysis_type) |>
-        mutate(scenario = row_number()) ->
-        scenario
+        mutate(individ_min = individ_min, individ_max = individ_min*200) |>
+        fix_n_analysis(iters = 100, cl=NULL) ->
+        pilot
+      })
 
-      pars[[i]] |>
-        select(parasite, !any_of(names(scenario))) |>
-        unique() |>
-        mutate(parameter_set = row_number()) |>
-        rowwise() |>
-        group_split() ->
-        pp
+      suppressWarnings(mod <- mgcv::gam(cbind(Positive, Negative) ~ s(n_individ), family="binomial", data=pilot))
+      pilot$predict <- plogis(predict(mod))
 
-      stopifnot(nrow(scenario)==1L || length(pp)==1L)
+      pilot |>
+        filter(predict > performance_max) ->
+        perf_ok
+      if(nrow(perf_ok)==0L) browser()
+      perf_ok |>
+        arrange(n_individ) |>
+        slice(1) |>
+        pull(n_individ) ->
+        individ_max
 
-      survey_sim(
-        n_individ = n_individ,
-        scenario = scenario,
-        parameters = pp,
-        iterations = iterations,
-        cl = cl,
-        output = "summarised",
-        analysis = scenario$analysis_type[1]
-      )
-    }) |>
-    bind_rows() |>
+      cat(individ_max, "->")
+      individ_max <- ceiling(individ_max*0.11)*10
+      cat(individ_max, "\n")
+
+      capture.output({
+        pars[[i]] |>
+        mutate(individ_min = individ_min, individ_max = individ_max) |>
+        fix_n_analysis(iters=iters, cl=NULL) ->
+          res
+      })
+
+      res
+    #}) |>
+    }, cl=cl) |>
+  bind_rows() |>
     ungroup()
+}
+
+
+plot_data <- function(res){
+  res |>
+    mutate(aborted = (n_FailZeroPre+n_FailPositiveScreen+n_FailPositivePre)) |>
+    mutate(Completion = 1 - aborted / (Positive+Negative)) |>
+    mutate(MeanCost = cost_mean, StdvCost = sqrt(cost_variance)) |>
+    mutate(Power = Positive / (Positive+Negative-aborted)) |>
+    mutate(SampleSize = n_individ)
+}
+
+plot_data_cost <- function(res){
+  res |>
+    plot_data() |>
+    pivot_longer(c("Performance","Completion","StdvCost","Power","SampleSize")) |>
+    mutate(name = factor(name, levels=c("Completion","Power","Performance","SampleSize","StdvCost")))
+}
+
+plot_data_ss <- function(res){
+  res |>
+    plot_data() |>
+    pivot_longer(c("Performance","Completion","StdvCost","Power","MeanCost")) |>
+    mutate(name = factor(name, levels=c("Completion","Power","Performance","MeanCost","StdvCost")))
 }
 
 
@@ -272,14 +315,15 @@ expand_grid(
     parameters_thresholds |> filter(drug=="ALB"),
     by = "parasite", relationship="many-to-many"
   ) |>
-  vary_n_analysis(n_individ = fig1_n_individ, iterations=iterations, cl=cl) ->
+  mutate(individ_min = individ_fig1, individ_max = individ_fig1) |>
+  vary_n_analysis(iterations=iterations, cl=cl) ->
   fig_1_data
-qsave(fig_1_data, "notebooks/paper_2025/fig_1_data.rqs")
+#qsave(fig_1_data, "notebooks/paper_2025/fig_1_data.rqs")
 
 fig_1_data |>
   mutate(
     Failed = n_failure + n_FailZeroPre,
-    Adequate = n_above_cutoffs + n_Susceptible,
+    Adequate = n_above_cutoffs + n_Susceptible + n_ClassifyFail,
     Reduced = n_below_cutoffs + n_Resistant + n_LowResistant,
     Inconclusive = n_between_cutoffs + n_Inconclusive
   ) |>
@@ -304,8 +348,121 @@ plotdata |>
 
 
 ############################################
-## Generate full parameter sets
+## Re-create figure 2
 ############################################
+
+expand_grid(
+  parameters_scenario |> filter(parasite=="hookworm"),
+  parameters_fixed,
+  parameters_cost |> filter(setting == "Ethiopia"),
+  parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
+  parameters_analysis |> filter(analysis_type=="delta")
+) |>
+  add_mean_and_cv() |>
+  left_join(
+    parameters_thresholds |> filter(drug=="ALB", framework=="FHT") |> mutate(true_efficacy = efficacy_expected),
+    by = "parasite", relationship="many-to-many"
+  ) ->
+  parameters
+
+parameters |>
+  vary_n_analysis(cl=10) ->
+  res
+#qsave(res, "notebooks/paper_2025/temp_res.rqs")
+
+res |>
+  plot_data_cost() |>
+  filter(name=="Performance", value>0.5, value<0.95) |>
+  ggplot(aes(x=MeanCost, y=value, col=variant)) +
+  geom_line() +
+  facet_grid(min_positive ~ endemicity, scales="free") +
+  geom_hline(yintercept = 0.8, lty="dashed")
+ggsave("fig_performance.pdf", width=10, height=10)
+
+pdf("fig_cost.pdf", width=10, height=10)
+res |>
+  group_by(min_positive) |>
+  group_split() |>
+  lapply(function(x){
+    plot_data_cost(x) |>
+      ggplot(aes(x=MeanCost, y=value, col=variant)) +
+      geom_line() +
+      facet_grid(name ~ endemicity, scales="free") +
+      ylab(NULL) +
+      labs(title=str_c("MinPos: ", x$min_positive[1]))
+  }) |>
+  print()
+dev.off()
+
+pdf("fig_sample.pdf", width=10, height=10)
+res |>
+  group_by(min_positive) |>
+  group_split() |>
+  lapply(function(x){
+    plot_data_ss(x) |>
+      ggplot(aes(x=SampleSize, y=value, col=variant)) +
+      geom_line() +
+      facet_grid(name ~ endemicity, scales="free") +
+      ylab(NULL) +
+      labs(title=str_c("MinPos: ", x$min_positive[1]))
+  }) |>
+  print()
+dev.off()
+
+
+
+ggplot(res, aes(x=cost_mean, y=Performance, col=design)) +
+  geom_line() +
+  facet_wrap(~endemicity, scales="free_x") +
+  geom_hline(yintercept=0.8, lty="dashed")
+
+ggplot(res, aes(x=cost_mean, y=sqrt(cost_variance), col=design)) +
+  geom_line() +
+  facet_wrap(~endemicity, scales="free") +
+  geom_hline(yintercept=0.8, lty="dashed")
+
+ggplot(res, aes(x=cost_mean, y=n_individ, col=design)) +
+  geom_line() +
+  facet_wrap(~endemicity, scales="free") +
+  geom_hline(yintercept=0.8, lty="dashed")
+
+res |>
+  mutate(Completion = 1 - (n_FailZeroPre+n_FailPositiveScreen+n_FailPositivePre) / (Positive+Negative)) |>
+  ggplot(aes(x=cost_mean, y=Completion, col=design)) +
+  geom_line() +
+  facet_wrap(~endemicity, scales="free") +
+  geom_hline(yintercept=0.8, lty="dashed")
+
+res |>
+  mutate(Power = Positive / (Positive+Negative- (n_FailZeroPre+n_FailPositiveScreen+n_FailPositivePre))) |>
+  ggplot(aes(x=cost_mean, y=Power, col=design)) +
+  geom_line() +
+  facet_wrap(~endemicity, scales="free") +
+  geom_hline(yintercept=0.8, lty="dashed")
+
+ggplot(res, aes(x=n_individ, y=sqrt(cost_variance), col=design)) +
+  geom_line() +
+  facet_wrap(~endemicity, scales="free") +
+  geom_hline(yintercept=0.8, lty="dashed")
+
+#ggsave("fig_3b.pdf", height=8, width=10)
+
+res |>
+  mutate(Performance = Positive / (Positive+Negative-n_FailPositivePre)) |>
+  ggplot(aes(x=cost_mean, y=Performance, col=design)) +
+  geom_line()
+
+ggplot(res, aes(x=n_individ, y=Performance, col=design)) +
+  geom_line()
+
+ggplot(res, aes(x=cost_mean, y=Performance, col=design)) +
+  geom_line()
+
+ggplot(res, aes(x=n_individ, y=(n_FailZeroPre+n_FailPositiveScreen+n_FailPositivePre), col=design)) +
+  geom_line()
+
+ggplot(res, aes(x=cost_mean, y=(n_FailZeroPre+n_FailPositiveScreen+n_FailPositivePre), col=design)) +
+  geom_line()
 
 expand_grid(
   parameters_scenario,
