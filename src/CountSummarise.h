@@ -1,6 +1,11 @@
 #ifndef COUNT_SUMMARISE_H
 #define COUNT_SUMMARISE_H
 
+// [[Rcpp::depends(bayescount)]]
+//#include "bayescount/FecrtClassify.h"
+#include "bayescount/bnb_pval.h"
+#include "bayescount/pbnbinom.h"
+
 #include <Rcpp.h>
 #include <array>
 

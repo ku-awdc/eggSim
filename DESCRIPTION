@@ -1,7 +1,7 @@
 Package: eggSim
 Title: Simulating Datasets Representing Egg Reduction Rate Data
-Version: 0.9.6-8
-Date: 2024-01-09
+Version: 0.9.7-1
+Date: 2025-03-28
 Authors@R: 
     c(person(given = "Matt",
            family = "Denwood",
@@ -16,6 +16,8 @@ Description: A collection of utilities to simulate data from different
     rate (ERR; aka faecal egg count reduction) datasets.
 License: GPL-3
 Encoding: UTF-8
+SystemRequirements:
+  C++20
 Depends:
     R (>= 4.2.0),
     tidyverse
@@ -41,4 +43,5 @@ Suggests:
 VignetteBuilder: knitr
 Language: en-GB
 LinkingTo: 
-    Rcpp
+    Rcpp,
+    bayescount (>= 1.2.0)
