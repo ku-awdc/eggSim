@@ -12,8 +12,8 @@ class CountSummariseTest
   const CountParams m_cp;
 
   // template<methods method, bool t_use_screen, bool t_paired, bool t_testing>
-  CountSummarise<methods::delta, false, true, true> m_cs_delta;
-  CountSummarise<methods::mean, false, true, true> m_cs_mean;
+  CountSummarise<methods::delta, false, true, true, 1> m_cs_delta;
+  CountSummarise<methods::mean, false, true, true, 1> m_cs_mean;
 
   CountSummariseTest() = delete;
 

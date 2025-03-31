@@ -213,7 +213,7 @@ fix_n_analysis <- function(parameters, iters=iterations, cl=NULL){
           scenario |> select(scenario, framework, analysis_type, endemicity, min_positive, variant),
           by="scenario"
         ) |>
-        mutate(Positive = (n_Susceptible+n_LowResistant+n_ClassifyFail), Negative = iters-Positive, Performance = Positive/iters)
+        mutate(Positive = (n_Susceptible+n_LowResistant), Negative = iters-Positive, Performance = Positive/iters)
     }) |>
     bind_rows() |>
     ungroup()
@@ -323,9 +323,9 @@ expand_grid(
 fig_1_data |>
   mutate(
     Failed = n_failure + n_FailZeroPre,
-    Adequate = n_above_cutoffs + n_Susceptible + n_ClassifyFail,
+    Adequate = n_above_cutoffs + n_Susceptible,
     Reduced = n_below_cutoffs + n_Resistant + n_LowResistant,
-    Inconclusive = n_between_cutoffs + n_Inconclusive
+    Inconclusive = n_between_cutoffs + n_Inconclusive + n_ClassifyFail
   ) |>
   mutate(Total = Failed + Adequate + Reduced + Inconclusive) |>
   select(true_efficacy, efficacy_expected, analysis, Failed, Adequate, Reduced, Inconclusive) |>

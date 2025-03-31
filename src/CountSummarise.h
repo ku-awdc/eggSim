@@ -4,7 +4,6 @@
 // [[Rcpp::depends(bayescount)]]
 //#include "bayescount/FecrtClassify.h"
 #include "bayescount/bnb_pval.h"
-#include "bayescount/pbnbinom.h"
 
 #include <Rcpp.h>
 #include <array>
@@ -32,7 +31,7 @@ struct CountReturn {
   double lower_stat = NA_REAL;
 };
 
-template<methods t_method, bool t_use_screen, bool t_paired, bool t_testing>
+template<methods t_method, bool t_use_screen, bool t_paired, bool t_testing, int t_mean_ratio>
 class CountSummarise;
 
 /*
@@ -42,7 +41,7 @@ class CountSummarise<methods::delta, t_use_screen, t_paired, t_testing>
 {
 */
 
-template<methods t_method, bool t_use_screen, bool t_paired, bool t_testing>
+template<methods t_method, bool t_use_screen, bool t_paired, bool t_testing, int t_mean_ratio>
 class CountSummarise
 {
 private:
@@ -79,6 +78,9 @@ private:
   std::array<int, m_tp> m_num_count = {};  // Zero-initialise
   // Mean counts within individual:
   std::array<double, m_tp> m_mean_count = {};  // Zero-initialise
+
+  // Only needed for BNB method:
+  int m_sum_pre = 0;
 
   // Allow extraction of int/double stats when we haven't yet hit the thresholds:
   template <typename T, size_t N>
@@ -148,7 +150,7 @@ private:
     const double n = static_cast<double>(m_num_pp-1L);
     const double var1 = m_varn_pp[0L] / n;
     const double var2 = m_varn_pp[1L] / n;
-    const double cov12 = m_covn_pp / n;
+    const double cov12 = std::min(0.99, m_covn_pp / n); // stop perfect correlations breaking things
 
     std::array<double, 2L> rv;
     if constexpr (t_paired)
@@ -258,6 +260,7 @@ public:
 
   void add_count_pre(const int count) noexcept
   {
+    m_sum_pre += count;
     const double dcount = static_cast<const double>(count);
     add_time(dcount, m_tpre);
     m_is_pos[m_tpre] = m_is_pos[m_tpre] || (count > 0L);
@@ -305,9 +308,11 @@ public:
 
         rv.result = Results::few_pre;
 
+      /*
       } else if (m_total_pos[m_tpost] == 0L) {
 
         rv.result = Results::class_fail;
+      */
 
       } else {
 
@@ -315,8 +320,57 @@ public:
         rv.target_stat = ci[1L];
         rv.lower_stat = ci[0L];
 
-        if ( Rcpp::NumericVector::is_na(ci[0L]) || Rcpp::NumericVector::is_na(ci[1L]) ) {
-          rv.result = Results::class_fail;  // Can happen due to zero variance or 100% covariance
+        // If zero-mean post-treatment use BNB:
+        if ( m_total_pos[m_tpost] == 0 ) {
+
+          //   inline std::array<double, 2> bnb_pval(int sum1, int N1, double K1, double mu1, double var1, int sum2, int N2, double K2, double mu2, double var2, double cov12, double mean_ratio, double H0_1, double H0_2, std::array<double, 2> const& conjugate_priors, int delta, int beta_iters, int approx){
+          const int sum1 = m_sum_pre;
+          const int N = m_num_pp-1;
+          const double mu1 = m_means_pp[0L];
+          const double var1 = m_varn_pp[0L] / static_cast<double>(N);
+          // Cheat a bit and make sure k is not more than 1:
+          const double K = std::min(1.0, (mu1 * mu1) / ((var1 <= mu1) ? var1 : (var1-mu1)));
+
+          constexpr int sum2 = 0;
+          constexpr double mu2 = 0.0;
+          constexpr double var2 = 0.0;
+          constexpr double cov12 = 0.0;
+          
+          // This only works for the specifically templated designs:
+          if constexpr (t_mean_ratio==0)
+          {
+            Rcpp::stop("BNB method for non-templated designs (unknown mean ratio) needs fixing");
+          }
+          constexpr double mean_ratio = static_cast<double>(t_mean_ratio);
+          double H0_1 = m_count_params.Teff;
+          double H0_2 = m_count_params.Tlow;
+
+          constexpr std::array<double, 2> conjpri = {0.0, 0.0};
+          constexpr int delta = 1;
+          constexpr int beta_iters = 1000;
+          constexpr int approx = 1;
+
+          std::array<double, 2> pvals = bayescount::bnb_pval(
+            sum1, N, K, mu1, var1,
+            sum2, N, K, mu2, var2,
+            cov12,
+            mean_ratio, H0_1, H0_2,
+            conjpri, delta, beta_iters, approx);
+
+          rv.target_stat = pvals[1L];
+          rv.lower_stat = pvals[0L];
+
+          // NB: only the second p-value is relevant as we are only using this for 100% observed reduction!
+          if ( Rcpp::NumericVector::is_na(pvals[1L]) ) {
+            rv.result = Results::class_fail;
+          } else if (pvals[1L] < m_count_params.tail) {
+            rv.result = Results::resistant;
+          } else {
+            rv.result = Results::inconclusive;
+          }
+
+        } else if ( Rcpp::NumericVector::is_na(ci[0L]) || Rcpp::NumericVector::is_na(ci[1L]) ) {
+          rv.result = Results::class_fail;  // Should now only happen with zero pre-treatment mean??
         } else if (ci[1L] < m_count_params.Teff && ci[0L] < m_count_params.Tlow) {
           rv.result = Results::resistant;
         } else if (ci[1L] < m_count_params.Teff && ci[0L] >= m_count_params.Tlow) {
@@ -335,7 +389,7 @@ public:
 
       rv.target_stat = NA_REAL;
       rv.lower_stat = NA_REAL;
-      
+
       if (m_total_pos[m_tpre] == 0L) {
 
         rv.result = Results::zero_pre;
@@ -352,10 +406,10 @@ public:
 
         const std::array<double, 2L> mus = get_means();
         const double eff = 1.0 - (mus[1L]/mus[0L]);
-      
+
         if (eff < m_count_params.Tlow) {
           rv.result = Results::efficacy_below;
-        } else {        
+        } else {
           rv.result = Results::efficacy_above;
         }
       }
@@ -398,14 +452,14 @@ public:
   {
     if (m_num_pp > 0L) {
       const std::array<double, 2L> rv = apply_minimums<double, 2L>(m_means_pp, NA_REAL);
-      return rv;      
+      return rv;
     } else {
       // Note: can't be static or constexpr because NA_REAL isn't
       const std::array<double, 2L> rv = { NA_REAL, NA_REAL };
       return rv;
     }
   }
-  
+
 
 };
 
