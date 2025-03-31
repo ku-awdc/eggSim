@@ -31,7 +31,7 @@ struct CountReturn {
   double lower_stat = NA_REAL;
 };
 
-template<methods t_method, bool t_use_screen, bool t_paired, bool t_testing, int t_mean_ratio>
+template<methods t_method, bool t_use_screen, bool t_paired, bool t_testing, int t_post_mult>
 class CountSummarise;
 
 /*
@@ -41,7 +41,7 @@ class CountSummarise<methods::delta, t_use_screen, t_paired, t_testing>
 {
 */
 
-template<methods t_method, bool t_use_screen, bool t_paired, bool t_testing, int t_mean_ratio>
+template<methods t_method, bool t_use_screen, bool t_paired, bool t_testing, int t_post_mult>
 class CountSummarise
 {
 private:
@@ -330,6 +330,7 @@ public:
           const double var1 = m_varn_pp[0L] / static_cast<double>(N);
           // Cheat a bit and make sure k is not more than 1:
           const double K = std::min(1.0, (mu1 * mu1) / ((var1 <= mu1) ? var1 : (var1-mu1)));
+          // const double K = (mu1 * mu1) / ((var1 <= mu1) ? var1 : (var1-mu1));
 
           constexpr int sum2 = 0;
           constexpr double mu2 = 0.0;
@@ -337,11 +338,11 @@ public:
           constexpr double cov12 = 0.0;
           
           // This only works for the specifically templated designs:
-          if constexpr (t_mean_ratio==0)
+          if constexpr (t_post_mult==0)
           {
             Rcpp::stop("BNB method for non-templated designs (unknown mean ratio) needs fixing");
           }
-          constexpr double mean_ratio = static_cast<double>(t_mean_ratio);
+          constexpr double mean_ratio = static_cast<double>(t_post_mult);
           double H0_1 = m_count_params.Teff;
           double H0_2 = m_count_params.Tlow;
 
@@ -360,11 +361,11 @@ public:
           rv.target_stat = pvals[1L];
           rv.lower_stat = pvals[0L];
 
-          // NB: only the second p-value is relevant as we are only using this for 100% observed reduction!
-          if ( Rcpp::NumericVector::is_na(pvals[1L]) ) {
+          // NB: only the first p-value is relevant as we are only using this for 100% observed reduction!
+          if ( Rcpp::NumericVector::is_na(pvals[0L]) ) {
             rv.result = Results::class_fail;
-          } else if (pvals[1L] < m_count_params.tail) {
-            rv.result = Results::resistant;
+          } else if (pvals[0L] < m_count_params.tail) {
+            rv.result = Results::susceptible;
           } else {
             rv.result = Results::inconclusive;
           }

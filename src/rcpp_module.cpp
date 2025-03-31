@@ -1,5 +1,7 @@
 #include <Rcpp.h>
 
+// [[Rcpp::depends(bayescount)]]
+
 #include "survey_sim.h"
 #include "utilities.h"
 #include "CountSummariseTest.h"

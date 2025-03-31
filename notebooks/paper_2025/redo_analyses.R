@@ -24,9 +24,9 @@ library("eggSim")
 ############################################
 
 ## General simulation parameters:
-iterations <- 1e4
+iterations <- 1e3
 cl <- 10
-individ_min <- 100
+individ_min <- 10
 individ_increment <- 5
 performance_max <- 0.999
 individ_fig1 <- 380
@@ -79,6 +79,7 @@ parameters_analysis <- tibble(analysis_type = c("mean","delta"))
 
 ## Parameters for simulated drug efficacy
 parameters_efficacy <- tibble(true_efficacy = seq(50,100,by=0.25)/100)
+parameters_efficacy <- tibble(true_efficacy = seq(50,100,by=2.5)/100)
 
 ## Cost parameters:
 bind_rows(
@@ -304,7 +305,7 @@ set.seed(2025-03-05)
 
 expand_grid(
   parameters_scenario |> filter(parasite=="hookworm", endemicity==15),
-  parameters_fixed |> filter(design == "NS_11"),
+  parameters_fixed |> filter(design == "NS_12", min_positive == 1),
   parameters_cost |> filter(setting == "Ethiopia"),
   parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
   parameters_analysis,
@@ -315,17 +316,17 @@ expand_grid(
     parameters_thresholds |> filter(drug=="ALB"),
     by = "parasite", relationship="many-to-many"
   ) |>
-  mutate(individ_min = individ_fig1, individ_max = individ_fig1) |>
-  vary_n_analysis(iterations=iterations, cl=cl) ->
+  mutate(individ_min = 100, individ_max = 100) |>
+  vary_n_analysis(iters=iterations, cl=cl) ->
   fig_1_data
 #qsave(fig_1_data, "notebooks/paper_2025/fig_1_data.rqs")
 
 fig_1_data |>
   mutate(
-    Failed = n_failure + n_FailZeroPre,
-    Adequate = n_above_cutoffs + n_Susceptible,
-    Reduced = n_below_cutoffs + n_Resistant + n_LowResistant,
-    Inconclusive = n_between_cutoffs + n_Inconclusive + n_ClassifyFail
+    Failed = n_FailZeroPre,
+    Adequate = if_else(analysis_type=="delta", n_Susceptible, n_above_cutoffs),
+    Reduced = if_else(analysis_type=="delta", n_Resistant + n_LowResistant, n_below_cutoffs),
+    Inconclusive = if_else(analysis_type=="delta", n_Inconclusive + n_ClassifyFail, n_between_cutoffs)
   ) |>
   mutate(Total = Failed + Adequate + Reduced + Inconclusive) |>
   select(true_efficacy, efficacy_expected, analysis, Failed, Adequate, Reduced, Inconclusive) |>
@@ -344,7 +345,10 @@ plotdata |>
   ungroup() |>
   ggplot(aes(x=true_efficacy, ymin=ymin, ymax=ymax, fill=classification)) +
   geom_ribbon() +
-  facet_grid(efficacy_expected ~ analysis)
+  facet_grid(efficacy_expected ~ analysis) +
+  theme_bw() +
+  geom_vline(aes(xintercept=efficacy_expected)) +
+  geom_vline(aes(xintercept=efficacy_expected-0.1))
 
 
 ############################################

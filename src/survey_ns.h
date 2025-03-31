@@ -24,9 +24,9 @@ void survey_ns(const int N_day_pre_, const int N_aliquot_pre_,
   // Defined in enums.h:
   TESTING();
 
-  constexpr int mean_ratio = nd1==0 ? 0 : (nd1*na1)/(nd2*na2);
-  // template<methods method, bool t_use_screen, bool t_paired, bool t_testing, int t_mean_ratio>
-  CountSummarise<method, false, true, t_testing, mean_ratio> count_summarise(count_params);
+  constexpr int post_mult = (t_fixed_n && (nd1*na1)==1) ? (nd2*na2) : 0;
+  // template<methods method, bool t_use_screen, bool t_paired, bool t_testing, int t_post_mult>
+  CountSummarise<method, false, true, t_testing, post_mult> count_summarise(count_params);
   
   const int N_day_pre = t_fixed_n ? nd1 : N_day_pre_;
   const int N_aliquot_pre = t_fixed_n ? na1 : N_aliquot_pre_;
