@@ -303,6 +303,103 @@ plot_data_ss <- function(res){
 
 set.seed(2025-03-05)
 
+cols <- c(gg_colour_hue(3),"grey50")
+names(cols) <- c("Reduced","Adequate","Inconclusive","Failed")
+
+expand_grid(
+  n_individ = c(10, 25, 50, 100, 250, 500),
+  min_positive = c(1, 10, 50),
+  endemicity = c(15, 35, 65),
+) ->
+all
+
+st <- Sys.time()
+all |>
+  slice_sample(prop=0.1) |>
+  filter(min_positive <= n_individ/2) |>
+  mutate(Row = row_number()) |>
+  rowwise() |>
+  group_split() |>
+  lapply(function(x){
+
+    cat(x$Row, "of", nrow(all), "-", as.numeric(st-Sys.time(), "mins"), "\n")
+    print(x)
+
+    expand_grid(
+      parameters_scenario |> filter(parasite=="hookworm", endemicity==x$endemicity),
+      parameters_fixed |> filter(design == "NS_12", min_positive == 1),
+      parameters_cost |> filter(setting == "Ethiopia"),
+      parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
+      parameters_analysis,
+      parameters_efficacy
+    ) |>
+      add_mean_and_cv() |>
+      left_join(
+        parameters_thresholds |> filter(drug=="ALB"),
+        by = "parasite", relationship="many-to-many"
+      ) |>
+      mutate(individ_min = x$n_individ, individ_max = x$n_individ) |>
+      mutate(min_positive_pre = x$min_positive) |>
+      vary_n_analysis(iters=iterations, cl=cl) ->
+      fig_1_data
+
+    fig_1_data |>
+      mutate(
+        Adequate = if_else(analysis_type=="delta", n_Susceptible, n_above_cutoffs),
+        Reduced = if_else(analysis_type=="delta", n_Resistant + n_LowResistant, n_below_cutoffs),
+        Inconclusive = if_else(analysis_type=="delta", n_Inconclusive, n_between_cutoffs),
+        Failed = n_FailZeroPre + n_FailPositiveScreen + n_FailPositivePre + if_else(analysis_type=="delta", n_ClassifyFail, 0)
+      ) |>
+      mutate(Total = Failed + Adequate + Reduced + Inconclusive) |>
+      select(true_efficacy, efficacy_expected, analysis, Adequate, Reduced, Inconclusive, Failed) |>
+      pivot_longer(Adequate:Failed, names_to="classification", values_to="tally") |>
+      mutate(analysis = if_else(analysis=="delta", "hypothesis", analysis)) ->
+      plotdata
+
+    plotdata |>
+      mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Failed","Reduced"))) |>
+      group_by(efficacy_expected, analysis, true_efficacy) |>
+      arrange(classification) |>
+      mutate(total = sum(tally), ymax = cumsum(tally/total), ymin = lag(ymax, default=0)) |>
+      ungroup() |>
+      ggplot(aes(x=true_efficacy, ymin=ymin, ymax=ymax, fill=classification)) +
+      geom_ribbon() +
+      facet_grid(efficacy_expected ~ analysis) +
+      theme_bw() +
+      geom_vline(aes(xintercept=efficacy_expected)) +
+      geom_vline(aes(xintercept=efficacy_expected-0.1)) +
+      geom_hline(yintercept=c(0.05,0.95)) +
+      scale_fill_manual(values=cols) +
+      labs(title = str_c("N = ", x$n_individ, ", MP = ", x$min_positive, ", End = ", x$endemicity, "%")) ->
+      plot1
+
+    plotdata |>
+      filter(classification!="Failed") |>
+      mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
+      group_by(efficacy_expected, analysis, true_efficacy) |>
+      arrange(classification) |>
+      mutate(total = sum(tally), ymax = cumsum(tally/total), ymin = lag(ymax, default=0)) |>
+      ungroup() |>
+      ggplot(aes(x=true_efficacy, ymin=ymin, ymax=ymax, fill=classification)) +
+      geom_ribbon() +
+      facet_grid(efficacy_expected ~ analysis) +
+      theme_bw() +
+      geom_vline(aes(xintercept=efficacy_expected)) +
+      geom_vline(aes(xintercept=efficacy_expected-0.1)) +
+      geom_hline(yintercept=c(0.05,0.95)) +
+      scale_fill_manual(values=cols) +
+      labs(title = str_c("N = ", x$n_individ, ", MP = ", x$min_positive, ", End = ", x$endemicity, "% (no failed)")) ->
+      plot2
+
+    list(plot1, plot2)
+
+  }) ->
+  plots
+
+pdf("plots_waavp.pdf")
+plots
+dev.off()
+
 expand_grid(
   parameters_scenario |> filter(parasite=="hookworm", endemicity==15),
   parameters_fixed |> filter(design == "NS_12", min_positive == 1),
@@ -316,7 +413,8 @@ expand_grid(
     parameters_thresholds |> filter(drug=="ALB"),
     by = "parasite", relationship="many-to-many"
   ) |>
-  mutate(individ_min = 100, individ_max = 100) |>
+  mutate(individ_min = 50, individ_max = 50) |>
+  mutate(min_positive_pre = 10) |>
   vary_n_analysis(iters=iterations, cl=cl) ->
   fig_1_data
 #qsave(fig_1_data, "notebooks/paper_2025/fig_1_data.rqs")
@@ -348,7 +446,8 @@ plotdata |>
   facet_grid(efficacy_expected ~ analysis) +
   theme_bw() +
   geom_vline(aes(xintercept=efficacy_expected)) +
-  geom_vline(aes(xintercept=efficacy_expected-0.1))
+  geom_vline(aes(xintercept=efficacy_expected-0.1)) +
+  geom_hline(yintercept=c(0.05,0.95))
 
 
 ############################################

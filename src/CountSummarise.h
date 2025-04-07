@@ -4,6 +4,7 @@
 // [[Rcpp::depends(bayescount)]]
 //#include "bayescount/FecrtClassify.h"
 #include "bayescount/bnb_pval.h"
+#include "bayescount/waavp_ci.h"
 
 #include <Rcpp.h>
 #include <array>
@@ -185,6 +186,29 @@ private:
     return rv;
   }
 
+  std::array<double, 2L> waavp_ci() const
+  {
+    const double mu1 = m_means_pp[0L];
+    const double mu2 = m_means_pp[1L];
+    const double n = static_cast<double>(m_num_pp-1L);
+    const double var1 = m_varn_pp[0L] / n;
+    const double var2 = m_varn_pp[1L] / n;
+    const double cov12 = std::min(0.99, m_covn_pp / n); // stop perfect correlations breaking things
+
+    std::array<double, 2L> rv;
+    if constexpr (t_paired)
+    {
+      //  std::array<double, 2> waavp_p_ci(double mu1, double mu2, double var1, double var2, double cov12, int N, double tail)
+      rv = bayescount::waavp_p_ci(mu1, mu2, var1, var2, cov12, n, m_count_params.tail);
+
+    }else{
+      // std::array<double, 2> waavp_u_ci(double mu1, double mu2, double var1, double var2, int N1, int N2, double tail)
+      rv = bayescount::waavp_u_ci(mu1, mu2, var1, var2, n, n, m_count_params.tail);
+    }
+
+    return rv;
+  }
+
 
 public:
   CountSummarise(const CountParams& count_params) noexcept
@@ -316,7 +340,9 @@ public:
 
       } else {
 
-        const std::array<double, 2L> ci = levecke_ci();
+//        const std::array<double, 2L> ci = levecke_ci();
+        const std::array<double, 2L> ci = waavp_ci();
+
         rv.target_stat = ci[1L];
         rv.lower_stat = ci[0L];
 
@@ -328,15 +354,23 @@ public:
           const int N = m_num_pp-1;
           const double mu1 = m_means_pp[0L];
           const double var1 = m_varn_pp[0L] / static_cast<double>(N);
-          // Cheat a bit and make sure k is not more than 1:
-          const double K = std::min(1.0, (mu1 * mu1) / ((var1 <= mu1) ? var1 : (var1-mu1)));
-          // const double K = (mu1 * mu1) / ((var1 <= mu1) ? var1 : (var1-mu1));
+
+          // Cheat a bit and make sure k is not more than 10:
+          const double vareff = std::max(var1-mu1, mu1*mu1*0.1);
+          // Calculate pre-treatment K:
+          const double K1 = (mu1 * mu1) / (vareff);
+
+          // Option to cheat a bit and artificially add correlation:
+          const double correlation = 0.0;
+          // Calculate effective post-treatment K:
+          const double K2 = (mu1 * mu1) / (vareff * (1.0 - correlation));
 
           constexpr int sum2 = 0;
+          // All are ignored if sum2 is 0:
           constexpr double mu2 = 0.0;
           constexpr double var2 = 0.0;
           constexpr double cov12 = 0.0;
-          
+
           // This only works for the specifically templated designs:
           if constexpr (t_post_mult==0)
           {
@@ -352,8 +386,8 @@ public:
           constexpr int approx = 1;
 
           std::array<double, 2> pvals = bayescount::bnb_pval(
-            sum1, N, K, mu1, var1,
-            sum2, N, K, mu2, var2,
+            sum1, N, K1, mu1, var1,
+            sum2, N, K2, mu2, var2,
             cov12,
             mean_ratio, H0_1, H0_2,
             conjpri, delta, beta_iters, approx);
@@ -362,6 +396,8 @@ public:
           rv.lower_stat = pvals[0L];
 
           // NB: only the first p-value is relevant as we are only using this for 100% observed reduction!
+//          if ( true) {
+
           if ( Rcpp::NumericVector::is_na(pvals[0L]) ) {
             rv.result = Results::class_fail;
           } else if (pvals[0L] < m_count_params.tail) {
