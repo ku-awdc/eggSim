@@ -98,7 +98,7 @@ bind_rows(
 ## Fixed parameters:
 expand_grid(
   variant = c("NS_11","NS_12","SSR_11A","SSR_12A","SSR_11B","SSR_12B"),
-  min_positive = c(1, 10, 25, 50, 100)
+  min_positive = c(1:10, 25, 50, 100)
 ) |>
   filter(!str_detect(variant, "A")) |>  # We agreed this makes no sense
   mutate(
@@ -304,6 +304,8 @@ plot_data_ss <- function(res){
 ## Recreate figure 1
 ############################################
 
+# TODO: main figure just with 300 children; move 100, 150, 250 or smth to appendix (new S1)
+
 set.seed(2025-03-05)
 
 cols <- c(gg_colour_hue(3),"grey50")
@@ -432,9 +434,11 @@ ggsave("fig1_rough.pdf", height=8, width=10)
 ## New figure 2
 ############################################
 
+# TODO: drop
+
 expand_grid(
   parameters_scenario |> filter(parasite=="hookworm"),
-  parameters_fixed |> filter(min_positive%in%c(1,50)),
+  parameters_fixed,
   parameters_cost |> filter(setting == "Ethiopia"),
   parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
   parameters_analysis |> filter(analysis_type=="delta")
@@ -458,7 +462,7 @@ res |>
   geom_line() +
   facet_grid(min_positive ~ endemicity, scales="free") +
   geom_hline(yintercept = 0.8, lty="dashed")
-ggsave("fig2_rough.pdf", width=15, height=6)
+ggsave("fig2_rough.pdf", width=15, height=20)
 
 
 
@@ -468,7 +472,7 @@ ggsave("fig2_rough.pdf", width=15, height=6)
 
 expand_grid(
   parameters_scenario |> filter(parasite=="hookworm", endemicity==2),
-  parameters_fixed |> filter(min_positive%in%c(1)),
+  parameters_fixed |> filter(min_positive==1),
   parameters_cost,
   parameters_dropadd,
   parameters_analysis |> filter(analysis_type=="delta")
@@ -522,7 +526,7 @@ LETTERS[1:4] |>
 ggsave("fig3_rough.pdf", width=9, height=8)
 
 
-# Note: scrap old figure 3 as it replicates S1
+# TODO: go with figure 3 as in old MS
 
 
 ############################################
@@ -661,4 +665,7 @@ res |>
 ggsave("fig4_rough.pdf", width=9, height=8)
 
 
+# TODO: table 3 and S2 (include variance of costs in latter)
+
+# NOTE: none of the figures should have anything other than min_positive=1
 
