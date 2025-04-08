@@ -24,12 +24,11 @@ library("eggSim")
 ############################################
 
 ## General simulation parameters:
-iterations <- 1e3
+iterations <- 1e4
 cl <- 10
 individ_min <- 10
 individ_increment <- 5
 performance_max <- 0.999
-individ_fig1 <- 380
 
 expand_grid(
   parasite = c("ascaris","hookworm","trichuris"),
@@ -49,11 +48,11 @@ tribble(~parasite, ~intercept, ~slope, ~day_cv, ~reduction_cv,
 ## Parameters for dropout and assessing other parasites:
 tibble(
   dropout = c("baseline", "with dropouts"),
-  dropout_screen = c(0,10),
-  dropout_pre = c(0,20),
+  dropout_screen = c(0,0.1),
+  dropout_pre = c(0,0.2),
 ) |>
   expand_grid(
-    force_inclusion_prob = c(0, 10, 20)
+    force_inclusion_prob = c(0, 0.05, 0.1, 0.15, 0.2)
   ) |>
   filter(dropout=="baseline" | force_inclusion_prob==0) ->
   parameters_dropadd
@@ -79,7 +78,6 @@ parameters_analysis <- tibble(analysis_type = c("mean","delta"))
 
 ## Parameters for simulated drug efficacy
 parameters_efficacy <- tibble(true_efficacy = seq(50,100,by=0.25)/100)
-parameters_efficacy <- tibble(true_efficacy = seq(50,100,by=2.5)/100)
 
 ## Cost parameters:
 bind_rows(
@@ -102,6 +100,7 @@ expand_grid(
   variant = c("NS_11","NS_12","SSR_11A","SSR_12A","SSR_11B","SSR_12B"),
   min_positive = c(1, 10, 25, 50, 100)
 ) |>
+  filter(!str_detect(variant, "A")) |>  # We agreed this makes no sense
   mutate(
     design = str_sub(variant, 1, if_else(str_detect(variant, "NS"), 5, 6)),
     method = "kk",
@@ -175,7 +174,7 @@ add_mean_and_cv <- function(x, mu_max=1e4){
 ## Utility functions
 ############################################
 
-fix_n_analysis <- function(parameters, iters=iterations, cl=NULL){
+fix_n_analysis <- function(parameters, iters=iterations, increment=individ_increment, cl=NULL){
 
   parameters |>
     group_by(framework, analysis_type, parasite, endemicity, mean_epg, min_positive, variant) |>
@@ -202,7 +201,7 @@ fix_n_analysis <- function(parameters, iters=iterations, cl=NULL){
       stopifnot(nrow(scenario)==1L || length(pp)==1L)
 
       survey_sim(
-        n_individ = seq(scenario$individ_min, scenario$individ_max, by=individ_increment),
+        n_individ = seq(scenario$individ_min, scenario$individ_max, by=increment),
         scenario = scenario,
         parameters = pp,
         iterations = iters,
@@ -221,7 +220,7 @@ fix_n_analysis <- function(parameters, iters=iterations, cl=NULL){
 }
 
 
-vary_n_analysis <- function(parameters, iters=iterations, cl=NULL){
+vary_n_analysis <- function(parameters, iters=iterations, increment=individ_increment, cl=NULL){
 
   parameters |>
     rowwise() |>
@@ -236,8 +235,8 @@ vary_n_analysis <- function(parameters, iters=iterations, cl=NULL){
 
       capture.output({
       pars[[i]] |>
-        mutate(individ_min = individ_min, individ_max = individ_min*200) |>
-        fix_n_analysis(iters = 100, cl=NULL) ->
+        mutate(individ_min = individ_min, individ_max = individ_min*5000) |>
+        fix_n_analysis(iters = 100, increment=10, cl=NULL) ->
         pilot
       })
 
@@ -254,18 +253,22 @@ vary_n_analysis <- function(parameters, iters=iterations, cl=NULL){
         pull(n_individ) ->
         individ_max
 
-      cat(individ_max, "->")
+      #cat(individ_max, "->")
       individ_max <- ceiling(individ_max*0.11)*10
-      cat(individ_max, "\n")
+      #cat(individ_max, "\n")
 
       capture.output({
         pars[[i]] |>
         mutate(individ_min = individ_min, individ_max = individ_max) |>
-        fix_n_analysis(iters=iters, cl=NULL) ->
+        fix_n_analysis(iters=iters, increment=increment, cl=NULL) ->
           res
       })
 
-      res
+      mn <- names(pars[[i]])[! names(pars[[i]]) %in% names(res)]
+      res |>
+        bind_cols(
+          pars[[i]][,mn]
+        )
     #}) |>
     }, cl=cl) |>
   bind_rows() |>
@@ -311,18 +314,24 @@ expand_grid(
   min_positive = c(1, 10, 50),
   endemicity = c(15, 35, 65),
 ) ->
-all
+  all
+
+expand_grid(
+  n_individ = c(75, 150, 300),
+  min_positive = c(1),
+  endemicity = c(15),
+) ->
+  all
 
 st <- Sys.time()
 all |>
-  slice_sample(prop=0.1) |>
   filter(min_positive <= n_individ/2) |>
   mutate(Row = row_number()) |>
   rowwise() |>
   group_split() |>
   lapply(function(x){
 
-    cat(x$Row, "of", nrow(all), "-", as.numeric(st-Sys.time(), "mins"), "\n")
+    cat(x$Row, "of", nrow(all), "-", as.numeric(Sys.time()-st, "mins"), "\n")
     print(x)
 
     expand_grid(
@@ -353,7 +362,8 @@ all |>
       mutate(Total = Failed + Adequate + Reduced + Inconclusive) |>
       select(true_efficacy, efficacy_expected, analysis, Adequate, Reduced, Inconclusive, Failed) |>
       pivot_longer(Adequate:Failed, names_to="classification", values_to="tally") |>
-      mutate(analysis = if_else(analysis=="delta", "hypothesis", analysis)) ->
+      mutate(analysis = if_else(analysis=="delta", "hypothesis", analysis)) |>
+      bind_cols(x) ->
       plotdata
 
     plotdata |>
@@ -391,72 +401,40 @@ all |>
       labs(title = str_c("N = ", x$n_individ, ", MP = ", x$min_positive, ", End = ", x$endemicity, "% (no failed)")) ->
       plot2
 
-    list(plot1, plot2)
+    list(data=plotdata, p1=plot1, p2=plot2)
 
   }) ->
   plots
+qsave(plots, "notebooks/paper_2025/fig1_res.rqs")
 
-pdf("plots_waavp.pdf")
-plots
-dev.off()
-
-expand_grid(
-  parameters_scenario |> filter(parasite=="hookworm", endemicity==15),
-  parameters_fixed |> filter(design == "NS_12", min_positive == 1),
-  parameters_cost |> filter(setting == "Ethiopia"),
-  parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
-  parameters_analysis,
-  parameters_efficacy
-) |>
-  add_mean_and_cv() |>
-  left_join(
-    parameters_thresholds |> filter(drug=="ALB"),
-    by = "parasite", relationship="many-to-many"
-  ) |>
-  mutate(individ_min = 50, individ_max = 50) |>
-  mutate(min_positive_pre = 10) |>
-  vary_n_analysis(iters=iterations, cl=cl) ->
-  fig_1_data
-#qsave(fig_1_data, "notebooks/paper_2025/fig_1_data.rqs")
-
-fig_1_data |>
-  mutate(
-    Failed = n_FailZeroPre,
-    Adequate = if_else(analysis_type=="delta", n_Susceptible, n_above_cutoffs),
-    Reduced = if_else(analysis_type=="delta", n_Resistant + n_LowResistant, n_below_cutoffs),
-    Inconclusive = if_else(analysis_type=="delta", n_Inconclusive + n_ClassifyFail, n_between_cutoffs)
-  ) |>
-  mutate(Total = Failed + Adequate + Reduced + Inconclusive) |>
-  select(true_efficacy, efficacy_expected, analysis, Failed, Adequate, Reduced, Inconclusive) |>
-  pivot_longer(Failed:Inconclusive, names_to="classification", values_to="tally") ->
-  plotdata
-
-## To insert into paper:
-summary((plotdata |> filter(classification=="Failed") |> pull(tally)) / iterations * 100)
-
-plotdata |>
+plots |>
+  lapply(\(x) x$data) |>
+  bind_rows() |>
   filter(classification != "Failed") |>
   mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
-  group_by(efficacy_expected, analysis, true_efficacy) |>
+  group_by(efficacy_expected, analysis, true_efficacy, n_individ) |>
   arrange(classification) |>
   mutate(total = sum(tally), ymax = cumsum(tally/total), ymin = lag(ymax, default=0)) |>
+  mutate(type = str_c(analysis, " - ", efficacy_expected) |> fct()) |>
   ungroup() |>
   ggplot(aes(x=true_efficacy, ymin=ymin, ymax=ymax, fill=classification)) +
   geom_ribbon() +
-  facet_grid(efficacy_expected ~ analysis) +
+  facet_grid(type ~ n_individ) +
   theme_bw() +
   geom_vline(aes(xintercept=efficacy_expected)) +
   geom_vline(aes(xintercept=efficacy_expected-0.1)) +
   geom_hline(yintercept=c(0.05,0.95))
+ggsave("fig1_rough.pdf", height=8, width=10)
+
 
 
 ############################################
-## Re-create figure 2
+## New figure 2
 ############################################
 
 expand_grid(
   parameters_scenario |> filter(parasite=="hookworm"),
-  parameters_fixed,
+  parameters_fixed |> filter(min_positive%in%c(1,50)),
   parameters_cost |> filter(setting == "Ethiopia"),
   parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
   parameters_analysis |> filter(analysis_type=="delta")
@@ -469,203 +447,218 @@ expand_grid(
   parameters
 
 parameters |>
-  vary_n_analysis(cl=10) ->
+  vary_n_analysis(cl=10, iters=iterations) ->
   res
-#qsave(res, "notebooks/paper_2025/temp_res.rqs")
+qsave(res, "notebooks/paper_2025/fig2_res.rqs")
 
 res |>
   plot_data_cost() |>
   filter(name=="Performance", value>0.5, value<0.95) |>
-  ggplot(aes(x=MeanCost, y=value, col=variant)) +
+  ggplot(aes(x=MeanCost, y=value, col=design)) +
   geom_line() +
   facet_grid(min_positive ~ endemicity, scales="free") +
   geom_hline(yintercept = 0.8, lty="dashed")
-ggsave("fig_performance.pdf", width=10, height=10)
-
-pdf("fig_cost.pdf", width=10, height=10)
-res |>
-  group_by(min_positive) |>
-  group_split() |>
-  lapply(function(x){
-    plot_data_cost(x) |>
-      ggplot(aes(x=MeanCost, y=value, col=variant)) +
-      geom_line() +
-      facet_grid(name ~ endemicity, scales="free") +
-      ylab(NULL) +
-      labs(title=str_c("MinPos: ", x$min_positive[1]))
-  }) |>
-  print()
-dev.off()
-
-pdf("fig_sample.pdf", width=10, height=10)
-res |>
-  group_by(min_positive) |>
-  group_split() |>
-  lapply(function(x){
-    plot_data_ss(x) |>
-      ggplot(aes(x=SampleSize, y=value, col=variant)) +
-      geom_line() +
-      facet_grid(name ~ endemicity, scales="free") +
-      ylab(NULL) +
-      labs(title=str_c("MinPos: ", x$min_positive[1]))
-  }) |>
-  print()
-dev.off()
+ggsave("fig2_rough.pdf", width=15, height=6)
 
 
 
-ggplot(res, aes(x=cost_mean, y=Performance, col=design)) +
-  geom_line() +
-  facet_wrap(~endemicity, scales="free_x") +
-  geom_hline(yintercept=0.8, lty="dashed")
-
-ggplot(res, aes(x=cost_mean, y=sqrt(cost_variance), col=design)) +
-  geom_line() +
-  facet_wrap(~endemicity, scales="free") +
-  geom_hline(yintercept=0.8, lty="dashed")
-
-ggplot(res, aes(x=cost_mean, y=n_individ, col=design)) +
-  geom_line() +
-  facet_wrap(~endemicity, scales="free") +
-  geom_hline(yintercept=0.8, lty="dashed")
-
-res |>
-  mutate(Completion = 1 - (n_FailZeroPre+n_FailPositiveScreen+n_FailPositivePre) / (Positive+Negative)) |>
-  ggplot(aes(x=cost_mean, y=Completion, col=design)) +
-  geom_line() +
-  facet_wrap(~endemicity, scales="free") +
-  geom_hline(yintercept=0.8, lty="dashed")
-
-res |>
-  mutate(Power = Positive / (Positive+Negative- (n_FailZeroPre+n_FailPositiveScreen+n_FailPositivePre))) |>
-  ggplot(aes(x=cost_mean, y=Power, col=design)) +
-  geom_line() +
-  facet_wrap(~endemicity, scales="free") +
-  geom_hline(yintercept=0.8, lty="dashed")
-
-ggplot(res, aes(x=n_individ, y=sqrt(cost_variance), col=design)) +
-  geom_line() +
-  facet_wrap(~endemicity, scales="free") +
-  geom_hline(yintercept=0.8, lty="dashed")
-
-#ggsave("fig_3b.pdf", height=8, width=10)
-
-res |>
-  mutate(Performance = Positive / (Positive+Negative-n_FailPositivePre)) |>
-  ggplot(aes(x=cost_mean, y=Performance, col=design)) +
-  geom_line()
-
-ggplot(res, aes(x=n_individ, y=Performance, col=design)) +
-  geom_line()
-
-ggplot(res, aes(x=cost_mean, y=Performance, col=design)) +
-  geom_line()
-
-ggplot(res, aes(x=n_individ, y=(n_FailZeroPre+n_FailPositiveScreen+n_FailPositivePre), col=design)) +
-  geom_line()
-
-ggplot(res, aes(x=cost_mean, y=(n_FailZeroPre+n_FailPositiveScreen+n_FailPositivePre), col=design)) +
-  geom_line()
+############################################
+## Re-create figure 2 (now 3)
+############################################
 
 expand_grid(
-  parameters_scenario,
-  parameters_fixed,
+  parameters_scenario |> filter(parasite=="hookworm", endemicity==2),
+  parameters_fixed |> filter(min_positive%in%c(1)),
   parameters_cost,
   parameters_dropadd,
+  parameters_analysis |> filter(analysis_type=="delta")
 ) |>
-  mutate(parameter_set = row_number()) |>
-  mutate(cost_aliquot_post = if_else(str_detect(design, "11"), cost_aliquot_post_11, cost_aliquot_post_12)) |>
-  add_mean_and_cv() |>
-  full_join(parameters_thresholds, by = "parasite", relationship="many-to-many") ->
-parameters
-
-
-
-
-  |>
-  group_by(framework, parasite, endemicity, mean_epg) |>
-  group_split() ->
-  all_parameters
-
-pp <- all_parameters[[1]]
-
-pp |>
-  distinct(parasite, mean_epg) |>
-  mutate(scenario = row_number(), true_efficacy = 80) ->
-  scenario
-
-pp |>
-  select(parasite, !any_of(names(scenario))) ->
-  pp
-
-cl <- NULL
-survey_sim(
-  n_individ = sample_size,
-  scenario = scenario,
-  parameters = pp[1:10,] |> rowwise() |> group_split(),
-  iterations = iterations,
-  cl = cl,
-  output = "summarised",
-  analysis = "mean"
-)
-
-
-stop("INCREASE SAMPLE SIZE WHERE NEEDED!!!")
-warning("Improve mechanism of specifying parameter values")
-
-
-
-
-tibble(
-  parasite = "hookworm",
-  day_cv = 1,
-  endemicity = c(5,15,35,65),
-  weight = 1/24
-) |>
-  add_mean_cv()
-
-100 * (1-dnbinom(0, 1/1.9^2, mu=283/24))
-
-integrate(function(x) dnbinom(0, 1, mu=x) * dgamma(x, 1, 1), 0, Inf)$value
-
-ii <- 1e5
-rgamma_mu <- function(n, k, mu) rgamma(n, k, rate=k/mu)
-dd <- rpois(ii, rgamma_mu(ii, 1/1^2, rgamma_mu(ii, 1/1.71^2, 354))/24)
-sum(dd!=0)/ii *100
-
-tibble(
-  EPG = 1:1000,
-) |>
-  mutate(
-    Weight1 = find_cvi(EPG, 0.01589, 0.00193, 1),
-    Weight24 = find_cvi(EPG, 0.01589, 0.00193, 1/24),
+  filter(
+    (dropout == "baseline" & force_inclusion_prob == 0) | # A/B
+      (setting == "Ethiopia" & force_inclusion_prob == 0 & dropout != "baseline") | # C
+      (setting == "Ethiopia" & dropout == "baseline" & design=="SSR_12") # D
   ) |>
-  pivot_longer(starts_with("Weight"), names_to="Weight", values_to="cv_i") |>
-  ggplot(aes(x=EPG, y=cv_i, col=Weight)) +
+  add_mean_and_cv() |>
+  left_join(
+    parameters_thresholds |> filter(drug=="ALB", framework=="FHT") |> mutate(true_efficacy = efficacy_expected),
+    by = "parasite", relationship="many-to-many"
+  ) ->
+  parameters
+
+parameters |>
+  vary_n_analysis(cl=10, iters=iterations) ->
+  res
+
+LETTERS[1:4] |>
+  lapply(\(x){
+    if(x=="A"){
+      res |>
+        filter(setting == "Ethiopia", dropout == "baseline", force_inclusion_prob == 0) |>
+        mutate(Panel = x)
+    }else if(x=="B"){
+      res |>
+        filter(setting == "Tanzania", dropout == "baseline", force_inclusion_prob == 0) |>
+        mutate(Panel = x)
+    }else if(x=="C"){
+      res |>
+        filter(setting == "Ethiopia", force_inclusion_prob == 0, dropout != "baseline") |>
+        mutate(Panel = x)
+    }else if(x=="D"){
+      res |>
+        filter(setting == "Ethiopia", dropout == "baseline", design=="SSR_12") |>
+        mutate(Panel = x)
+    }else{
+      stop("ERROR")
+    }
+  }) |>
+  bind_rows() |>
+  filter(endemicity==2) |>
+  plot_data_cost() |>
+  filter(name=="Performance", value>0.5, value<0.95) |>
+  ggplot(aes(x=MeanCost, y=value, col=design, lty=factor(force_inclusion_prob))) +
   geom_line() +
-  theme(legend.position = "bottom", legend.title = element_blank()) +
-  ylim(0,NA)
-ggsave("calculating_cv_ind.pdf", width=6, height=5)
-
-find_cvi(1:250, 0.01589, 0.00193, 1)
-find_cvi(1:250, 0.01589, 0.00193, 1/24)
-
-find_mu <- function(prev, k){
-
-}
-find_mu(0.05, 0.023)*c(34,24,10)
-find_mu(0.15, 0.053)*c(34,24,10)
+  facet_wrap(~Panel, scales="free") +
+  geom_hline(yintercept = 0.8, lty="dashed")
+ggsave("fig3_rough.pdf", width=9, height=8)
 
 
-alpha <- c(49.5,30.2,53.8)
-beta <- c(12.4, 56.1, 17.9)
-mean <- alpha / (alpha+beta)
-var <- (alpha*beta) / ((alpha+beta)^2 * (alpha+beta+1))
-mean
-qbeta(0.025,alpha,beta)
-qbeta(0.975,alpha,beta)
-ss <- rbeta(1e4,alpha[1],beta[1])
-sd(ss)/mean(ss)
-sqrt(var)/mean
+# Note: scrap old figure 3 as it replicates S1
 
-iters <- 1e5
+
+############################################
+## Re-create figure S1
+############################################
+
+expand_grid(
+  parameters_scenario |> filter(parasite=="hookworm", endemicity!=2),
+  parameters_fixed |> filter(min_positive%in%c(1)),
+  parameters_cost,
+  parameters_dropadd |> filter(dropout=="baseline", force_inclusion_prob == 0),
+  parameters_analysis |> filter(analysis_type=="delta")
+) |>
+  add_mean_and_cv() |>
+  left_join(
+    parameters_thresholds |> filter(drug=="ALB", framework=="FHT") |> mutate(true_efficacy = efficacy_expected),
+    by = "parasite", relationship="many-to-many"
+  ) ->
+  parameters
+
+parameters |>
+  vary_n_analysis(cl=10, iters=iterations, increment=1) ->
+  res
+
+res |>
+  plot_data_cost() |>
+  filter(name=="Performance", value>0.5, value<0.95) |>
+  ggplot(aes(x=MeanCost, y=value*100, col=design)) +
+  geom_line() +
+  facet_grid(setting~endemicity, scales="free") +
+  geom_hline(yintercept = 80, lty="dashed") +
+  ylab("Performance (%)")
+ggsave("figS1_rough.pdf", width=12, height=6)
+
+
+
+############################################
+## Re-create figure S2
+############################################
+
+expand_grid(
+  parameters_scenario |> filter(parasite=="hookworm", endemicity!=2),
+  parameters_fixed |> filter(min_positive%in%c(1)),
+  parameters_cost |> filter(setting == "Ethiopia"),
+  parameters_dropadd |> filter(force_inclusion_prob == 0),
+  parameters_analysis |> filter(analysis_type=="delta")
+) |>
+  add_mean_and_cv() |>
+  left_join(
+    parameters_thresholds |> filter(drug=="ALB", framework=="FHT") |> mutate(true_efficacy = efficacy_expected),
+    by = "parasite", relationship="many-to-many"
+  ) ->
+  parameters
+
+parameters |>
+  vary_n_analysis(cl=10, iters=iterations, increment=1) ->
+  res
+
+res |>
+  plot_data_cost() |>
+  filter(name=="Performance", value>0.5, value<0.95) |>
+  ggplot(aes(x=MeanCost, y=value*100, col=design)) +
+  geom_line() +
+  facet_grid(dropout~endemicity, scales="free") +
+  geom_hline(yintercept = 80, lty="dashed") +
+  ylab("Performance (%)")
+ggsave("figS2_rough.pdf", width=12, height=6)
+
+
+############################################
+## Re-create figure S3
+############################################
+
+expand_grid(
+  parameters_scenario |> filter(parasite=="hookworm", endemicity!=2),
+  parameters_fixed |> filter(min_positive%in%c(1), design=="SSR_12"),
+  parameters_cost |> filter(setting == "Ethiopia"),
+  parameters_dropadd |> filter(dropout == "baseline"),
+  parameters_analysis |> filter(analysis_type=="delta")
+) |>
+  add_mean_and_cv() |>
+  left_join(
+    parameters_thresholds |> filter(drug=="ALB", framework=="FHT") |> mutate(true_efficacy = efficacy_expected),
+    by = "parasite", relationship="many-to-many"
+  ) ->
+  parameters
+
+parameters |>
+  vary_n_analysis(cl=10, iters=iterations, increment=1) ->
+  res
+
+res |>
+  plot_data_cost() |>
+  filter(name=="Performance", value>0.5, value<0.95) |>
+  ggplot(aes(x=MeanCost, y=value*100, col=factor(force_inclusion_prob))) +
+  geom_line() +
+  facet_wrap(~endemicity, scales="free") +
+  geom_hline(yintercept = 80, lty="dashed") +
+  ylab("Performance (%)")
+ggsave("figS3_rough.pdf", width=12, height=6)
+
+
+
+############################################
+## Re-create figure 4
+############################################
+
+expand_grid(
+  parameters_scenario |> filter(endemicity==15),
+  parameters_fixed |> filter(min_positive%in%c(1)),
+  parameters_cost |> filter(setting == "Ethiopia"),
+  parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob==0),
+  parameters_analysis |> filter(analysis_type=="delta")
+) |>
+  add_mean_and_cv() |>
+  left_join(
+    parameters_thresholds |> filter(framework=="FHT", parasite=="hookworm" | drug=="ALB") |> mutate(true_efficacy = efficacy_expected),
+    by = "parasite", relationship="many-to-many"
+  ) ->
+  parameters
+
+parameters |>
+  vary_n_analysis(cl=10, iters=iterations, increment=1) ->
+  res
+
+res |>
+  filter(force_inclusion_prob==0) |>
+  plot_data_cost() |>
+  filter(name=="Performance", value>0.5, value<0.95) |>
+  mutate(panel = str_c(drug, " vs. ", parasite)) |>
+  ggplot(aes(x=MeanCost, y=value*100, col=design)) +
+  geom_line() +
+  facet_wrap(~panel, scales="free") +
+  geom_hline(yintercept = 80, lty="dashed") +
+  ylab("Performance (%)")
+ggsave("fig4_rough.pdf", width=9, height=8)
+
+
+
