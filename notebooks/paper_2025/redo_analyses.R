@@ -310,16 +310,10 @@ set.seed(2025-03-05)
 
 cols <- c(gg_colour_hue(3),"grey50")
 names(cols) <- c("Reduced","Adequate","Inconclusive","Failed")
+cols <- c("Reduced" = "#F8766D", "Inconclusive" = "#00BFC4", "Adequate" = "#7CAE00")
 
 expand_grid(
-  n_individ = c(10, 25, 50, 100, 250, 500),
-  min_positive = c(1, 10, 50),
-  endemicity = c(15, 35, 65),
-) ->
-  all
-
-expand_grid(
-  n_individ = c(75, 150, 300),
+  n_individ = c(100, 250, 300, 500),
   min_positive = c(1),
   endemicity = c(15),
 ) ->
@@ -407,27 +401,50 @@ all |>
 
   }) ->
   plots
-qsave(plots, "notebooks/paper_2025/fig1_res.rqs")
+#qsave(plots, "notebooks/paper_2025/fig1_res.rqs")
 
 plots |>
   lapply(\(x) x$data) |>
   bind_rows() |>
+  filter(n_individ==300) |>
   filter(classification != "Failed") |>
   mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
   group_by(efficacy_expected, analysis, true_efficacy, n_individ) |>
   arrange(classification) |>
   mutate(total = sum(tally), ymax = cumsum(tally/total), ymin = lag(ymax, default=0)) |>
   mutate(type = str_c(analysis, " - ", efficacy_expected) |> fct()) |>
+  mutate(type = factor(type,
+                       levels=c("mean - 0.9", "hypothesis - 0.9", "mean - 0.962", "hypothesis - 0.962"),
+                       labels=c(
+                         expression("A: Point estimate with T"[l] *"="* " 80% T"[u] *"="* " 90%"),
+                         expression("B: Hypothesis testing with T"[l] *"="* " 80% T"[u] *"="* " 90%"),
+                         expression("C: Point estimate with T"[l] *"="* " 86.2% T"[u] *"="* " 96.2%"),
+                         expression("D: Hypothesis testing with T"[l] *"="* " 86.2% T"[u] *"="* " 96.2%")
+                        )
+  )) |>
   ungroup() |>
-  ggplot(aes(x=true_efficacy, ymin=ymin, ymax=ymax, fill=classification)) +
+  ggplot(aes(x=true_efficacy*100, ymin=ymin*100, ymax=ymax*100, fill=classification)) +
   geom_ribbon() +
-  facet_grid(type ~ n_individ) +
-  theme_bw() +
-  geom_vline(aes(xintercept=efficacy_expected)) +
-  geom_vline(aes(xintercept=efficacy_expected-0.1)) +
-  geom_hline(yintercept=c(0.05,0.95))
-ggsave("fig1_rough.pdf", height=8, width=10)
+  facet_wrap( ~ type, labeller = label_parsed) +
+  # geom_hline(yintercept=c(0.05,0.95)) +
+  geom_vline(aes(xintercept=efficacy_expected*100)) +
+  geom_vline(aes(xintercept=efficacy_expected*100-10), lty="dashed") +
+  theme_minimal() +
+  scale_fill_manual(values=cols, guide = guide_legend(reverse = TRUE)) +
+  labs(x = "True efficacy (%)",
+       y = "Proportion of iterations (%)",
+       fill = "Efficacy classification") +
+  theme_minimal() +
+  theme(strip.text = element_text(size = 12), legend.title = element_text(size = 12))
+ggsave("fig1.pdf", height=8, width=10)
 
+expand_grid(
+  parameters_scenario |> filter(parasite=="hookworm", endemicity==15),
+  parameters_fixed,
+  parameters_cost |> filter(setting == "Ethiopia")
+) |>
+  add_mean_and_cv() |>
+  distinct(endemicity, mean_epg)
 
 
 ############################################
