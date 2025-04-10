@@ -27,7 +27,7 @@ library("eggSim")
 iterations <- 1e4
 cl <- 10
 individ_min <- 10
-individ_increment <- 5
+individ_increment <- 1
 performance_max <- 0.999
 
 expand_grid(
@@ -403,6 +403,7 @@ all |>
   plots
 #qsave(plots, "notebooks/paper_2025/fig1_res.rqs")
 
+## Figure 1:
 plots |>
   lapply(\(x) x$data) |>
   bind_rows() |>
@@ -446,45 +447,50 @@ expand_grid(
   add_mean_and_cv() |>
   distinct(endemicity, mean_epg)
 
+## New figure S1:
+plots |>
+  lapply(\(x) x$data) |>
+  bind_rows() |>
+  filter(n_individ!=300) |>
+  filter(classification != "Failed") |>
+  mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
+  group_by(efficacy_expected, analysis, true_efficacy, n_individ) |>
+  arrange(classification) |>
+  mutate(total = sum(tally), ymax = cumsum(tally/total), ymin = lag(ymax, default=0)) |>
+  mutate(type = str_c(analysis, " - ", efficacy_expected) |> fct()) |>
+  mutate(type = factor(type,
+                       levels=c("mean - 0.9", "hypothesis - 0.9", "mean - 0.962", "hypothesis - 0.962"),
+                       labels=c(
+                         expression(atop("A: Point estimate with", "T"[l] *"="* " 80% T"[u] *"="* " 90%")),
+                         expression(atop("B: Hypothesis testing with", "T"[l] *"="* " 80% T"[u] *"="* " 90%")),
+                         expression(atop("C: Point estimate with", "T"[l] *"="* " 86.2% T"[u] *"="* " 96.2%")),
+                         expression(atop("D: Hypothesis testing with", "T"[l] *"="* " 86.2% T"[u] *"="* " 96.2%"))
+                       )
+  )) |>
+  mutate(n_individ = factor(n_individ, levels=c(100,250,500), labels=c(
+    expression("N "*"="*" 100"), expression("N "*"="*" 250"), expression("N "*"="*" 500")))
+  ) |>
+  ungroup() |>
+  ggplot(aes(x=true_efficacy*100, ymin=ymin*100, ymax=ymax*100, fill=classification)) +
+  geom_ribbon() +
+  facet_grid(n_individ ~ type, labeller = label_parsed) +
+  geom_segment(aes(y=5, x=50, xend=efficacy_expected*100-10), lty="dotted") +
+  geom_segment(aes(y=95, x=efficacy_expected*100, xend=100), lty="dotted") +
+  geom_vline(aes(xintercept=efficacy_expected*100)) +
+  geom_vline(aes(xintercept=efficacy_expected*100-10), lty="dashed") +
+  theme_minimal() +
+  scale_fill_manual(values=cols, guide = guide_legend(reverse = TRUE)) +
+  labs(x = "True efficacy (%)",
+       y = "Proportion of iterations (%)",
+       fill = "Efficacy classification") +
+  theme_minimal() +
+  theme(strip.text = element_text(size = 12), legend.title = element_text(size = 12))
+ggsave("figS1.pdf", height=8, width=12)
+
+
 
 ############################################
-## New figure 2
-############################################
-
-# TODO: drop
-
-expand_grid(
-  parameters_scenario |> filter(parasite=="hookworm"),
-  parameters_fixed,
-  parameters_cost |> filter(setting == "Ethiopia"),
-  parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
-  parameters_analysis |> filter(analysis_type=="delta")
-) |>
-  add_mean_and_cv() |>
-  left_join(
-    parameters_thresholds |> filter(drug=="ALB", framework=="FHT") |> mutate(true_efficacy = efficacy_expected),
-    by = "parasite", relationship="many-to-many"
-  ) ->
-  parameters
-
-parameters |>
-  vary_n_analysis(cl=10, iters=iterations) ->
-  res
-qsave(res, "notebooks/paper_2025/fig2_res.rqs")
-
-res |>
-  plot_data_cost() |>
-  filter(name=="Performance", value>0.5, value<0.95) |>
-  ggplot(aes(x=MeanCost, y=value, col=design)) +
-  geom_line() +
-  facet_grid(min_positive ~ endemicity, scales="free") +
-  geom_hline(yintercept = 0.8, lty="dashed")
-ggsave("fig2_rough.pdf", width=15, height=20)
-
-
-
-############################################
-## Re-create figure 2 (now 3)
+## Re-create figure 2
 ############################################
 
 expand_grid(
