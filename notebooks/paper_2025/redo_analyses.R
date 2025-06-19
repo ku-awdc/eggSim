@@ -13,10 +13,10 @@ theme_set(theme_light())
 library("qs")
 
 ## The eggSim package currently must be installed from github
-if(!requireNamespace("eggSim")){
-  remotes::install_github("ku-awdc/eggSim")
-}
+## (bayescount-link branch, which requires an in-development version of bayescount)
+# if(!requireNamespace("eggSim")) remotes::install_github("ku-awdc/eggSim")
 library("eggSim")
+if(packageVersion("eggSim") < "0.9.7") stop("You need to install the bayescount-link branch of eggSim")
 
 
 ############################################
@@ -304,8 +304,6 @@ plot_data_ss <- function(res){
 ## Recreate figure 1
 ############################################
 
-# TODO: main figure just with 300 children; move 100, 150, 250 or smth to appendix (new S1)
-
 set.seed(2025-03-05)
 
 cols <- c(gg_colour_hue(3),"grey50")
@@ -515,25 +513,26 @@ expand_grid(
 parameters |>
   vary_n_analysis(cl=10, iters=iterations) ->
   res
+# qsave(res, "notebooks/paper_2025/fig2_res.rqs")
 
 LETTERS[1:4] |>
   lapply(\(x){
     if(x=="A"){
       res |>
         filter(setting == "Ethiopia", dropout == "baseline", force_inclusion_prob == 0) |>
-        mutate(Panel = x)
+        mutate(Panel = "A: Ethiopian cost")
     }else if(x=="B"){
       res |>
         filter(setting == "Tanzania", dropout == "baseline", force_inclusion_prob == 0) |>
-        mutate(Panel = x)
+        mutate(Panel = "B: Tanzanian cost")
     }else if(x=="C"){
       res |>
         filter(setting == "Ethiopia", force_inclusion_prob == 0, dropout != "baseline") |>
-        mutate(Panel = x)
+        mutate(Panel = "C: Drop-outs")
     }else if(x=="D"){
       res |>
-        filter(setting == "Ethiopia", dropout == "baseline", design=="SSR_12") |>
-        mutate(Panel = x)
+        filter(setting == "Ethiopia", dropout == "baseline", design=="SSR_12", force_inclusion_prob%in%c(0,0.1,0.2)) |>
+        mutate(Panel = "D: Assessing multiple STH")
     }else{
       stop("ERROR")
     }
@@ -541,12 +540,16 @@ LETTERS[1:4] |>
   bind_rows() |>
   filter(endemicity==2) |>
   plot_data_cost() |>
-  filter(name=="Performance", value>0.5, value<0.95) |>
-  ggplot(aes(x=MeanCost, y=value, col=design, lty=factor(force_inclusion_prob))) +
+  filter(name=="Performance") |> #, value>0.5, value<0.95) |>
+  mutate(design = fct(design, levels=c("NS_11","NS_12","SSR_11","SSR_12"))) |>
+  ggplot(aes(x=MeanCost/1e3, y=value*1e2, col=design, lty=str_c(force_inclusion_prob*100,"%")), parse=TRUE) +
   geom_line() +
-  facet_wrap(~Panel, scales="free") +
-  geom_hline(yintercept = 0.8, lty="dashed")
-ggsave("fig3_rough.pdf", width=9, height=8)
+  facet_wrap(~Panel, scales="fixed") +
+  geom_hline(yintercept = c(80,100), lty="dashed") +
+  labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Performance (%)") +
+  scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
+  guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
+ggsave("fig3.pdf", width=7, height=6)
 
 
 # TODO: go with figure 3 as in old MS
