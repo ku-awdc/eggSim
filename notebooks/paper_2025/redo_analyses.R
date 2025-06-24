@@ -1,7 +1,7 @@
 ############################################
 ##
 ## Script to re-generate analysis/results
-## Matt Denwood, 2025-03-05
+## Matt Denwood, 2025-06-24
 ## This file is distributed as part of eggSim
 ## License:  GPL-3
 ##
@@ -18,6 +18,8 @@ library("qs")
 library("eggSim")
 if(packageVersion("eggSim") < "0.9.7") stop("You need to install the bayescount-link branch of eggSim")
 
+library("pbapply")
+pboptions(use_lb=TRUE)
 
 ############################################
 ## Parameter values
@@ -579,15 +581,19 @@ parameters |>
 
 res |>
   plot_data_cost() |>
-  filter(name=="Performance", value>0.5, value<0.95) |>
+  filter(name=="Performance") |> #, value>0.5, value<0.95) |>
   ggplot(aes(x=MeanCost, y=value*100, col=design)) +
   geom_line() +
-  facet_grid(setting~endemicity, scales="free") +
+  facet_grid(setting~endemicity, scales="fixed") +
   geom_hline(yintercept = 80, lty="dashed") +
-  ylab("Performance (%)")
+  ylab("Performance (%)") + xlim(0,10000) + ylim(50,100)
 ggsave("figS1_rough.pdf", width=12, height=6)
 
+## TODO: Figure 3 should be 4x4 as it is,
+## New Figure S1 should replace S1/S2, and have 3 rows: Ethiopia wo dropout, Tanzania wo dropout, Ethiopia with dropout
+## All to have 50,100 ylim, 0-10000 xlim, dashed lines at 80% dash and 90% dot
 
+## Figure S3 as it is but with above ylim/xlim
 
 ############################################
 ## Re-create figure S2
@@ -695,3 +701,33 @@ ggsave("fig4_rough.pdf", width=9, height=8)
 
 # NOTE: none of the figures should have anything other than min_positive=1
 
+
+## TODO: Table S2:  add all padd values, and ethiopia & tanzanian costs, all 4 - should be 1300 rows
+## Add colum for difference in cost and sample size compared to optimal design for that combo
+
+## New figure with sample size x, mean cost, performance, var cost on y (rows), design in cols?
+
+
+############################################
+## Re-create Table S2
+############################################
+
+
+expand_grid(
+  parameters_scenario |> filter(endemicity%in%c(5,15,35,65)),
+  parameters_fixed |> filter(min_positive%in%c(1)),
+  parameters_cost, # |> filter(setting == "Ethiopia"),
+  parameters_dropadd |> filter(force_inclusion_prob==0) |> select(starts_with("dropout")),
+  parameters_dropadd |> filter(dropout=="baseline") |> select(!starts_with("dropout")),
+  parameters_analysis |> filter(analysis_type=="delta")
+) |>
+  add_mean_and_cv() |>
+  left_join(
+    parameters_thresholds |> filter(framework=="FHT") |> mutate(true_efficacy = efficacy_expected),
+    by = "parasite", relationship="many-to-many"
+  ) ->
+  parameters
+
+parameters |>
+  vary_n_analysis(cl=10L, iters=iterations, increment=1) ->
+  res
