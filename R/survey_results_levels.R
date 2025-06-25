@@ -15,6 +15,7 @@ survey_results_levels <- function(){
         "FailZeroPre", "The survey failed due to zero pre-treatment counts. Note that this classification takes precedence over FailPositiveScreen and FailPositivePre.",
         "FailPositiveScreen", "The survey failed because the number of positive individuals at screening was lower than the specified min_positive_screen parameter. This only applies to the SSR design.",
         "FailPositivePre", "The survey failed because the number of positive individuals at pre-treatment was lower than the specified min_positive_pre parameter.",
+        "FailNoPost", "The survey failed because fewer than 2 individuals were sampled at both pre- and post-treatment (due to e.g. dropouts).",
         "EfficacyBelowLT", "The observed efficacy was below the specified efficacy_lower_target parameter. This only applies to the mean analysis method.",
         "EfficacyAboveLT", "The observed efficacy was equal to or above the specified efficacy_lower_target parameter. This only applies to the mean analysis method (and the remaining classifications do not apply for the mean analysis method).",
         "ClassifyFail", "The survey succeeded but the delta method failed to produce valid confidence intervals for the data, either because of a 100% observed reduction or perfect correlation between pre- and post-treatment data.",

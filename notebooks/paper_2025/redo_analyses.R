@@ -203,7 +203,7 @@ fix_n_analysis <- function(parameters, iters=iterations, increment=individ_incre
       stopifnot(nrow(scenario)==1L || length(pp)==1L)
 
       survey_sim(
-        n_individ = seq(scenario$individ_min, scenario$individ_max, by=increment),
+        n_individ = seq(scenario$individ_min[1], scenario$individ_max[1], by=increment),
         scenario = scenario,
         parameters = pp,
         iterations = iters,
@@ -233,6 +233,7 @@ vary_n_analysis <- function(parameters, iters=iterations, increment=individ_incr
     pbapply::pblapply(function(i){
     #lapply(function(i){
 
+      try({
       if(is.null(cl)) cat("Parameter cluster ", i, " of ", length(pars), "...\n", sep="")
 
       capture.output({
@@ -248,7 +249,7 @@ vary_n_analysis <- function(parameters, iters=iterations, increment=individ_incr
       pilot |>
         filter(predict > performance_max) ->
         perf_ok
-      if(nrow(perf_ok)==0L) browser()
+      if(nrow(perf_ok)==0L) return(pars[[i]] |> mutate(Status = "PerfNotOK"))
       perf_ok |>
         arrange(n_individ) |>
         slice(1) |>
@@ -270,11 +271,27 @@ vary_n_analysis <- function(parameters, iters=iterations, increment=individ_incr
       res |>
         bind_cols(
           pars[[i]][,mn]
-        )
-    #}) |>
-    }, cl=cl) |>
-  bind_rows() |>
-    ungroup()
+        ) |>
+        mutate(Status = "OK") ->
+        out
+      }) -> ss
+
+      if(inherits(ss, "try-error")) return(pars[[i]] |> mutate(Status = "Failed", MSG = as.character(ss)))
+
+      return(out)
+
+    #}) ->
+    }, cl=cl) ->
+    out
+
+  ss <- try({
+    out |>
+      bind_rows() |>
+      ungroup() ->
+      out
+  })
+
+  return(out)
 }
 
 
@@ -345,7 +362,7 @@ all |>
       ) |>
       mutate(individ_min = x$n_individ, individ_max = x$n_individ) |>
       mutate(min_positive_pre = x$min_positive) |>
-      vary_n_analysis(iters=iterations, cl=cl) ->
+      fix_n_analysis(iters=iterations, cl=cl) ->
       fig_1_data
 
     fig_1_data |>

@@ -59,6 +59,7 @@ std::vector<std::string> GetResultsLevels()
       ResultToString(Results::zero_pre),
       ResultToString(Results::few_screen),
       ResultToString(Results::few_pre),
+      ResultToString(Results::no_post),
       ResultToString(Results::efficacy_below),
       ResultToString(Results::efficacy_above),
       ResultToString(Results::class_fail),

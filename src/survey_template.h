@@ -127,6 +127,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
     Rcpp::IntegerVector n_result_7(ol);
     Rcpp::IntegerVector n_result_8(ol);
     Rcpp::IntegerVector n_result_9(ol);
+    Rcpp::IntegerVector n_result_10(ol);
     Rcpp::IntegerVector n_total(ol);
 
     Rcpp::IntegerVector n_below_cutoffs(ol);
@@ -249,7 +250,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
         mean_days[ind] += (static_cast<double>(ndays) - mean_days[ind]) / n_total[ind];
 
         // TODO: cleanup somehow
-        if(result_ll[i] > 9L || result_ll[i] < 0L) Rcpp::stop("Unhandled result_ll");
+        if(result_ll[i] > 10L || result_ll[i] < 0L) Rcpp::stop("Unhandled result_ll");
         n_result_0[ind] += static_cast<int>(result_ll[i] == 0L);
         n_result_1[ind] += static_cast<int>(result_ll[i] == 1L);
         n_result_2[ind] += static_cast<int>(result_ll[i] == 2L);
@@ -260,6 +261,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
         n_result_7[ind] += static_cast<int>(result_ll[i] == 7L);
         n_result_8[ind] += static_cast<int>(result_ll[i] == 8L);
         n_result_9[ind] += static_cast<int>(result_ll[i] == 9L);
+        n_result_10[ind] += static_cast<int>(result_ll[i] == 10L);
 
         // Only use these if the scenario was successful:
         if (ResultIsSuccess(result_ll[i]))
@@ -346,6 +348,7 @@ Rcpp::DataFrame survey_template(const Rcpp::IntegerVector& all_ns, const Rcpp::D
                             Rcpp::_["n_result_4"] = n_result_4, Rcpp::_["n_result_5"] = n_result_5,
                             Rcpp::_["n_result_6"] = n_result_6, Rcpp::_["n_result_7"] = n_result_7,
                             Rcpp::_["n_result_8"] = n_result_8, Rcpp::_["n_result_9"] = n_result_9,
+                            Rcpp::_["n_result_10"] = n_result_10,
                             Rcpp::_["n_success"] = n_success, Rcpp::_["n_total"] = n_total );
 
     Rcpp::Environment pkg = Rcpp::Environment::namespace_env("dplyr");

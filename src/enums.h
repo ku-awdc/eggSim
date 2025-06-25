@@ -10,6 +10,7 @@ enum class Results {
   zero_pre, // Failure due to zero mean pre-treatment
   few_screen, // Failure due to insufficient screening positive
   few_pre, // Failure due to insufficient pre-treatment positive
+  no_post, // Failure due to <2 individuals surviving to post-treatment (all but max 1 dropped out)
   efficacy_below, // Where no test is applied but the efficacy is below the lower target
   efficacy_above, // Where no test is applied but the efficacy is greater than or equal to the lower target
   class_fail, // Unable to apply the test/classification due to 100% reduction or something similar
@@ -27,6 +28,7 @@ constexpr const char* ResultToString(Results result)
         case Results::zero_pre: return "FailZeroPre";
         case Results::few_screen: return "FailPositiveScreen";
         case Results::few_pre: return "FailPositivePre";
+        case Results::no_post: return "FailNoPost";
         case Results::efficacy_below: return "EfficacyBelowLT"; // Only for mean method
         case Results::efficacy_above: return "EfficacyAboveLT"; // Only for mean method (actually above or equal to)
         case Results::class_fail: return "ClassifyFail"; // This and below only for delta method
@@ -45,6 +47,7 @@ constexpr const bool ResultIsSuccess(Results result)
         case Results::zero_pre: return false;
         case Results::few_screen: return false;
         case Results::few_pre: return false;
+        case Results::no_post: return false;
         case Results::efficacy_below: return true; // Only for mean method
         case Results::efficacy_above: return true; // Only for mean method (actually above or equal to)
         case Results::class_fail: return true; // NOTE: this is a success in that means can be calculated
@@ -61,16 +64,17 @@ constexpr const bool ResultIsSuccess(const int result)
 {
     switch (result)
     {
-        case 0L: return false; // Results::zero_pre
-        case 1L: return false; // Results::few_screen
-        case 2L: return false; // Results::few_pre
-        case 3L: return true; // Results::efficacy_below
-        case 4L: return true; // Results::efficacy_above
-        case 5L: return true; // Results::class_fail
-        case 6L: return true; // Results::resistant
-        case 7L: return true; // Results::low_resistant
-        case 8L: return true; // Results::inconclusive
-        case 9L: return true; // Results::susceptible
+        case 0: return false; // Results::zero_pre
+        case 1: return false; // Results::few_screen
+        case 2: return false; // Results::few_pre
+        case 3: return false; // Results::no_post
+        case 4: return true; // Results::efficacy_below
+        case 5: return true; // Results::efficacy_above
+        case 6: return true; // Results::class_fail
+        case 7: return true; // Results::resistant
+        case 8: return true; // Results::low_resistant
+        case 9: return true; // Results::inconclusive
+        case 10: return true; // Results::susceptible
         default: Rcpp::stop("Unimplemented result in ResultIsSuccess");
     }
 }

@@ -80,9 +80,6 @@ private:
   // Mean counts within individual:
   std::array<double, m_tp> m_mean_count = {};  // Zero-initialise
 
-  // Only needed for BNB method:
-  int m_sum_pre = 0;
-
   // Allow extraction of int/double stats when we haven't yet hit the thresholds:
   template <typename T, size_t N>
   const std::array<double, N> apply_minimums(const std::array<T, N> input, const double replacement) const noexcept
@@ -146,12 +143,12 @@ private:
   // Underlying functions for the delta methods of obtaining CI:
   std::array<double, 2L> levecke_ci() const
   {
-    const double mu1 = m_means_pp[0L];
-    const double mu2 = m_means_pp[1L];
-    const double n = static_cast<double>(m_num_pp-1L);
-    const double var1 = m_varn_pp[0L] / n;
-    const double var2 = m_varn_pp[1L] / n;
-    const double cov12 = std::min(0.99, m_covn_pp / n); // stop perfect correlations breaking things
+    const double mu1 = m_means_pp[0];
+    const double mu2 = m_means_pp[1];
+    const double n = static_cast<double>(m_num_pp);
+    const double var1 = m_varn_pp[0] / static_cast<double>(m_num_pp-1);
+    const double var2 = m_varn_pp[1] / static_cast<double>(m_num_pp-1);
+    const double cov12 = std::min(0.99, m_covn_pp / static_cast<double>(m_num_pp-1)); // stop perfect correlations breaking things
 
     std::array<double, 2L> rv;
     if constexpr (t_paired)
@@ -188,12 +185,12 @@ private:
 
   std::array<double, 2L> waavp_ci() const
   {
-    const double mu1 = m_means_pp[0L];
-    const double mu2 = m_means_pp[1L];
-    const double n = static_cast<double>(m_num_pp-1L);
-    const double var1 = m_varn_pp[0L] / n;
-    const double var2 = m_varn_pp[1L] / n;
-    const double cov12 = std::min(0.99, m_covn_pp / n); // stop perfect correlations breaking things
+    const double mu1 = m_means_pp[0];
+    const double mu2 = m_means_pp[1];
+    const double n = static_cast<double>(m_num_pp);
+    const double var1 = m_varn_pp[0] / static_cast<double>(m_num_pp-1);
+    const double var2 = m_varn_pp[1] / static_cast<double>(m_num_pp-1);
+    const double cov12 = std::min(0.99, m_covn_pp / static_cast<double>(m_num_pp-1)); // stop perfect correlations breaking things
 
     std::array<double, 2L> rv;
     if constexpr (t_paired)
@@ -284,7 +281,6 @@ public:
 
   void add_count_pre(const int count) noexcept
   {
-    m_sum_pre += count;
     const double dcount = static_cast<const double>(count);
     add_time(dcount, m_tpre);
     m_is_pos[m_tpre] = m_is_pos[m_tpre] || (count > 0L);
@@ -316,6 +312,7 @@ public:
 
   CountReturn get_result() const
   {
+
     CountReturn rv;
 
     if constexpr (t_method == methods::delta) {
@@ -332,6 +329,16 @@ public:
 
         rv.result = Results::few_pre;
 
+      } else if (m_num_pp < 2) {
+
+        // Variance isn't defined for either 0 or 1 individual (can happen with dropouts):
+        rv.result = Results::no_post;
+
+      } else if (m_varn_pp[0] == 0.0 || (m_total_pos[m_tpost] > 0 && m_varn_pp[1] == 0.0)) {
+        
+        // Pre-treatment k isn't defined and variance (both pre/post) is unreliable:
+        rv.result = Results::class_fail;
+
       /*
       } else if (m_total_pos[m_tpost] == 0L) {
 
@@ -343,33 +350,22 @@ public:
 //        const std::array<double, 2L> ci = levecke_ci();
         const std::array<double, 2L> ci = waavp_ci();
 
-        rv.target_stat = ci[1L];
-        rv.lower_stat = ci[0L];
+        rv.target_stat = ci[1];
+        rv.lower_stat = ci[0];
 
         // If zero-mean post-treatment use BNB:
         if ( m_total_pos[m_tpost] == 0 ) {
 
-          //   inline std::array<double, 2> bnb_pval(int sum1, int N1, double K1, double mu1, double var1, int sum2, int N2, double K2, double mu2, double var2, double cov12, double mean_ratio, double H0_1, double H0_2, std::array<double, 2> const& conjugate_priors, int delta, int beta_iters, int approx){
-          const int sum1 = m_sum_pre;
-          const int N = m_num_pp-1;
-          const double mu1 = m_means_pp[0L];
-          const double var1 = m_varn_pp[0L] / static_cast<double>(N);
+          // inline double bnb_pval_100(double const sum1, double const N1, double const N2, double const K, double const mean_ratio, double const H0){
+          const double N = static_cast<double>(m_num_pp);
+          const double mu1 = m_means_pp[0];
+          const double var1 = m_varn_pp[0] / static_cast<double>(m_num_pp-1);
+          const double sum1 = mu1*N;
 
           // Cheat a bit and make sure k is not more than 10:
           const double vareff = std::max(var1-mu1, mu1*mu1*0.1);
           // Calculate pre-treatment K:
-          const double K1 = (mu1 * mu1) / (vareff);
-
-          // Option to cheat a bit and artificially add correlation:
-          const double correlation = 0.0;
-          // Calculate effective post-treatment K:
-          const double K2 = (mu1 * mu1) / (vareff * (1.0 - correlation));
-
-          constexpr int sum2 = 0;
-          // All are ignored if sum2 is 0:
-          constexpr double mu2 = 0.0;
-          constexpr double var2 = 0.0;
-          constexpr double cov12 = 0.0;
+          const double K = (mu1 * mu1) / (vareff);
 
           // This only works for the specifically templated designs:
           if constexpr (t_post_mult==0)
@@ -377,30 +373,23 @@ public:
             Rcpp::stop("BNB method for non-templated designs (unknown mean ratio) needs fixing");
           }
           constexpr double mean_ratio = static_cast<double>(t_post_mult);
-          double H0_1 = m_count_params.Teff;
-          double H0_2 = m_count_params.Tlow;
+          double const H0 = m_count_params.Tlow;
 
-          constexpr std::array<double, 2> conjpri = {0.0, 0.0};
-          constexpr int delta = 1;
-          constexpr int beta_iters = 1000;
-          constexpr int approx = 1;
+          double const pval = bayescount::bnb_pval_100(sum1, N, N, K, mean_ratio, H0);
 
-          std::array<double, 2> pvals = bayescount::bnb_pval(
-            sum1, N, K1, mu1, var1,
-            sum2, N, K2, mu2, var2,
-            cov12,
-            mean_ratio, H0_1, H0_2,
-            conjpri, delta, beta_iters, approx);
+          if( !R_finite(pval) || std::abs(sum1 - (mu1*N)) > 0.001){
+            std::string msg = std::format("Error with following parameters: sum1={0}, m_num_pp={1}, m_means_pp[0]={2}, m_varn_pp[0]={3}, vareff={4} -> pval={5}", sum1, m_num_pp, m_means_pp[0], m_varn_pp[0], vareff, pval);
+            Rcpp::Rcout << msg << "\n";
+            Rcpp::warning(msg);
+          }
 
-          rv.target_stat = pvals[1L];
-          rv.lower_stat = pvals[0L];
+          // NB: only the lower p-value is relevant as we are only using this for 100% observed reduction!
+          rv.target_stat = NA_REAL;
+          rv.lower_stat = pval;
 
-          // NB: only the first p-value is relevant as we are only using this for 100% observed reduction!
-//          if ( true) {
-
-          if ( Rcpp::NumericVector::is_na(pvals[0L]) ) {
+          if ( Rcpp::NumericVector::is_na(pval) ) {
             rv.result = Results::class_fail;
-          } else if (pvals[0L] < m_count_params.tail) {
+          } else if (pval < m_count_params.tail) {
             rv.result = Results::susceptible;
           } else {
             rv.result = Results::inconclusive;

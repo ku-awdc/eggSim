@@ -44,4 +44,4 @@ VignetteBuilder: knitr
 Language: en-GB
 LinkingTo: 
     Rcpp,
-    bayescount (>= 1.2.0)
+    bayescount (>= 1.2.1-2)
