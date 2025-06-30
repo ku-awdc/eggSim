@@ -330,7 +330,7 @@ names(cols) <- c("Reduced","Adequate","Inconclusive","Failed")
 cols <- c("Reduced" = "#F8766D", "Inconclusive" = "#00BFC4", "Adequate" = "#7CAE00")
 
 expand_grid(
-  n_individ = c(100, 250, 300, 500),
+  n_individ = c(20, 50, 100, 250, 300, 500),
   min_positive = c(1),
   endemicity = c(15),
 ) ->
@@ -445,6 +445,8 @@ plots |>
   geom_ribbon() +
   facet_wrap( ~ type, labeller = label_parsed) +
   # geom_hline(yintercept=c(0.05,0.95)) +
+  geom_segment(aes(y=5, x=50, xend=efficacy_expected*100-10), lty="dotted") +
+  geom_segment(aes(y=95, x=efficacy_expected*100, xend=100), lty="dotted") +
   geom_vline(aes(xintercept=efficacy_expected*100)) +
   geom_vline(aes(xintercept=efficacy_expected*100-10), lty="dashed") +
   theme_minimal() +
@@ -453,8 +455,9 @@ plots |>
        y = "Proportion of iterations (%)",
        fill = "Efficacy classification") +
   theme_minimal() +
-  theme(strip.text = element_text(size = 12), legend.title = element_text(size = 12))
-ggsave("fig1.pdf", height=8, width=10)
+  # theme(strip.text = element_text(size = 12), legend.title = element_text(size = 12), legend.position = "bottom")
+  theme(strip.text = element_text(size = 12), legend.title = element_blank(), legend.position = "bottom")
+ggsave("notebooks/paper_2025/fig1.pdf", height=8, width=10)
 
 expand_grid(
   parameters_scenario |> filter(parasite=="hookworm", endemicity==15),
@@ -468,7 +471,7 @@ expand_grid(
 plots |>
   lapply(\(x) x$data) |>
   bind_rows() |>
-  filter(n_individ!=300) |>
+  filter(n_individ!=300, n_individ>=100) |>
   filter(classification != "Failed") |>
   mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
   group_by(efficacy_expected, analysis, true_efficacy, n_individ) |>
@@ -484,8 +487,8 @@ plots |>
                          expression(atop("D: Hypothesis testing with", "T"[l] *"="* " 86.2% T"[u] *"="* " 96.2%"))
                        )
   )) |>
-  mutate(n_individ = factor(n_individ, levels=c(100,250,500), labels=c(
-    expression("N "*"="*" 100"), expression("N "*"="*" 250"), expression("N "*"="*" 500")))
+  mutate(n_individ = factor(n_individ, levels=c(20,50,100,250,500), labels=c(
+    expression("N "*"="*" 20"), expression("N "*"="*" 50"), expression("N "*"="*" 100"), expression("N "*"="*" 250"), expression("N "*"="*" 500")))
   ) |>
   ungroup() |>
   ggplot(aes(x=true_efficacy*100, ymin=ymin*100, ymax=ymax*100, fill=classification)) +
@@ -501,8 +504,16 @@ plots |>
        y = "Proportion of iterations (%)",
        fill = "Efficacy classification") +
   theme_minimal() +
-  theme(strip.text = element_text(size = 12), legend.title = element_text(size = 12))
-ggsave("figS1.pdf", height=8, width=12)
+  #theme(strip.text = element_text(size = 12), legend.title = element_text(size = 12))
+  theme(strip.text = element_text(size = 12), legend.title = element_blank(), legend.position = "bottom")
+ggsave("notebooks/paper_2025/figS1.pdf", height=8, width=12)
+
+
+############################################
+## New figure S2
+############################################
+
+## New figure with sample size x, performance & mean cost & var cost on y (one per row), design in cols?
 
 
 
@@ -560,31 +571,37 @@ LETTERS[1:4] |>
   filter(endemicity==2) |>
   plot_data_cost() |>
   filter(name=="Performance") |> #, value>0.5, value<0.95) |>
+  {function(x){
+    x |>
+      distinct(design, force_inclusion_prob, Panel) |>
+      mutate(MeanCost = 70*1e3, value=1) |>
+      bind_rows(x)
+  }}() |>
   mutate(design = fct(design, levels=c("NS_11","NS_12","SSR_11","SSR_12"))) |>
   ggplot(aes(x=MeanCost/1e3, y=value*1e2, col=design, lty=str_c(force_inclusion_prob*100,"%")), parse=TRUE) +
   geom_line() +
   facet_wrap(~Panel, scales="fixed") +
-  geom_hline(yintercept = c(80,100), lty="dashed") +
+  geom_hline(yintercept = c(80), lty="dashed") +
+  geom_hline(yintercept = c(90), lty="dotted") +
+  coord_cartesian(ylim = c(50,100), xlim = c(0,30)) +
   labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Performance (%)") +
   scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
   guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
-ggsave("fig3.pdf", width=7, height=6)
-
-
-# TODO: go with figure 3 as in old MS
+ggsave("notebooks/paper_2025/fig2.pdf", width=7, height=6)
 
 
 ############################################
-## Re-create figure S1
+## Re-create figures 3 and S3
 ############################################
 
 expand_grid(
   parameters_scenario |> filter(parasite=="hookworm", endemicity!=2),
   parameters_fixed |> filter(min_positive%in%c(1)),
   parameters_cost,
-  parameters_dropadd |> filter(dropout=="baseline", force_inclusion_prob == 0),
+  parameters_dropadd |> filter(force_inclusion_prob == 0),
   parameters_analysis |> filter(analysis_type=="delta")
 ) |>
+  filter(dropout=="baseline" | setting=="Ethiopia") |>
   add_mean_and_cv() |>
   left_join(
     parameters_thresholds |> filter(drug=="ALB", framework=="FHT") |> mutate(true_efficacy = efficacy_expected),
@@ -595,58 +612,68 @@ expand_grid(
 parameters |>
   vary_n_analysis(cl=10, iters=iterations, increment=1) ->
   res
+# qsave(res, "notebooks/paper_2025/fig3_res.rqs")
+
+res |>
+  plot_data_cost() |>
+  filter(name=="Performance", dropout=="baseline", setting=="Ethiopia") |> #, value>0.5, value<0.95) |>
+  mutate(Panel = str_c(
+    factor(endemicity, levels=c(5,15,35,65), labels=LETTERS[1:4]) |> as.character(),
+    ": ", round(mean_epg,1), " epg; ", endemicity, "% prev."
+  )
+  ) |>
+  {function(x){
+    x |>
+      distinct(design, Panel) |>
+      mutate(MeanCost = 70*1e3, value=1) |>
+      bind_rows(x)
+  }}() |>
+  filter(!is.na(Panel)) |>
+  ggplot(aes(x=MeanCost/1e3, y=value*100, col=design)) +
+  geom_line() +
+  facet_wrap(~Panel, scales="fixed") +
+  ylab("Performance (%)") +
+  geom_hline(yintercept = c(80), lty="dashed") +
+  geom_hline(yintercept = c(90), lty="dotted") +
+  coord_cartesian(ylim = c(50,100), xlim = c(0,10)) +
+  labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Performance (%)") +
+  scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
+  guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
+ggsave("notebooks/paper_2025/fig3.pdf", width=7, height=6)
+
 
 res |>
   plot_data_cost() |>
   filter(name=="Performance") |> #, value>0.5, value<0.95) |>
-  ggplot(aes(x=MeanCost, y=value*100, col=design)) +
+  {function(x){
+    x |>
+      distinct(design, setting, dropout, endemicity) |>
+      mutate(MeanCost = 70*1e3, value=1) |>
+      bind_rows(x)
+  }}() |>
+  mutate(Row = fct(case_when(
+    dropout=="baseline" ~ str_c(setting),
+    TRUE ~ str_c(setting, " w/ drop-outs")
+  ), levels=c("Ethiopia", "Tanzania", "Ethiopia w/ drop-outs"))) |>
+  mutate(Col = fct(str_c(endemicity,"% prev."))) |>
+  ggplot(aes(x=MeanCost/1e3, y=value*100, col=design)) +
   geom_line() +
-  facet_grid(setting~endemicity, scales="fixed") +
-  geom_hline(yintercept = 80, lty="dashed") +
-  ylab("Performance (%)") + xlim(0,10000) + ylim(50,100)
-ggsave("figS1_rough.pdf", width=12, height=6)
+  facet_grid(Row~Col, scales="fixed") +
+  ylab("Performance (%)") +
+  geom_hline(yintercept = c(80), lty="dashed") +
+  geom_hline(yintercept = c(90), lty="dotted") +
+  coord_cartesian(ylim = c(50,100), xlim = c(0,10)) +
+  labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Performance (%)") +
+  scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
+  guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1)) +
+  scale_x_continuous(breaks=seq(0,10,by=2))
+ggsave("notebooks/paper_2025/figS3.pdf", width=9, height=7)
 
-## TODO: Figure 3 should be 4x4 as it is,
-## New Figure S1 should replace S1/S2, and have 3 rows: Ethiopia wo dropout, Tanzania wo dropout, Ethiopia with dropout
-## All to have 50,100 ylim, 0-10000 xlim, dashed lines at 80% dash and 90% dot
 
-## Figure S3 as it is but with above ylim/xlim
-
-############################################
-## Re-create figure S2
-############################################
-
-expand_grid(
-  parameters_scenario |> filter(parasite=="hookworm", endemicity!=2),
-  parameters_fixed |> filter(min_positive%in%c(1)),
-  parameters_cost |> filter(setting == "Ethiopia"),
-  parameters_dropadd |> filter(force_inclusion_prob == 0),
-  parameters_analysis |> filter(analysis_type=="delta")
-) |>
-  add_mean_and_cv() |>
-  left_join(
-    parameters_thresholds |> filter(drug=="ALB", framework=="FHT") |> mutate(true_efficacy = efficacy_expected),
-    by = "parasite", relationship="many-to-many"
-  ) ->
-  parameters
-
-parameters |>
-  vary_n_analysis(cl=10, iters=iterations, increment=1) ->
-  res
-
-res |>
-  plot_data_cost() |>
-  filter(name=="Performance", value>0.5, value<0.95) |>
-  ggplot(aes(x=MeanCost, y=value*100, col=design)) +
-  geom_line() +
-  facet_grid(dropout~endemicity, scales="free") +
-  geom_hline(yintercept = 80, lty="dashed") +
-  ylab("Performance (%)")
-ggsave("figS2_rough.pdf", width=12, height=6)
 
 
 ############################################
-## Re-create figure S3
+## Re-create figure S4
 ############################################
 
 expand_grid(
@@ -667,16 +694,29 @@ parameters |>
   vary_n_analysis(cl=10, iters=iterations, increment=1) ->
   res
 
+
 res |>
   plot_data_cost() |>
-  filter(name=="Performance", value>0.5, value<0.95) |>
-  ggplot(aes(x=MeanCost, y=value*100, col=factor(force_inclusion_prob))) +
+  filter(name=="Performance") |> #, value>0.5, value<0.95) |>
+  {function(x){
+    x |>
+      distinct(design, force_inclusion_prob, endemicity) |>
+      mutate(MeanCost = 70*1e3, value=1) |>
+      bind_rows(x)
+  }}() |>
+  mutate(Col = fct(str_c(endemicity,"% prev."))) |>
+  mutate(Padd = fct(str_c(force_inclusion_prob*100,"%"), levels=str_c(c(0,0.05,0.1,0.15,0.2)*100,"%"))) |>
+  ggplot(aes(x=MeanCost/1e3, y=value*100, col=Padd)) +
   geom_line() +
-  facet_wrap(~endemicity, scales="free") +
-  geom_hline(yintercept = 80, lty="dashed") +
-  ylab("Performance (%)")
-ggsave("figS3_rough.pdf", width=12, height=6)
-
+  facet_wrap(~Col, scales="fixed") +
+  ylab("Performance (%)") +
+  geom_hline(yintercept = c(80), lty="dashed") +
+  geom_hline(yintercept = c(90), lty="dotted") +
+  coord_cartesian(ylim = c(50,100), xlim = c(0,10)) +
+  labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Performance (%)") +
+  guides(color = guide_legend(title=bquote(P[add]))) +
+  scale_x_continuous(breaks=seq(0,10,by=2))
+ggsave("notebooks/paper_2025/figS4.pdf", width=7, height=6)
 
 
 ############################################
@@ -702,33 +742,48 @@ parameters |>
   res
 
 res |>
-  filter(force_inclusion_prob==0) |>
   plot_data_cost() |>
-  filter(name=="Performance", value>0.5, value<0.95) |>
-  mutate(panel = str_c(drug, " vs. ", parasite)) |>
-  ggplot(aes(x=MeanCost, y=value*100, col=design)) +
+  filter(name=="Performance") |> #, value>0.5, value<0.95) |>
+  {function(x){
+    return(x)
+    x |>
+      distinct(parasite, drug, design) |>
+      mutate(MeanCost = case_when(
+        parasite=="ascaris" ~ 1250,
+        parasite=="trichuris" ~ 100000,
+        drug=="ALB" ~ 7000,
+        drug=="MEB" ~ 60000
+      ), value=1) |>
+      bind_rows(x)
+  }}() |>
+  mutate(Col = str_c(drug, " vs. ", parasite)) |>
+  mutate(Col = factor(str_c(drug," against ", parasite), levels=c(
+    "ALB against hookworm", "MEB against hookworm", "ALB against ascaris", "ALB against trichuris"
+  ), labels=c(
+    "ALB against Hookworm", "MEB against Hookworm", "ALB against Ascaris", "ALB against Trichuris"
+  ))) |>
+  ggplot(aes(x=MeanCost/1e3, y=value*100, col=design)) +
   geom_line() +
-  facet_wrap(~panel, scales="free") +
-  geom_hline(yintercept = 80, lty="dashed") +
-  ylab("Performance (%)")
-ggsave("fig4_rough.pdf", width=9, height=8)
+  facet_wrap(~Col, scales="free_x") +
+  ylab("Performance (%)") +
+  geom_hline(yintercept = c(80), lty="dashed") +
+  geom_hline(yintercept = c(90), lty="dotted") +
+  coord_cartesian(ylim = c(50,100)) +
+  #coord_cartesian(ylim = c(50,100), xlim = c(0, 60)) +
+  labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Performance (%)") +
+  scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
+  guides(color = guide_legend(title="Survey design"))
+ggsave("notebooks/paper_2025/fig4.pdf", width=7, height=6)
 
-
-# TODO: table 3 and S2 (include variance of costs in latter)
-
-# NOTE: none of the figures should have anything other than min_positive=1
-
-
-## TODO: Table S2:  add all padd values, and ethiopia & tanzanian costs, all 4 - should be 1300 rows
-## Add colum for difference in cost and sample size compared to optimal design for that combo
-
-## New figure with sample size x, mean cost, performance, var cost on y (rows), design in cols?
 
 
 ############################################
 ## Re-create Table S2
 ############################################
 
+## TODO: Table S2:  add all padd values, and ethiopia & tanzanian costs, all 4 - should be 1300 rows
+## Add colum for difference in cost and sample size compared to optimal design for that combo
+## Also add variance in costs
 
 expand_grid(
   parameters_scenario |> filter(endemicity%in%c(5,15,35,65)),
@@ -745,6 +800,52 @@ expand_grid(
   ) ->
   parameters
 
+## Takes around 4 hours:
 parameters |>
   vary_n_analysis(cl=10L, iters=iterations, increment=1) ->
   res
+
+# qsave(res, "notebooks/paper_2025/tables2_res.rqs")
+# res <- qread("~/Desktop/tables2_res.rqs")
+
+res |>
+  group_by(variant, design, parasite, setting, scenario, mean_epg, true_efficacy, efficacy_expected, endemicity, framework, analysis_type, min_positive, dropout, force_inclusion_prob) |>
+  lapply(X=c(0.8,0.9), FUN=function(x, rr){
+    rr |>
+      arrange(Performance) |>
+      filter(Performance >= x) |>
+      slice(1) |>
+      ungroup() |>
+      full_join(
+        rr |>
+          distinct(variant, design, parasite, setting, scenario, mean_epg, true_efficacy, efficacy_expected, endemicity, framework, analysis_type, min_positive, dropout, force_inclusion_prob)
+      ) |>
+      mutate(Power = x)
+  }, rr=_) |>
+  bind_rows() ->
+  ts2res
+
+ts2res |> count(Power)
+ts2res |> filter(is.na(n_individ)) |> count(design, parasite, true_efficacy, efficacy_expected, endemicity, dropout, force_inclusion_prob, setting, Power)
+ts2res |> count(design, parasite, endemicity, dropout, force_inclusion_prob)
+
+
+## What??
+res |>
+  filter(design=="SSR_11", parasite=="trichuris", endemicity==5, dropout=="with dropouts", force_inclusion_prob==0, setting=="Ethiopia") |>
+  View()
+
+
+## For Table 3:
+
+ts2res |>
+  filter(endemicity==15, dropout=="with dropouts", force_inclusion_prob==0, setting=="Ethiopia") |>
+  select(drug, parasite, design, Power, n_individ) |>
+  mutate(parasite = fct(parasite, levels=c("hookworm","ascaris","trichuris"))) |>
+  arrange(drug, parasite, Power) |>
+  writexl::write_xlsx("notebooks/paper_2025/table_3.xlsx")
+
+
+## For Table S2:
+
+
