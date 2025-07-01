@@ -945,14 +945,55 @@ parameters |>
   vary_n_analysis(cl=10L, iters=iterations, performance=c(0.8,0.9), increment=1) ->
   res
 
+res |>
+  group_by(endemicity, dropout, force_inclusion_prob, setting, drug, parasite, Target) |>
+  mutate(n_individ_min = min(n_individ), cost_mean_min = min(cost_mean)) |>
+  ungroup() |>
+  mutate(n_individ_delta = n_individ-n_individ_min, cost_mean_delta = cost_mean-cost_mean_min) |>
+  select(drug, parasite, setting, endemicity, dropout, force_inclusion_prob, Target, design, n_individ, n_individ_min, n_individ_delta, cost_mean, cost_mean_min, cost_mean_delta, cost_variance) |>
+  arrange(drug, parasite, setting, endemicity, dropout, force_inclusion_prob, Target, design) ->
+  res
+
 stopifnot(nrow(res)==(nrow(parameters)*2L))
 
 # qsave(res, "notebooks/paper_2025/tables2_res.rqs")
-# res <- qread("notebooks/paper_2025/tables2_res_1e3.rqs")
-
-res |> count(Target)
+# res <- qread("notebooks/paper_2025/tables2_res.rqs")
 
 
-## For Figure S5:
+res |>
+  filter(cost_mean==cost_mean_min) |>
+  count(drug, parasite, endemicity, design) |>
+  print(n=Inf)
 
-ggplot(res)
+
+## Additional plots (not for the paper):
+
+ggplot(res, aes(x=design, y=cost_mean_delta+1)) +
+  geom_violin() +
+  facet_grid(endemicity ~ str_c(drug," vs. ", parasite), scales="fixed") +
+  scale_y_continuous(trans="log10")
+
+ggplot(res, aes(x=design, y=cost_mean_delta+1)) +
+  geom_boxplot() +
+  facet_grid(endemicity ~ str_c(drug," vs. ", parasite), scales="fixed") +
+  scale_y_continuous(trans="log10")
+
+ggplot(res, aes(col=design, y=cost_mean_delta+1)) +
+  stat_ecdf() +
+  facet_grid(endemicity ~ str_c(drug," vs. ", parasite), scales="fixed") +
+  scale_y_continuous(trans="log10")
+
+ggplot(res, aes(col=design, y=cost_mean+1)) +
+  stat_ecdf() +
+  facet_grid(endemicity ~ str_c(drug," vs. ", parasite), scales="fixed") +
+  scale_y_continuous(trans="log10")
+
+ggplot(res, aes(col=design, y=n_individ_delta+1)) +
+  stat_ecdf() +
+  facet_grid(endemicity ~ str_c(drug," vs. ", parasite), scales="fixed") +
+  scale_y_continuous(trans="log10")
+
+ggplot(res, aes(col=design, y=n_individ+1)) +
+  stat_ecdf() +
+  facet_grid(endemicity ~ str_c(drug," vs. ", parasite), scales="fixed") +
+  scale_y_continuous(trans="log10")
