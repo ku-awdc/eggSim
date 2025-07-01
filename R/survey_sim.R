@@ -11,6 +11,7 @@
 #' @param output type of output:  one of summarised, full or extended
 #' @param analysis type of ERR/FECRT analysis:  one of mean or delta
 #' @param check_memory should the expected memory allocation be checked before proceeding?  Does not apply to output type summarised.
+#' @param quiet option to suppress output to screen
 #'
 #' @importFrom pbapply pblapply
 #' @importFrom parallel makeForkCluster makePSOCKcluster stopCluster clusterSetRNGStream clusterExport
@@ -29,7 +30,8 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
                        scenario = survey_scenario(parasite),
                        parameters = survey_parameters(design, parasite, method),
                        iterations = 1e3, cl=NULL,
-                       output="summarised", analysis="mean", check_memory=TRUE)
+                       output="summarised", analysis="mean", check_memory=TRUE,
+                       quiet = FALSE)
 {
 
   # TODO: pmatching for string arguments
@@ -87,7 +89,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
   }
 
   ## Run the parameter/scenario/n_individ combos:
-  cat("Running simulations for ", length(parameters), " parameter sets...\n", sep="")
+  if(!quiet) cat("Running simulations for ", length(parameters), " parameter sets...\n", sep="")
   st <- Sys.time()
 
   parameters |>
@@ -253,7 +255,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
     bind_rows() ->
     results
 
-  cat("Done in ", round(as.numeric(Sys.time()-st, units='mins'), 1), " minutes\n", sep="")
+  if(!quiet) cat("Done in ", round(as.numeric(Sys.time()-st, units='mins'), 1), " minutes\n", sep="")
 
   return(as_tibble(results))
 }

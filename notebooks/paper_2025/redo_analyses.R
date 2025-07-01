@@ -19,7 +19,7 @@ library("eggSim")
 if(packageVersion("eggSim") < "0.9.7") stop("You need to install the bayescount-link branch of eggSim")
 
 library("pbapply")
-pboptions(use_lb=TRUE)
+pboptions(use_lb=FALSE)
 
 ############################################
 ## Parameter values
@@ -28,9 +28,7 @@ pboptions(use_lb=TRUE)
 ## General simulation parameters:
 iterations <- 1e4
 cl <- 10
-individ_min <- 10
 individ_increment <- 1
-performance_max <- 0.999
 
 expand_grid(
   parasite = c("ascaris","hookworm","trichuris"),
@@ -176,118 +174,188 @@ add_mean_and_cv <- function(x, mu_max=1e4){
 ## Utility functions
 ############################################
 
-fix_n_analysis <- function(parameters, iters=iterations, increment=individ_increment, cl=NULL){
+fix_n_analysis <- function(parameters, iters=iterations, min = 10L, max = 500L, increment=individ_increment, cl=NULL){
 
-  parameters |>
-    group_by(framework, analysis_type, parasite, endemicity, mean_epg, min_positive, variant) |>
-    group_split() ->
-    pars
-
-  seq_along(pars) |>
-    lapply(function(i){
-      pars[[i]] |>
-        distinct(parasite, mean_epg, true_efficacy, endemicity, framework, analysis_type, individ_min, individ_max, min_positive, variant) |>
-        mutate(scenario = row_number()) ->
-        scenario
-
-      stopifnot(nrow(scenario |> distinct(individ_min, individ_max))==1L)
-
-      pars[[i]] |>
-        select(parasite, !any_of(names(scenario))) |>
-        unique() |>
-        mutate(parameter_set = row_number()) |>
-        rowwise() |>
-        group_split() ->
-        pp
-
-      stopifnot(nrow(scenario)==1L || length(pp)==1L)
-
-      survey_sim(
-        n_individ = seq(scenario$individ_min[1], scenario$individ_max[1], by=increment),
-        scenario = scenario,
-        parameters = pp,
-        iterations = iters,
-        cl = cl,
-        output = "summarised",
-        analysis = scenario$analysis_type[1]
-      ) |>
-        left_join(
-          scenario |> select(scenario, framework, analysis_type, endemicity, min_positive, variant),
-          by="scenario"
-        ) |>
-        mutate(Positive = (n_Susceptible+n_LowResistant), Negative = iters-Positive, Performance = Positive/iters)
-    }) |>
-    bind_rows() |>
-    ungroup()
-}
-
-
-vary_n_analysis <- function(parameters, iters=iterations, increment=individ_increment, cl=NULL){
+  if(!"ParSet" %in% names(parameters)){
+    parameters <- parameters |> mutate(ParSet = row_number())
+  }
 
   parameters |>
     rowwise() |>
     group_split() ->
     pars
 
-  seq_along(pars) |>
-    pbapply::pblapply(function(i){
-    #lapply(function(i){
+  if(is.null(cl)){
+    lafun <- lapply
+  }else{
+    if(cl==1){
+      lafun <- function(x, ff) pblapply(x, ff, cl=NULL)
+    }else{
+      lafun <- function(x, ff) pblapply(x, ff, cl=cl)
+    }
+  }
+
+  pars |>
+    lafun(function(pp){
+
+      survey_sim(
+        n_individ = seq(min, max, by=increment),
+        scenario = pp |> mutate(scenario=1) |> select(parasite, mean_epg, true_efficacy, scenario),
+        parameters = pp |> mutate(parameter_set = ParSet) |> select(-mean_epg, -true_efficacy),
+        iterations = iters,
+        cl = NULL,
+        output = "summarised",
+        analysis = pp$analysis_type,
+        quiet=TRUE
+      ) ->
+        res
+
+      bind_cols(
+        res,
+        pp[!names(pp) %in% names(res)]
+      ) |>
+        mutate(Positive = (n_Susceptible+n_LowResistant), Negative = iters-Positive, Performance = Positive/iters) |>
+        select(ParSet, Performance, everything())
+
+    }) |>
+    bind_rows() |>
+    ungroup()
+}
+
+
+vary_n_analysis <- function(parameters, iters=iterations, performance=NULL, performance_max=0.999, min = 10L, max = 500L, increment=individ_increment, cl=NULL){
+
+  if(!"ParSet" %in% names(parameters)){
+    parameters <- parameters |> mutate(ParSet = row_number())
+  }
+
+  parameters |>
+    slice_sample(prop=1) |>
+    rowwise() |>
+    group_split() ->
+    pars
+
+  stopifnot(nrow(parameters)==length(pars))
+
+  if(is.null(cl)){
+    lafun <- lapply
+  }else{
+    if(cl==1){
+      lafun <- function(x, ff) pblapply(x, ff, cl=NULL)
+    }else{
+      lafun <- function(x, ff) pblapply(x, ff, cl=cl)
+    }
+  }
+
+  pars |>
+    lafun(function(pp){
 
       try({
-      if(is.null(cl)) cat("Parameter cluster ", i, " of ", length(pars), "...\n", sep="")
+        if(is.null(cl)) cat("Parameter cluster ", i, " of ", length(pars), "...\n", sep="")
 
-      capture.output({
-      pars[[i]] |>
-        mutate(individ_min = individ_min, individ_max = individ_min*5000) |>
-        fix_n_analysis(iters = 100, increment=10, cl=NULL) ->
-        pilot
-      })
+        ok <- FALSE
 
-      suppressWarnings(mod <- mgcv::gam(cbind(Positive, Negative) ~ s(n_individ), family="binomial", data=pilot))
-      pilot$predict <- plogis(predict(mod))
+        emin <- min
+        emax <- max
 
-      pilot |>
-        filter(predict > performance_max) ->
-        perf_ok
-      if(nrow(perf_ok)==0L) return(pars[[i]] |> mutate(Status = "PerfNotOK"))
-      perf_ok |>
-        arrange(n_individ) |>
-        slice(1) |>
-        pull(n_individ) ->
-        individ_max
+        while(!ok){
+          pp |>
+            fix_n_analysis(iters = 100, min=emin, max=emax, increment=10, cl=NULL) ->
+            pilot
 
-      #cat(individ_max, "->")
-      individ_max <- ceiling(individ_max*0.11)*10
-      #cat(individ_max, "\n")
+          suppressWarnings(mod <- mgcv::gam(cbind(Positive, Negative) ~ s(n_individ), family="binomial", data=pilot))
+          pilot$predict <- plogis(predict(mod))
 
-      capture.output({
-        pars[[i]] |>
-        mutate(individ_min = individ_min, individ_max = individ_max) |>
-        fix_n_analysis(iters=iters, increment=increment, cl=NULL) ->
-          res
-      })
+          ok <- any(pilot$predict >=  performance_max)
 
-      mn <- names(pars[[i]])[! names(pars[[i]]) %in% names(res)]
-      res |>
-        bind_cols(
-          pars[[i]][,mn]
-        ) |>
-        mutate(Status = "OK") ->
-        out
+          if(!ok){
+            emin <- emax / 2
+            emax <- emax * 2
+          }
+        }
+
+        pilot |>
+          filter(predict > performance_max) |>
+          arrange(n_individ) |>
+          slice(1) |>
+          pull(n_individ) ->
+          individ_max
+
+        emax <- ceiling(individ_max*0.11)*10
+
+        pp |>
+          fix_n_analysis(iters=iters, min = min, max = emax, increment=increment, cl=NULL) |>
+          mutate(Status = "OK") |>
+          arrange(Performance) |>
+          select(ParSet, Status, Performance, everything()) ->
+            res
+
+        if(!is.null(performance)){
+          lapply(performance, function(pf){
+            res |>
+              filter(Performance >= pf) |>
+              slice(1) |>
+              mutate(Target = pf) |>
+              select(Target, Low=n_individ)
+          }) |>
+            bind_rows()  ->
+            lr
+
+          lapply(performance, function(pf){
+            res |>
+              arrange(desc(Performance)) |>
+              filter(cummin(Performance) >= pf) |>
+              slice(n()) |>
+              mutate(Target = pf) |>
+              select(Target, High=n_individ)
+          }) |>
+            bind_rows() ->
+            hr
+
+          full_join(lr, hr, by="Target") |>
+            mutate(Mean = (Low+High)/2) |>
+            select(Target, Mean) |>
+            rowwise() |>
+            group_split() |>
+            lapply(function(x){
+              bind_cols(
+                x, res
+              ) |>
+                filter(n_individ >= Mean) |>
+                slice(1) |>
+                select(-Mean)
+            }) |>
+            bind_rows() ->
+            or
+
+          stopifnot(nrow(or)==length(performance))
+
+          or |>
+            select(ParSet, Status, Target, Performance, everything()) ->
+            res
+        }
+
+        return(res)
+
       }) -> ss
 
-      if(inherits(ss, "try-error")) return(pars[[i]] |> mutate(Status = "Failed", MSG = as.character(ss)))
+      if(inherits(ss, "try-error")) return(pp |> mutate(Status = "Failed", MSG = as.character(ss)))
 
       return(out)
 
-    #}) ->
-    }, cl=cl) ->
+    }) ->
     out
+
+  if(any(sapply(out, \(x) !"Status" %in% names(x) || any(x$Status!="OK")))){
+    warning("One or more error encountered")
+    return(out)
+  }
 
   ss <- try({
     out |>
       bind_rows() |>
-      ungroup() ->
+      ungroup() |>
+      arrange(ParSet, Performance) ->
       out
   })
 
@@ -360,9 +428,8 @@ all |>
         parameters_thresholds |> filter(drug=="ALB"),
         by = "parasite", relationship="many-to-many"
       ) |>
-      mutate(individ_min = x$n_individ, individ_max = x$n_individ) |>
       mutate(min_positive_pre = x$min_positive) |>
-      fix_n_analysis(iters=iterations, cl=cl) ->
+      fix_n_analysis(iters=iterations, min = x$n_individ, max=x$n_individ, cl=cl) ->
       fig_1_data
 
     fig_1_data |>
@@ -513,8 +580,50 @@ ggsave("notebooks/paper_2025/figS1.pdf", height=8, width=12)
 ## New figure S2
 ############################################
 
-## New figure with sample size x, performance & mean cost & var cost on y (one per row), design in cols?
+expand_grid(
+  parameters_scenario |> filter(parasite=="hookworm", endemicity==15),
+  parameters_fixed |> filter(min_positive == 1),
+  parameters_cost |> filter(setting == "Ethiopia"),
+  parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
+  parameters_analysis |> filter(analysis_type=="delta")
+) |>
+  add_mean_and_cv() |>
+  left_join(
+    parameters_thresholds |> filter(drug=="ALB", framework=="FHT") |> mutate(true_efficacy = efficacy_expected),
+    by = "parasite", relationship="many-to-many"
+  ) |>
+  mutate(min_positive_pre = 1) |>
+  fix_n_analysis(iters=iterations, min = 10, max=1000, cl=cl) ->
+  fig_S2_data
 
+fig_S2_data |>
+  mutate(design = fct(design, levels=c("NS_11","NS_12","SSR_11","SSR_12"))) |>
+  mutate(cost_sd = sqrt(cost_variance) / 1e3, cost_mean = cost_mean/1e3, Performance=Performance*1e2) |>
+  pivot_longer(c(Performance, cost_mean, cost_sd)) |>
+  mutate(Panel = factor(
+    name,
+    levels = c("Performance","cost_mean","cost_sd"),
+    labels = c(
+      expression("A: Performance (" * "%" * ")"),
+      expression("B: Mean cost"[total]~ "(x1000 US$)"),
+      expression("C: Standard deviation of cost"[total]~ "(x1000 US$)")
+    )
+  )) ->
+  ps2d
+
+ps2d |>
+  ggplot(aes(x=n_individ, y=value, col=design)) +
+  geom_hline(data=tibble(Panel=factor(levels(ps2d$Panel)[1], levels=levels(ps2d$Panel)), yi=80), aes(yintercept=yi), lty="dashed") +
+  geom_hline(data=tibble(Panel=factor(levels(ps2d$Panel)[1], levels=levels(ps2d$Panel)), yi=90), aes(yintercept=yi), lty="dotted") +
+  geom_line() +
+  facet_wrap(~Panel, scales="free_y", ncol=1, labeller = label_parsed) +
+  coord_cartesian(xlim=c(50,500)) +
+  labs(x="Number of Children", y=NULL) +
+  scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
+  guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
+ggsave("notebooks/paper_2025/figS2.pdf", width=7, height=6)
+
+## TODO: other ggplot additions package for different y axis breaks
 
 
 ############################################
@@ -800,52 +909,50 @@ expand_grid(
   ) ->
   parameters
 
-## Takes around 4 hours:
-parameters |>
-  vary_n_analysis(cl=10L, iters=iterations, increment=1) ->
-  res
-
-# qsave(res, "notebooks/paper_2025/tables2_res.rqs")
-# res <- qread("~/Desktop/tables2_res.rqs")
-
-res |>
-  group_by(variant, design, parasite, setting, scenario, mean_epg, true_efficacy, efficacy_expected, endemicity, framework, analysis_type, min_positive, dropout, force_inclusion_prob) |>
-  lapply(X=c(0.8,0.9), FUN=function(x, rr){
-    rr |>
-      arrange(Performance) |>
-      filter(Performance >= x) |>
-      slice(1) |>
-      ungroup() |>
-      full_join(
-        rr |>
-          distinct(variant, design, parasite, setting, scenario, mean_epg, true_efficacy, efficacy_expected, endemicity, framework, analysis_type, min_positive, dropout, force_inclusion_prob)
-      ) |>
-      mutate(Power = x)
-  }, rr=_) |>
-  bind_rows() ->
-  ts2res
-
-ts2res |> count(Power)
-ts2res |> filter(is.na(n_individ)) |> count(design, parasite, true_efficacy, efficacy_expected, endemicity, dropout, force_inclusion_prob, setting, Power)
-ts2res |> count(design, parasite, endemicity, dropout, force_inclusion_prob)
-
-
-## What??
-res |>
-  filter(design=="SSR_11", parasite=="trichuris", endemicity==5, dropout=="with dropouts", force_inclusion_prob==0, setting=="Ethiopia") |>
-  View()
-
 
 ## For Table 3:
-
-ts2res |>
+parameters |>
   filter(endemicity==15, dropout=="with dropouts", force_inclusion_prob==0, setting=="Ethiopia") |>
-  select(drug, parasite, design, Power, n_individ) |>
+  vary_n_analysis(cl=10L, iters=iterations, performance=c(0.8,0.9), increment=1) ->
+  resA
+
+parameters |>
+  filter(endemicity==15, dropout=="with dropouts", force_inclusion_prob==0, setting=="Ethiopia") |>
+  vary_n_analysis(cl=10L, iters=iterations, performance=c(0.8,0.9), increment=1) ->
+  resB
+
+parameters |>
+  filter(endemicity==15, dropout=="with dropouts", force_inclusion_prob==0, setting=="Ethiopia") |>
+  vary_n_analysis(cl=10L, iters=iterations, performance=c(0.8,0.9), increment=1) ->
+  resC
+
+bind_rows(
+  resA |> mutate(Replicate = "A"),
+  resB |> mutate(Replicate = "B"),
+  resC |> mutate(Replicate = "C"),
+) |>
+  filter(endemicity==15, dropout=="with dropouts", force_inclusion_prob==0, setting=="Ethiopia") |>
+  select(drug, parasite, design, Target, Replicate, n_individ) |>
   mutate(parasite = fct(parasite, levels=c("hookworm","ascaris","trichuris"))) |>
-  arrange(drug, parasite, Power) |>
+  arrange(drug, parasite, Target, design, Replicate) |>
   writexl::write_xlsx("notebooks/paper_2025/table_3.xlsx")
 
 
 ## For Table S2:
 
+## Takes around 4 hours (??):
+parameters |>
+  vary_n_analysis(cl=10L, iters=iterations, performance=c(0.8,0.9), increment=1) ->
+  res
 
+stopifnot(nrow(res)==(nrow(parameters)*2L))
+
+# qsave(res, "notebooks/paper_2025/tables2_res.rqs")
+# res <- qread("notebooks/paper_2025/tables2_res_1e3.rqs")
+
+res |> count(Target)
+
+
+## For Figure S5:
+
+ggplot(res)
