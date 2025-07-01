@@ -934,8 +934,13 @@ bind_rows(
   filter(endemicity==15, dropout=="with dropouts", force_inclusion_prob==0, setting=="Ethiopia") |>
   select(drug, parasite, design, Target, Replicate, n_individ) |>
   mutate(parasite = fct(parasite, levels=c("hookworm","ascaris","trichuris"))) |>
-  arrange(drug, parasite, Target, design, Replicate) |>
+  arrange(drug, parasite, Target, design, Replicate) ->
+  res
+
+res |>
   writexl::write_xlsx("notebooks/paper_2025/table_3.xlsx")
+
+# qsave(res, "notebooks/paper_2025/table3_res.rqs")
 
 
 ## For Table S2:
