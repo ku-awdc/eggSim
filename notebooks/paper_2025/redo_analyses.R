@@ -945,7 +945,7 @@ res |>
 
 ## For Table S2:
 
-## Takes around 4 hours (??):
+## Takes around 11 hours (??):
 parameters |>
   vary_n_analysis(cl=10L, iters=iterations, performance=c(0.8,0.9), increment=1) ->
   res
@@ -959,9 +959,11 @@ res |>
   arrange(drug, parasite, setting, endemicity, dropout, force_inclusion_prob, Target, design) ->
   res
 
+qsave(res, "~/Desktop/tables2_res.rqs")
+
 stopifnot(nrow(res)==(nrow(parameters)*2L))
 
-# qsave(res, "notebooks/paper_2025/tables2_res.rqs")
+qsave(res, "notebooks/paper_2025/tables2_res.rqs")
 # res <- qread("notebooks/paper_2025/tables2_res.rqs")
 
 
