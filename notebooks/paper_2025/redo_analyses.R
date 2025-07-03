@@ -945,7 +945,7 @@ res |>
 
 ## For Table S2:
 
-## Takes around 11 hours (??):
+## Takes around 7.5 hours:
 parameters |>
   vary_n_analysis(cl=10L, iters=iterations, performance=c(0.8,0.9), increment=1) ->
   res
