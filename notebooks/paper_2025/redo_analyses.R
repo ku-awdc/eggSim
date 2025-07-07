@@ -32,7 +32,7 @@ individ_increment <- 1
 
 expand_grid(
   parasite = c("ascaris","hookworm","trichuris"),
-  endemicity = c(2,5,15,35,65)
+  endemicity = c(5,15,35,65)
 ) ->
   parameters_scenario
 
@@ -486,12 +486,13 @@ all |>
   }) ->
   plots
 #qsave(plots, "notebooks/paper_2025/fig1_res.rqs")
+plots <- qread("notebooks/paper_2025/fig1_res.rqs")
 
 ## Figure 1:
 plots |>
   lapply(\(x) x$data) |>
   bind_rows() |>
-  filter(n_individ==300) |>
+  filter(n_individ==250) |>
   filter(classification != "Failed") |>
   mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
   group_by(efficacy_expected, analysis, true_efficacy, n_individ) |>
@@ -499,11 +500,11 @@ plots |>
   mutate(total = sum(tally), ymax = cumsum(tally/total), ymin = lag(ymax, default=0)) |>
   mutate(type = str_c(analysis, " - ", efficacy_expected) |> fct()) |>
   mutate(type = factor(type,
-                       levels=c("mean - 0.9", "hypothesis - 0.9", "mean - 0.962", "hypothesis - 0.962"),
+                       levels=c("mean - 0.9", "mean - 0.962", "hypothesis - 0.9", "hypothesis - 0.962"),
                        labels=c(
                          expression("A: Point estimate with T"[l] *"="* " 80% T"[u] *"="* " 90%"),
-                         expression("B: Hypothesis testing with T"[l] *"="* " 80% T"[u] *"="* " 90%"),
                          expression("C: Point estimate with T"[l] *"="* " 86.2% T"[u] *"="* " 96.2%"),
+                         expression("B: Hypothesis testing with T"[l] *"="* " 80% T"[u] *"="* " 90%"),
                          expression("D: Hypothesis testing with T"[l] *"="* " 86.2% T"[u] *"="* " 96.2%")
                         )
   )) |>
@@ -512,8 +513,8 @@ plots |>
   geom_ribbon() +
   facet_wrap( ~ type, labeller = label_parsed) +
   # geom_hline(yintercept=c(0.05,0.95)) +
-  geom_segment(aes(y=5, x=50, xend=efficacy_expected*100-10), lty="dotted") +
-  geom_segment(aes(y=95, x=efficacy_expected*100, xend=100), lty="dotted") +
+#  geom_segment(aes(y=5, x=50, xend=efficacy_expected*100-10), lty="dotted") +
+#  geom_segment(aes(y=95, x=efficacy_expected*100, xend=100), lty="dotted") +
   geom_vline(aes(xintercept=efficacy_expected*100)) +
   geom_vline(aes(xintercept=efficacy_expected*100-10), lty="dashed") +
   theme_minimal() +
@@ -574,8 +575,6 @@ plots |>
   #theme(strip.text = element_text(size = 12), legend.title = element_text(size = 12))
   theme(strip.text = element_text(size = 12), legend.title = element_blank(), legend.position = "bottom")
 ggsave("notebooks/paper_2025/figS1.pdf", height=8, width=12)
-
-## TODO: use 250 for both Fig1 and S1;  re-order B/C for Fig1;  no dotted lines for Fig1 but keep for S1
 
 
 ############################################
@@ -684,9 +683,15 @@ LETTERS[1:4] |>
   filter(name=="Performance") |> #, value>0.5, value<0.95) |>
   {function(x){
     x |>
-      distinct(design, force_inclusion_prob, Panel) |>
-      mutate(MeanCost = 70*1e3, value=1) |>
-      bind_rows(x)
+      filter(Panel=="A: Ethiopian cost", design == "NS_12") |>
+      mutate(Panel = "D: Assessing multiple STH") |>
+      bind_rows(
+        x
+      )
+    #x |>
+    #  distinct(design, force_inclusion_prob, Panel) |>
+    #  mutate(MeanCost = 70*1e3, value=1) |>
+    #  bind_rows(x)
   }}() |>
   mutate(design = fct(design, levels=c("NS_11","NS_12","SSR_11","SSR_12"))) |>
   ggplot(aes(x=MeanCost/1e3, y=value*1e2, col=design, lty=str_c(force_inclusion_prob*100,"%")), parse=TRUE) +
@@ -700,11 +705,6 @@ LETTERS[1:4] |>
   guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
 ggsave("notebooks/paper_2025/fig2.pdf", width=7, height=6)
 
-## TODO: Add solid green and/or red line to panel D, and fix cheat where it goes to 100%
-## TODO: remove padd!=0 for NS designs, table S2
-## TODO: remove 2% prevalence from everything, change Fig2 to 5%
-## TODO: figure 3 cap to 6000
-## TODO: figure S4 change colours to lty
 
 ############################################
 ## Re-create figures 3 and S3
@@ -729,6 +729,7 @@ parameters |>
   vary_n_analysis(cl=10, iters=iterations, increment=1) ->
   res
 # qsave(res, "notebooks/paper_2025/fig3_res.rqs")
+res <- qread("notebooks/paper_2025/fig3_res.rqs")
 
 res |>
   plot_data_cost() |>
@@ -751,7 +752,7 @@ res |>
   ylab("Performance (%)") +
   geom_hline(yintercept = c(80), lty="dashed") +
   geom_hline(yintercept = c(90), lty="dotted") +
-  coord_cartesian(ylim = c(50,100), xlim = c(0,10)) +
+  coord_cartesian(ylim = c(50,100), xlim = c(0,6)) +
   labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Performance (%)") +
   scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
   guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
@@ -809,7 +810,8 @@ expand_grid(
 parameters |>
   vary_n_analysis(cl=10, iters=iterations, increment=1) ->
   res
-
+# qsave(res, "notebooks/paper_2025/figS4_res.rqs")
+res <- qread("notebooks/paper_2025/figS4_res.rqs")
 
 res |>
   plot_data_cost() |>
@@ -822,13 +824,13 @@ res |>
   }}() |>
   mutate(Col = fct(str_c(endemicity,"% prev."))) |>
   mutate(Padd = fct(str_c(force_inclusion_prob*100,"%"), levels=str_c(c(0,0.05,0.1,0.15,0.2)*100,"%"))) |>
-  ggplot(aes(x=MeanCost/1e3, y=value*100, col=Padd)) +
-  geom_line() +
+  ggplot(aes(x=MeanCost/1e3, y=value*100, lty=Padd)) +
+  geom_line(col=gg_colour_hue(4)[4]) +
   facet_wrap(~Col, scales="fixed") +
   ylab("Performance (%)") +
   geom_hline(yintercept = c(80), lty="dashed") +
   geom_hline(yintercept = c(90), lty="dotted") +
-  coord_cartesian(ylim = c(50,100), xlim = c(0,10)) +
+  coord_cartesian(ylim = c(50,100), xlim = c(0,6)) +
   labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Performance (%)") +
   guides(color = guide_legend(title=bquote(P[add]))) +
   scale_x_continuous(breaks=seq(0,10,by=2))
@@ -898,9 +900,6 @@ ggsave("notebooks/paper_2025/fig4.pdf", width=7, height=6)
 ## Re-create Table S2
 ############################################
 
-## TODO: Table S2:  add all padd values, and ethiopia & tanzanian costs, all 4 - should be 1300 rows
-## Add colum for difference in cost and sample size compared to optimal design for that combo
-## Also add variance in costs
 
 expand_grid(
   parameters_scenario |> filter(endemicity%in%c(5,15,35,65)),
@@ -945,10 +944,14 @@ bind_rows(
   arrange(drug, parasite, Target, design, Replicate) ->
   res
 
-res |>
-  writexl::write_xlsx("notebooks/paper_2025/table_3.xlsx")
-
 # qsave(res, "notebooks/paper_2025/table3_res.rqs")
+res <- qread("notebooks/paper_2025/table3_res.rqs")
+
+res |>
+  group_by(drug, parasite, design, Target) |>
+  summarise(n_individ = ceiling(mean(n_individ)/5)*5, .groups="drop") |>
+  pivot_wider(names_from="design", values_from="n_individ") |>
+  writexl::write_xlsx("notebooks/paper_2025/table_3.xlsx")
 
 
 ## For Table S2:
@@ -967,11 +970,8 @@ res |>
   arrange(drug, parasite, setting, endemicity, dropout, force_inclusion_prob, Target, design) ->
   res
 
-qsave(res, "~/Desktop/tables2_res.rqs")
-
 stopifnot(nrow(res)==(nrow(parameters)*2L))
-
-qsave(res, "notebooks/paper_2025/tables2_res.rqs")
+# qsave(res, "notebooks/paper_2025/tables2_res.rqs")
 # res <- qread("notebooks/paper_2025/tables2_res.rqs")
 
 
@@ -982,6 +982,7 @@ res |>
 
 
 res |>
+  rename(power=Target) |>
   writexl::write_xlsx("notebooks/paper_2025/table_S2.xlsx")
 
 
@@ -989,7 +990,106 @@ res |>
 
 ## Additional plots:
 
-## TODO: choose a consistent reference design
+
+pdf("notebooks/paper_2025/figX_mean_cost.pdf", width=6, height=6)
+for(dp in unique(with(res, str_c(drug," vs. ", parasite)))){
+  print({
+    res |>
+      filter(Target==0.8, str_c(drug," vs. ", parasite)==dp) |>
+      filter(force_inclusion_prob==0 | design%in%c("SSR_11","SSR_12")) |>
+      ggplot(aes(x=str_c(format(force_inclusion_prob) |> str_replace(" ", "0"), " (", design, ")"), y=cost_mean, col=design, fill=design, pch=str_c(setting, " ", dropout))) +
+      #  geom_boxplot() +
+      # geom_violin() +
+      #  geom_point() +
+      geom_point(position = position_dodge(width=0.5)) +
+      facet_wrap( ~ fct(str_c(endemicity, "% prev.")), scales="free_y", nrow=2) +
+      #  facet_grid(fct(str_c(endemicity, "% prev.")) ~ str_c(drug," vs. ", parasite) , scales="fixed") +
+      #  scale_y_continuous(breaks=c(0,1,2,3,4), labels=c("$0","$10","$100","$1k","$10k")) +
+      labs(y="Mean cost of survey design for 80% power", x="Padd") +
+      theme(legend.position="bottom", legend.title=element_blank()) +
+      #  geom_hline(yintercept=0, lty="dashed") +
+      ggtitle(dp) +
+      theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+      guides(color = "none", fill = "none")
+    #  scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
+    #  scale_fill_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"])))
+  })
+}
+dev.off()
+
+pdf("notebooks/paper_2025/total_children.pdf", width=6, height=6)
+for(dp in unique(with(res, str_c(drug," vs. ", parasite)))){
+  print({
+    res |>
+      filter(Target==0.8, str_c(drug," vs. ", parasite)==dp) |>
+      filter(force_inclusion_prob==0 | design%in%c("SSR_11","SSR_12")) |>
+      ggplot(aes(x=str_c(format(force_inclusion_prob) |> str_replace(" ", "0"), " (", design, ")"), y=n_individ, col=design, fill=design, pch=str_c(setting, " ", dropout))) +
+      #  geom_boxplot() +
+      # geom_violin() +
+      #  geom_point() +
+      geom_point(position = position_dodge(width=0.5)) +
+      facet_wrap( ~ fct(str_c(endemicity, "% prev.")), scales="free_y", nrow=2) +
+      #  facet_grid(fct(str_c(endemicity, "% prev.")) ~ str_c(drug," vs. ", parasite) , scales="fixed") +
+      #  scale_y_continuous(breaks=c(0,1,2,3,4), labels=c("$0","$10","$100","$1k","$10k")) +
+      labs(y="Sample size for 80% power", x="Padd") +
+      theme(legend.position="bottom", legend.title=element_blank()) +
+      #  geom_hline(yintercept=0, lty="dashed") +
+      ggtitle(dp) +
+      theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+      guides(color = "none", fill = "none")
+    #  scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
+    #  scale_fill_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"])))
+  })
+}
+dev.off()
+
+pdf("notebooks/paper_2025/figX_relative_cost.pdf", width=6, height=6)
+for(dp in unique(with(res, str_c(drug," vs. ", parasite)))){
+  print({
+    res |>
+      group_by(endemicity, dropout, force_inclusion_prob, setting, drug, parasite, Target) |>
+      mutate(cost_mean_min = cost_mean[design=="NS_11"]) |>
+      ungroup() |>
+      mutate(n_individ_delta = n_individ-n_individ_min, cost_mean_delta = cost_mean-cost_mean_min) |>
+      filter(Target==0.8, design!='NS_11') |>
+      filter(Target==0.8, str_c(drug," vs. ", parasite)==dp) |>
+      filter(force_inclusion_prob==0 | design%in%c("SSR_11","SSR_12")) |>
+      ggplot(aes(x=str_c(format(force_inclusion_prob) |> str_replace(" ", "0"), " (", design, ")"), y=cost_mean_delta, col=design, fill=design, pch=str_c(setting, " ", dropout))) +
+      #  geom_boxplot() +
+      # geom_violin() +
+      #  geom_point() +
+      geom_point(position = position_dodge(width=0.5)) +
+      facet_wrap( ~ fct(str_c(endemicity, "% prev.")), scales="free_y", nrow=2) +
+      #  facet_grid(fct(str_c(endemicity, "% prev.")) ~ str_c(drug," vs. ", parasite) , scales="fixed") +
+      #  scale_y_continuous(breaks=c(0,1,2,3,4), labels=c("$0","$10","$100","$1k","$10k")) +
+      labs(y="Absolute difference in cost relative to NS_11 (for 80% power)", x="Padd") +
+      theme(legend.position="bottom", legend.title=element_blank()) +
+      geom_hline(yintercept=0, lty="dashed") +
+      ggtitle(dp) +
+      theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) +
+      guides(col = "none", fill = "none") +
+      scale_colour_manual(values=gg_colour_hue(4)[-1])
+    #  scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
+    #  scale_fill_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"])))
+  })
+}
+dev.off()
+
+res |>
+  filter(Target==0.8) |>
+  filter(force_inclusion_prob==0 | design%in%c("SSR_11","SSR_12")) |>
+  ggplot(aes(x=str_c(format(force_inclusion_prob) |> str_replace(" ", "0"), design), y=n_individ, col=design, fill=design, pch=str_c(setting, " ", dropout))) +
+  #  geom_boxplot() +
+  # geom_violin() +
+  #  geom_point() +
+  geom_point(position = position_dodge(width=0.5)) +
+  facet_grid(str_c(drug," vs. ", parasite) ~ fct(str_c(endemicity, "% prev.")), scales="free_y") +
+  #  facet_grid(fct(str_c(endemicity, "% prev.")) ~ str_c(drug," vs. ", parasite) , scales="fixed") +
+  #  scale_y_continuous(breaks=c(0,1,2,3,4), labels=c("$0","$10","$100","$1k","$10k")) +
+  labs(y="Absolute difference in cost relative to NS_11 (for 80% power)", x="Padd") +
+  theme(legend.position="bottom", legend.title=element_blank()) +
+  geom_hline(yintercept=0, lty="dashed")
+
 
 res |>
   group_by(endemicity, dropout, force_inclusion_prob, setting, drug, parasite, Target) |>
@@ -997,17 +1097,23 @@ res |>
   ungroup() |>
   mutate(n_individ_delta = n_individ-n_individ_min, cost_mean_delta = cost_mean-cost_mean_min) |>
   filter(Target==0.8, design!='NS_11') |>
-  ggplot(aes(x=factor(force_inclusion_prob), y=cost_mean_delta, col=design, fill=design)) +
+  filter(force_inclusion_prob==0 | design%in%c("SSR_11","SSR_12")) |>
+  ggplot(aes(x=str_c(format(force_inclusion_prob) |> str_replace(" ", "0"), " (", design, ")"), y=cost_mean_delta, col=design, fill=design, pch=str_c(setting, " ", dropout))) +
   #  geom_boxplot() +
-  geom_violin() +
-  facet_grid(str_c(drug," vs. ", parasite) ~ fct(str_c(endemicity, "% prev.")), scales="free_y") +
+  # geom_violin() +
+#  geom_point() +
+  geom_point(position = position_dodge(width=0.5)) +
+  facet_grid(str_c(drug," vs. ", parasite) ~ fct(str_c(endemicity, "% prev.")), scales="fixed") +
+#  facet_grid(fct(str_c(endemicity, "% prev.")) ~ str_c(drug," vs. ", parasite) , scales="fixed") +
 #  scale_y_continuous(breaks=c(0,1,2,3,4), labels=c("$0","$10","$100","$1k","$10k")) +
-  labs(y="Absolute difference in cost", x="Padd") +
+  labs(y="Absolute difference in cost relative to NS_11 (for 80% power)", x="Padd") +
   theme(legend.position="bottom", legend.title=element_blank()) +
-  geom_hline(yintercept=0, lty="dashed")
+  geom_hline(yintercept=0, lty="dashed")+
+  scale_colour_manual(values=gg_colour_hue(4)[-1]) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 #  scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
 #  scale_fill_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"])))
-ggsave("notebooks/paper_2025/figS5a.pdf", width=9, height=7)
+ggsave("notebooks/paper_2025/figS5.pdf", width=9, height=9)
 
 res |>
   filter(Target==0.8, force_inclusion_prob==0.2) |>
