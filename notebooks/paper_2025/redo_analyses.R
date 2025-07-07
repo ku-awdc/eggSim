@@ -223,6 +223,126 @@ fix_n_analysis <- function(parameters, iters=iterations, min = 10L, max = 500L, 
 }
 
 
+vary_nim_analysis <- function(parameters, performance=0.8, min = 100L, max = 500L, NIMlen=25L, cl=NULL){
+
+  stopifnot(length(performance)==1L)
+
+  if(!"ParSet" %in% names(parameters)){
+    parameters <- parameters |> mutate(ParSet = row_number())
+  }
+
+  parameters |>
+    slice_sample(prop=1) |>
+    rowwise() |>
+    group_split() ->
+    pars
+
+  stopifnot(nrow(parameters)==length(pars))
+
+  if(is.null(cl)){
+    lafun <- lapply
+  }else{
+    if(cl==1){
+      lafun <- function(x, ff) pblapply(x, ff, cl=NULL)
+    }else{
+      lafun <- function(x, ff) pblapply(x, ff, cl=cl)
+    }
+  }
+
+  pars |>
+    lafun(function(pp){
+
+      try({
+
+        tibble(
+          Iterations = c(100,100,1000,10000),
+          Scaling = c(0.2, 0.15, 0.1, 0.05),
+          GAM = c(FALSE, TRUE, TRUE, TRUE)
+        ) ->
+          pgrs
+
+        nimrange <- c(10^-4, 5)
+        for(r in seq_len(nrow(pgrs))){
+
+          (10^seq(log10(nimrange[2]),log10(nimrange[1]),length=NIMlen)) |>
+            as.list() |>
+            lapply(\(x){
+              pp |>
+                mutate(efficacy_lower_target = efficacy_expected - x) |>
+                fix_n_analysis(iters = pgrs$Iterations[r], min=min, max=max, increment=10, cl=NULL) |>
+                mutate(NIM = x)
+            }) |>
+            bind_rows() ->
+            pilot
+
+          pilot |>
+            group_by(n_individ) |>
+            group_split() |>
+            lapply(\(x){
+              obs <- x |> arrange(NIM) |> filter(Performance > performance) |> slice(1)
+              if(pgrs$GAM[r]){
+                ss <- try(suppressWarnings(mod <- mgcv::gam(cbind(Positive, Negative) ~ s(NIM), family="binomial", data=x)))
+                if(inherits(ss, "try-error")) browser()
+
+                afun <- with(x, approxfun(NIM ~ predict(mod)))
+                tibble(
+                  SampleSize = x$n_individ[1],
+                  Performance = performance,
+                  MinNIM = afun(qlogis(performance*(1-pgrs$Scaling[r]))),
+                  BestNIM = afun(qlogis(performance)),
+                  MaxNIM = afun(qlogis(performance*(1+pgrs$Scaling[r]))),
+                  ObsPerf = obs$Performance,
+                  ObsNIM = obs$NIM
+                )
+              }else{
+                tibble(
+                  SampleSize = x$n_individ[1],
+                  Performance = performance,
+                  MinNIM = x |> arrange(NIM) |> filter(Performance > 0.5) |> slice(1) |> pull(NIM),
+                  BestNIM = NA_real_,
+                  MaxNIM = x |> arrange(desc(NIM)) |> filter(Performance < 1) |> slice(1) |> pull(NIM),
+                  ObsPerf = obs$Performance,
+                  ObsNIM = obs$NIM
+                )
+              }
+            }) |>
+            bind_rows() ->
+            nims
+
+          nimrange <- c(min(nims$MinNIM, na.rm=TRUE), max(nims$MaxNIM, na.rm=TRUE))
+        }
+
+        bind_cols(
+          pp |> select(ParSet, parasite, drug, endemicity, design, efficacy_expected),
+          nims
+        ) ->
+          out
+
+      }) -> ss
+
+      if(inherits(ss, "try-error")) return(pp |> mutate(Status = "Failed", MSG = as.character(ss)))
+
+      return(out)
+
+    }) ->
+    out
+
+  if(any(sapply(out, \(x) "Status" %in% names(x)))){
+    warning("One or more error encountered")
+    return(out)
+  }
+
+  ss <- try({
+    out |>
+      bind_rows() |>
+      ungroup() ->
+      out
+  })
+
+  return(out)
+}
+
+
 vary_n_analysis <- function(parameters, iters=iterations, performance=NULL, performance_max=0.999, min = 10L, max = 500L, increment=individ_increment, cl=NULL){
 
   if(!"ParSet" %in% names(parameters)){
@@ -251,7 +371,7 @@ vary_n_analysis <- function(parameters, iters=iterations, performance=NULL, perf
     lafun(function(pp){
 
       try({
-        if(is.null(cl)) cat("Parameter cluster ", i, " of ", length(pars), "...\n", sep="")
+        #if(is.null(cl)) cat("Parameter cluster ", i, " of ", length(pars), "...\n", sep="")
 
         ok <- FALSE
 
@@ -385,6 +505,81 @@ plot_data_ss <- function(res){
     pivot_longer(c("Performance","Completion","StdvCost","Power","MeanCost")) |>
     mutate(name = factor(name, levels=c("Completion","Power","Performance","MeanCost","StdvCost")))
 }
+
+
+############################################
+## Calibrate non-inferiority margins
+############################################
+
+
+expand_grid(
+  parameters_scenario, # |> filter(endemicity==15),
+  parameters_fixed |> filter(design == "NS_11", min_positive == 1),
+  parameters_cost |> filter(setting == "Ethiopia"),
+  parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
+  parameters_analysis |> filter(analysis_type=="delta")
+) |>
+  add_mean_and_cv() |>
+  left_join(
+    parameters_thresholds |>
+      filter(framework=="FHT") |>
+      mutate(true_efficacy = efficacy_expected),
+    by = "parasite", relationship="many-to-many"
+  ) |>
+  mutate(
+    MinSampleSize = 100,
+    MaxSampleSize = 500,
+    TargetPower = 0.8,
+  ) ->
+  parameters
+
+parameters |>
+  vary_nim_analysis(cl=6) ->
+  perfout
+#qsave(perfout, "notebooks/paper_2025/perfout_res.rqs")
+perfout <- qread("notebooks/paper_2025/perfout_res.rqs")
+
+
+perfout |>
+  ggplot(aes(x=SampleSize, y=BestNIM, ymin=MinNIM, ymax=MaxNIM)) +
+  geom_ribbon(alpha=0.25) +
+  geom_line() +
+  geom_point(aes(y=ObsNIM, col=ObsPerf)) +
+  facet_wrap(~ parasite + drug)
+
+perfout |>
+  bind_rows() |>
+  mutate(Lower = efficacy_expected - BestNIM) |>
+  filter(Lower >= 0) |>
+  ggplot(aes(x=SampleSize, y=Lower, col=factor(endemicity))) +
+  geom_hline(aes(yintercept = efficacy_expected), lty="dashed") +
+  geom_hline(yintercept = 1, lty="dotted") +
+  geom_hline(aes(yintercept = 1-(1-efficacy_expected)*c(2)), lty="dotted") +
+  geom_line() +
+  facet_wrap(~ str_c(drug, " vs. ", parasite), scales="free_y") +
+  ylim(c(NA,1))
+ggsave("noninfmargins.pdf")
+
+perfout |>
+  bind_rows() |>
+  filter(endemicity==15 & SampleSize==500 | endemicity==35 & SampleSize==250) |>
+  mutate(lower_efficacy = efficacy_expected - BestNIM) |>
+  select(parasite, drug, endemicity, SampleSize, efficacy_expected, lower_efficacy, NIM=BestNIM) |>
+  arrange(parasite, drug, endemicity) |>
+  writexl::write_xlsx("noninfmargins.xlsx")
+
+perfout |>
+  bind_rows() |>
+  mutate(Lower = efficacy_expected - BestNIM) |>
+  filter(Lower >= 0, endemicity>5) |>
+  ggplot(aes(x=SampleSize, y=Lower)) +
+  geom_hline(aes(yintercept = efficacy_expected), lty="dashed") +
+  geom_hline(yintercept = 1, lty="dotted") +
+  geom_hline(aes(yintercept = 1-(1-efficacy_expected)*2), lty="dotted") +
+  geom_line() +
+  facet_grid(str_c(drug, " vs. ", parasite) ~ endemicity, scales="free_y") +
+  ylim(c(NA,1))
+
 
 
 ############################################
