@@ -72,7 +72,8 @@ tribble(~parasite, ~drug, ~WHO.efficacy_lower_target, ~WHO.efficacy_expected, ~F
   mutate(efficacy_lower_target = efficacy_lower_target / 100) |>
   mutate(efficacy_expected = efficacy_expected / 100) |>
   mutate(NIM = case_when(
-      parasite == "ascaris" ~ 5,
+      parasite == "ascaris" & drug == "ALB" ~ 2.9,
+      parasite == "ascaris" & drug == "MEB" ~ 5,
       parasite == "hookworm" & drug == "ALB" ~ 5,
       parasite == "hookworm" & drug == "MEB" ~ 25,
       parasite == "trichuris" ~ 35,
@@ -1176,7 +1177,7 @@ res |>
   res
 
 stopifnot(nrow(res)==(nrow(parameters)*2L))
-# qsave(res, "notebooks/paper_2025/tables2_res.rqs")
+# qsave(res, "notebooks/paper_2025/tables2_res_t2.rqs")
 # res <- qread("notebooks/paper_2025/tables2_res.rqs")
 
 
