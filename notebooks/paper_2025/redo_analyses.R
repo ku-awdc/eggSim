@@ -70,7 +70,14 @@ tribble(~parasite, ~drug, ~WHO.efficacy_lower_target, ~WHO.efficacy_expected, ~F
   separate_wider_delim(name, delim=".", names=c("framework", "name")) |>
   pivot_wider(names_from=name, values_from=value) |>
   mutate(efficacy_lower_target = efficacy_lower_target / 100) |>
-  mutate(efficacy_expected = efficacy_expected / 100) ->
+  mutate(efficacy_expected = efficacy_expected / 100) |>
+  mutate(NIM = case_when(
+      parasite == "ascaris" ~ 5,
+      parasite == "hookworm" & drug == "ALB" ~ 5,
+      parasite == "hookworm" & drug == "MEB" ~ 25,
+      parasite == "trichuris" ~ 35,
+  )) |>
+  mutate(efficacy_lower_target = efficacy_expected - NIM/100) ->
   parameters_thresholds
 
 ## Parameters for analysis type
@@ -1111,6 +1118,8 @@ expand_grid(
   ) ->
   parameters
 
+## TODO: take out p_add for NS then duplicate them later
+
 
 ## For Table 3:
 parameters |>
@@ -1153,6 +1162,7 @@ res |>
 
 ## Takes around 7.5 hours:
 parameters |>
+  slice_sample(prop=1) |>
   vary_n_analysis(cl=10L, iters=iterations, performance=c(0.8,0.9), increment=1) ->
   res
 
@@ -1185,7 +1195,6 @@ res |>
 
 ## Additional plots:
 
-
 pdf("notebooks/paper_2025/figX_mean_cost.pdf", width=6, height=6)
 for(dp in unique(with(res, str_c(drug," vs. ", parasite)))){
   print({
@@ -1212,7 +1221,7 @@ for(dp in unique(with(res, str_c(drug," vs. ", parasite)))){
 }
 dev.off()
 
-pdf("notebooks/paper_2025/total_children.pdf", width=6, height=6)
+pdf("notebooks/paper_2025/figX_total_children.pdf", width=6, height=6)
 for(dp in unique(with(res, str_c(drug," vs. ", parasite)))){
   print({
     res |>
@@ -1245,7 +1254,7 @@ for(dp in unique(with(res, str_c(drug," vs. ", parasite)))){
       group_by(endemicity, dropout, force_inclusion_prob, setting, drug, parasite, Target) |>
       mutate(cost_mean_min = cost_mean[design=="NS_11"]) |>
       ungroup() |>
-      mutate(n_individ_delta = n_individ-n_individ_min, cost_mean_delta = cost_mean-cost_mean_min) |>
+      mutate(cost_mean_delta = cost_mean-cost_mean_min) |>
       filter(Target==0.8, design!='NS_11') |>
       filter(Target==0.8, str_c(drug," vs. ", parasite)==dp) |>
       filter(force_inclusion_prob==0 | design%in%c("SSR_11","SSR_12")) |>
@@ -1286,29 +1295,72 @@ res |>
   geom_hline(yintercept=0, lty="dashed")
 
 
+
+res |>
+  filter(Target==0.8) |>
+  filter(force_inclusion_prob==0 | design%in%c("SSR_11","SSR_12")) |>
+  ggplot(aes(x=str_c(format(force_inclusion_prob) |> str_replace(" ", "0"), " (", design, ")"), y=n_individ, col=design, fill=design, pch=str_c(setting, " ", dropout))) +
+  #  geom_boxplot() +
+  # geom_violin() +
+#  geom_point() +
+  geom_point(position = position_dodge(width=0.5)) +
+#  facet_grid(str_c(drug," vs. ", parasite) ~ fct(str_c(endemicity, "% prev.")), scales="fixed") +
+  facet_grid(fct(str_c(endemicity, "% prev.")) ~ str_c(drug, " vs. ", parasite, "\n(", efficacy_lower_target*100, " - ", efficacy_expected*100, ")"), scales="free_y") +
+#  scale_y_continuous(breaks=c(0,1,2,3,4), labels=c("$0","$10","$100","$1k","$10k")) +
+  labs(y="Required sample size for 80% power", x="Padd") +
+  theme(legend.position="bottom", legend.title=element_blank()) +
+  geom_hline(yintercept=0, lty="dashed")+
+#  scale_colour_manual(values=gg_colour_hue(4)[-1]) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+#  scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
+#  scale_fill_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"])))
+ggsave("notebooks/paper_2025/figS5.pdf", width=12, height=9)
+
+res |>
+  filter(Target==0.8) |>
+  filter(force_inclusion_prob==0 | design%in%c("SSR_11","SSR_12")) |>
+  ggplot(aes(x=str_c(format(force_inclusion_prob) |> str_replace(" ", "0"), " (", design, ")"), y=cost_mean, col=design, fill=design, pch=str_c(setting, " ", dropout))) +
+  #  geom_boxplot() +
+  # geom_violin() +
+  #  geom_point() +
+  geom_point(position = position_dodge(width=0.5)) +
+  #  facet_grid(str_c(drug," vs. ", parasite) ~ fct(str_c(endemicity, "% prev.")), scales="fixed") +
+  facet_grid(fct(str_c(endemicity, "% prev.")) ~ str_c(drug, " vs. ", parasite, "\n(", efficacy_lower_target*100, " - ", efficacy_expected*100, ")"), scales="free_y") +
+  #  scale_y_continuous(breaks=c(0,1,2,3,4), labels=c("$0","$10","$100","$1k","$10k")) +
+  labs(y="Mean cost for 80% power", x="Padd") +
+  theme(legend.position="bottom", legend.title=element_blank()) +
+  geom_hline(yintercept=0, lty="dashed")+
+  #  scale_colour_manual(values=gg_colour_hue(4)[-1]) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
+#  scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
+#  scale_fill_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"])))
+ggsave("notebooks/paper_2025/figS6.pdf", width=12, height=9)
+
+
 res |>
   group_by(endemicity, dropout, force_inclusion_prob, setting, drug, parasite, Target) |>
   mutate(cost_mean_min = cost_mean[design=="NS_11"]) |>
   ungroup() |>
-  mutate(n_individ_delta = n_individ-n_individ_min, cost_mean_delta = cost_mean-cost_mean_min) |>
+  mutate(cost_mean_delta = cost_mean-cost_mean_min) |>
   filter(Target==0.8, design!='NS_11') |>
   filter(force_inclusion_prob==0 | design%in%c("SSR_11","SSR_12")) |>
   ggplot(aes(x=str_c(format(force_inclusion_prob) |> str_replace(" ", "0"), " (", design, ")"), y=cost_mean_delta, col=design, fill=design, pch=str_c(setting, " ", dropout))) +
   #  geom_boxplot() +
   # geom_violin() +
-#  geom_point() +
+  #  geom_point() +
   geom_point(position = position_dodge(width=0.5)) +
-  facet_grid(str_c(drug," vs. ", parasite) ~ fct(str_c(endemicity, "% prev.")), scales="fixed") +
-#  facet_grid(fct(str_c(endemicity, "% prev.")) ~ str_c(drug," vs. ", parasite) , scales="fixed") +
-#  scale_y_continuous(breaks=c(0,1,2,3,4), labels=c("$0","$10","$100","$1k","$10k")) +
-  labs(y="Absolute difference in cost relative to NS_11 (for 80% power)", x="Padd") +
+  #  facet_grid(str_c(drug," vs. ", parasite) ~ fct(str_c(endemicity, "% prev.")), scales="fixed") +
+  facet_grid(fct(str_c(endemicity, "% prev.")) ~ str_c(drug, " vs. ", parasite, "\n(", efficacy_lower_target*100, " - ", efficacy_expected*100, ")"), scales="free_y") +
+  #  scale_y_continuous(breaks=c(0,1,2,3,4), labels=c("$0","$10","$100","$1k","$10k")) +
+  labs(y="Absolute difference in mean cost relative to NS_11 (for 80% power)", x="Padd") +
   theme(legend.position="bottom", legend.title=element_blank()) +
   geom_hline(yintercept=0, lty="dashed")+
   scale_colour_manual(values=gg_colour_hue(4)[-1]) +
   theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1))
 #  scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
 #  scale_fill_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"])))
-ggsave("notebooks/paper_2025/figS5.pdf", width=9, height=9)
+ggsave("notebooks/paper_2025/figS7.pdf", width=12, height=9)
+
 
 res |>
   filter(Target==0.8, force_inclusion_prob==0.2) |>
