@@ -72,7 +72,7 @@ tribble(~parasite, ~drug, ~WHO.efficacy_lower_target, ~WHO.efficacy_expected, ~F
   mutate(efficacy_lower_target = efficacy_lower_target / 100) |>
   mutate(efficacy_expected = efficacy_expected / 100) |>
   mutate(NIM = case_when(
-      parasite == "ascaris" & drug == "ALB" ~ 2.9,
+      parasite == "ascaris" & drug == "ALB" ~ 1.9,
       parasite == "ascaris" & drug == "MEB" ~ 5,
       parasite == "hookworm" & drug == "ALB" ~ 5,
       parasite == "hookworm" & drug == "MEB" ~ 25,
@@ -1168,7 +1168,7 @@ parameters |>
   res
 
 res |>
-  group_by(endemicity, dropout, force_inclusion_prob, setting, drug, parasite, Target) |>
+  group_by(endemicity, dropout, force_inclusion_prob, setting, drug, parasite, efficacy_expected, efficacy_lower_target, NIM, Target) |>
   mutate(n_individ_min = min(n_individ), cost_mean_min = min(cost_mean)) |>
   ungroup() |>
   mutate(n_individ_delta = n_individ-n_individ_min, cost_mean_delta = cost_mean-cost_mean_min) |>
@@ -1177,7 +1177,7 @@ res |>
   res
 
 stopifnot(nrow(res)==(nrow(parameters)*2L))
-# qsave(res, "notebooks/paper_2025/tables2_res_t2.rqs")
+# qsave(res, "notebooks/paper_2025/tables2_res_t3.rqs")
 # res <- qread("notebooks/paper_2025/tables2_res.rqs")
 
 
