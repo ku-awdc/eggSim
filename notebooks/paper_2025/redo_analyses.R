@@ -231,7 +231,7 @@ fix_n_analysis <- function(parameters, iters=iterations, min = 10L, max = 500L, 
 }
 
 
-vary_nim_analysis <- function(parameters, performance=0.8, min = 100L, max = 500L, NIMlen=25L, cl=NULL){
+vary_nim_analysis <- function(parameters, performance=0.8, min = 100L, max = 1000L, NIMlen=25L, cl=NULL){
 
   stopifnot(length(performance)==1L)
 
@@ -289,16 +289,16 @@ vary_nim_analysis <- function(parameters, performance=0.8, min = 100L, max = 500
             lapply(\(x){
               obs <- x |> arrange(NIM) |> filter(Performance > performance) |> slice(1)
               if(pgrs$GAM[r]){
-                ss <- try(suppressWarnings(mod <- mgcv::gam(cbind(Positive, Negative) ~ s(NIM), family="binomial", data=x)))
+                ss <- try(suppressWarnings(mod <- mgcv::gam(cbind(Positive, Negative) ~ s(log(NIM)), family="binomial", data=x)))
                 if(inherits(ss, "try-error")) browser()
 
-                afun <- with(x, approxfun(NIM ~ predict(mod)))
+                afun <- with(x |> mutate(logNIM = log(NIM)), approxfun(logNIM ~ predict(mod)))
                 tibble(
                   SampleSize = x$n_individ[1],
                   Performance = performance,
-                  MinNIM = afun(qlogis(performance*(1-pgrs$Scaling[r]))),
-                  BestNIM = afun(qlogis(performance)),
-                  MaxNIM = afun(qlogis(performance*(1+pgrs$Scaling[r]))),
+                  MinNIM = afun(qlogis(performance*(1-pgrs$Scaling[r]))) |> exp(),
+                  BestNIM = afun(qlogis(performance)) |> exp(),
+                  MaxNIM = afun(qlogis(performance*(1+pgrs$Scaling[r]))) |> exp(),
                   ObsPerf = obs$Performance,
                   ObsNIM = obs$NIM
                 )
@@ -520,7 +520,7 @@ plot_data_ss <- function(res){
 ############################################
 
 expand_grid(
-  parameters_scenario, # |> filter(endemicity==15),
+  parameters_scenario |> distinct(parasite) |> expand_grid(endemicity = seq(5,65,by=2.5)),
   parameters_fixed |> filter(design == "NS_11", min_positive == 1),
   parameters_cost |> filter(setting == "Ethiopia"),
   parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
@@ -532,26 +532,24 @@ expand_grid(
       filter(framework=="FHT") |>
       mutate(true_efficacy = efficacy_expected),
     by = "parasite", relationship="many-to-many"
-  ) |>
-  mutate(
-    MinSampleSize = 100,
-    MaxSampleSize = 500,
-    TargetPower = 0.8,
   ) ->
-  parameters
+  perf_parameters
 
-parameters |>
-  vary_nim_analysis(cl=6) ->
+perf_parameters |>
+  vary_nim_analysis(performance=0.8, min=100, max=1000, cl=8) ->
   perfout
 #qsave(perfout, "notebooks/paper_2025/perfout_res.rqs")
 perfout <- qread("notebooks/paper_2025/perfout_res.rqs")
 
 
 perfout |>
-  ggplot(aes(x=SampleSize, y=BestNIM, ymin=MinNIM, ymax=MaxNIM)) +
-  geom_ribbon(alpha=0.25) +
+#  lapply(\(x) if(nrow(x)==1) NULL else x) |>
+  bind_rows() |>
+  mutate(endemicity = factor(endemicity)) |>
+  ggplot(aes(x=SampleSize, y=BestNIM, ymin=MinNIM, ymax=MaxNIM, col=endemicity, fill=endemicity)) +
+  geom_ribbon(alpha=0.25, lwd=0) +
   geom_line() +
-  geom_point(aes(y=ObsNIM, col=ObsPerf)) +
+#  geom_point(aes(y=ObsNIM, col=ObsPerf)) +
   facet_wrap(~ parasite + drug)
 
 perfout |>
@@ -588,6 +586,16 @@ perfout |>
   ylim(c(NA,1))
 
 
+tribble(~effort, ~parasite, ~drug, ~lower,
+        "Moderate", "ascaris", "ALB", 0.996,
+        "Moderate", "ascaris", "MEB", 0.940,
+        "Moderate", "hookworm", "ALB", 0.910,
+        "Moderate", "hookworm", "MEB", 0.560,
+        "Moderate", "trichuris", "ALB", 0.300,
+        "Moderate", "trichuris", "MEB", 0.260,
+) ->
+  thresholds
+
 
 ############################################
 ## Endemicity vs non-inferiority margins
@@ -595,7 +603,7 @@ perfout |>
 
 
 expand_grid(
-  parameters_scenario |> select(parasite) |> expand_grid(endemicity = seq(5,65,by=2.5)),
+  parameters_scenario |> distinct(parasite) |> expand_grid(endemicity = seq(5,65,by=2.5)),
   parameters_fixed |> filter(design == "NS_11", min_positive == 1),
   parameters_cost |> filter(setting == "Ethiopia"),
   parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
@@ -610,37 +618,152 @@ expand_grid(
   ) |>
   mutate(
     MinSampleSize = 100,
-    MaxSampleSize = 500,
+    MaxSampleSize = 1000,
     TargetPower = 0.8,
   ) ->
   parameters
 
 parameters |>
-  vary_nim_analysis(cl=6) ->
+  vary_nim_analysis(cl=8) ->
   endperfout
 #qsave(endperfout, "notebooks/paper_2025/endperfout_res.rqs")
 endperfout <- qread("notebooks/paper_2025/endperfout_res.rqs")
 
+endperfout[which(sapply(endperfout, nrow)==1)] |> bind_rows() |> count(parasite, endemicity)
 
-perfout |>
-  ggplot(aes(x=SampleSize, y=BestNIM, ymin=MinNIM, ymax=MaxNIM)) +
-  geom_ribbon(alpha=0.25) +
-  geom_line() +
-  geom_point(aes(y=ObsNIM, col=ObsPerf)) +
-  facet_wrap(~ parasite + drug)
-
-perfout |>
+endperfout |>
+  lapply(\(x) if(nrow(x)==1) NULL else x) |>
   bind_rows() |>
+  filter(SampleSize %in% c(100,250,500,1000), !is.na(BestNIM)) |>
+  ggplot(aes(x=endemicity, y=BestNIM, col=factor(SampleSize))) +
+  geom_line() +
+  facet_wrap(~ parasite + drug, scales="free_y")
+
+endperfout |>
+  lapply(\(x) if(nrow(x)==1) NULL else x) |>
+  bind_rows() |>
+  group_by(parasite, drug, endemicity, SampleSize, efficacy_expected) |>
+  summarise(BestNIM = mean(BestNIM), efficacy_expected = mean(efficacy_expected), .groups="drop") |>
   mutate(Lower = efficacy_expected - BestNIM) |>
-  filter(Lower >= 0) |>
-  ggplot(aes(x=SampleSize, y=Lower, col=factor(endemicity))) +
+  filter(SampleSize %in% c(100,250,500,1000), !is.na(BestNIM)) |>
+  filter(SampleSize >= 250 | endemicity >= 35, SampleSize>=500 | endemicity >=15) ->
+  plotdata
+
+plotdata |>
+  ggplot(aes(x=endemicity, y=Lower, col=factor(SampleSize))) +
   geom_hline(aes(yintercept = efficacy_expected), lty="dashed") +
   geom_hline(yintercept = 1, lty="dotted") +
   geom_hline(aes(yintercept = 1-(1-efficacy_expected)*c(2)), lty="dotted") +
+  geom_segment(data=plotdata |> filter(endemicity %in% unique(parameters_scenario$endemicity)),
+             aes(x=0, xend=endemicity, y=Lower, col=factor(SampleSize)), lty="dashed") +
   geom_line() +
   facet_wrap(~ str_c(drug, " vs. ", parasite), scales="free_y") +
-  ylim(c(NA,1))
+  ylim(c(NA,1)) +
+  scale_x_continuous(breaks=parameters_scenario |> distinct(endemicity) |> pull(endemicity)) +
+  theme(legend.position = "bottom", legend.title = element_blank()) +
+  ylab("Lower Threshold") + xlab("Endemicity")
 ggsave("noninfmargins.pdf")
+
+endperfout |>
+  lapply(\(x) if(nrow(x)==1) NULL else x) |>
+  bind_rows() |>
+  group_by(parasite, drug, endemicity, SampleSize, efficacy_expected) |>
+  summarise(BestNIM = mean(BestNIM), efficacy_expected = mean(efficacy_expected), .groups="drop") |>
+  mutate(Lower = efficacy_expected - BestNIM) |>
+  filter(SampleSize %in% c(100,250,500), !is.na(BestNIM)) |>
+  filter(endemicity %in% unique(parameters_scenario$endemicity)) |>
+  select(parasite, drug, endemicity, SampleSize, NIM=BestNIM, Efficacy = efficacy_expected, LowerThreshold = Lower) |>
+  arrange(parasite, drug, endemicity, SampleSize) |>
+  writexl::write_xlsx("noninfmargins.xlsx")
+
+tribble(~Effort, ~SampleSize, ~endemicity,
+        "Easy", 500, 5,
+        "Easy", 250, 15,
+        "Easy", 100, 35,
+        "Moderate", 1000, 5,
+        "Moderate", 500, 15,
+        "Moderate", 250, 35,
+        "Moderate", 100, 65,
+        "Hard", 1000, 15,
+        "Hard", 500, 35,
+        "Hard", 250, 65,
+        "Extreme", 1000, 35,
+        "Extreme", 500, 65
+) |>
+  mutate(Effort = fct(Effort)) ->
+  effort
+
+endperfout |>
+  bind_rows() |>
+  group_by(parasite, drug, endemicity, SampleSize, efficacy_expected) |>
+  summarise(BestNIM = mean(BestNIM), efficacy_expected = mean(efficacy_expected), .groups="drop") |>
+  mutate(Lower = efficacy_expected - BestNIM) |>
+  right_join(effort) |>
+  filter(endemicity %in% unique(parameters_scenario$endemicity)) |>
+  select(parasite, drug, Effort, endemicity, SampleSize, NIM=BestNIM, Efficacy = efficacy_expected, LowerThreshold = Lower) |>
+  arrange(parasite, drug, endemicity, SampleSize) |>
+  writexl::write_xlsx("noninfmargins.xlsx")
+
+perfout |>
+  bind_rows() |>
+  select(parasite, drug, endemicity, SampleSize, efficacy_expected, BestNIM) |>
+  mutate(Lower = efficacy_expected - BestNIM) |>
+  right_join(effort, by = join_by(endemicity, SampleSize)) |>
+  group_by(parasite, drug, Effort, efficacy_expected) |>
+  summarise(Lower = mean(Lower), .groups='drop') |>
+  bind_rows(
+    perfout |>
+      bind_rows() |>
+      mutate(Lower = efficacy_expected - BestNIM) |>
+      right_join(effort, by = join_by(endemicity, SampleSize)) |>
+      select(parasite, drug, endemicity, Effort, efficacy_expected, Lower)
+  ) |>
+  mutate(endemicity = if_else(is.na(endemicity), "Average", str_c("End_", endemicity |> format() |> str_replace(" ", "0")))) |>
+  bind_rows(
+    tribble(~Effort, ~parasite, ~drug, ~Lower,
+            "Moderate", "ascaris", "ALB", 0.996,
+            "Moderate", "ascaris", "MEB", 0.940,
+            "Moderate", "hookworm", "ALB", 0.910,
+            "Moderate", "hookworm", "MEB", 0.560,
+            "Moderate", "trichuris", "ALB", 0.300,
+            "Moderate", "trichuris", "MEB", 0.260,
+    ) |>
+      mutate(Effort = fct(Effort, levels=levels(effort$Effort))) |>
+      left_join(parameters_thresholds |> filter(framework=="FHT") |> select(parasite,drug,efficacy_expected),
+                by = join_by(parasite, drug)) |> mutate(endemicity = "Using")
+  ) |>
+  mutate(endemicity = fct(endemicity, levels=c(str_c("End_",format(c(5,15,35,65))|>str_replace(" ", "0")), "Average", "Using"))) |>
+  pivot_wider(names_from=endemicity, values_from=Lower, names_sort=TRUE) |>
+  arrange(parasite, drug, Effort) |>
+  mutate(Using = case_when(
+    Effort=="Moderate" ~ Using,
+    TRUE ~ round(Average, if_else(parasite=="ascaris"&drug=="ALB", 3, 2))
+  )) ->
+  all_thresholds
+
+writexl::write_xlsx(all_thresholds, "all_thresholds.xlsx")
+
+
+perfout |>
+  bind_rows() |>
+  group_by(parasite, drug, endemicity, SampleSize, efficacy_expected) |>
+  summarise(BestNIM = mean(BestNIM), efficacy_expected = mean(efficacy_expected), .groups="drop") |>
+  mutate(Lower = efficacy_expected - BestNIM) |>
+#  filter(SampleSize >= 250 | endemicity >= 15) |>
+  filter(!is.na(BestNIM), SampleSize %in% c(100,250,500,1000)) |>
+  ggplot(aes(x=endemicity, y=Lower, col=factor(SampleSize))) +
+  geom_hline(aes(yintercept = efficacy_expected), lty="dashed") +
+  geom_hline(yintercept = 1, lty="dotted") +
+  geom_hline(aes(yintercept = 1-(1-efficacy_expected)*c(2)), lty="dotted") +
+  geom_segment(data=plotdata |> right_join(effort),
+               aes(x=0, xend=endemicity, y=Lower, col=factor(SampleSize)), lty="dashed") +
+  geom_line() +
+  facet_wrap(~ str_c(drug, " vs. ", parasite), scales="free_y") +
+  ylim(c(NA,1)) +
+  scale_x_continuous(breaks=parameters_scenario |> distinct(endemicity) |> pull(endemicity)) +
+  theme(legend.position = "bottom", legend.title = element_blank()) +
+  ylab("Lower Threshold") + xlab("Endemicity")
+
 
 perfout |>
   bind_rows() |>
@@ -1180,8 +1303,10 @@ ggsave("notebooks/paper_2025/fig4.pdf", width=7, height=6)
 ############################################
 
 
+##### RUNNING FROM HERE
+
 expand_grid(
-  parameters_scenario |> filter(endemicity%in%c(5,15,35,65)),
+  parameters_scenario,
   parameters_fixed |> filter(min_positive%in%c(1)),
   parameters_cost, # |> filter(setting == "Ethiopia"),
   parameters_dropadd |> filter(force_inclusion_prob==0) |> select(starts_with("dropout")),
@@ -1190,12 +1315,54 @@ expand_grid(
 ) |>
   add_mean_and_cv() |>
   left_join(
-    parameters_thresholds |> filter(framework=="FHT") |> mutate(true_efficacy = efficacy_expected),
+    parameters_thresholds |>
+      filter(framework=="FHT") |>
+      mutate(true_efficacy = efficacy_expected) |>
+      select(parasite, drug, framework, efficacy_expected, true_efficacy),
     by = "parasite", relationship="many-to-many"
+  ) |>
+  left_join(
+    all_thresholds |> select(parasite, drug, Effort, efficacy_expected, efficacy_lower_target=Using),
+    by = join_by(parasite, drug, efficacy_expected),
+    relationship="many-to-many"
   ) ->
   parameters
 
-## TODO: take out p_add for NS then duplicate them later
+## Take out p_add for NS then duplicate them later
+parameters |>
+  filter(design %in% c("SSR_11","SSR_12") | force_inclusion_prob==0) ->
+  parameters_subselected
+
+parameters_subselected |>
+  slice_sample(prop=1) |>
+  vary_n_analysis(cl=8L, iters=iterations, performance=c(0.8,0.9), increment=1) ->
+  res
+
+expand_grid(
+  parameters_scenario |> distinct(parasite) |> expand_grid(endemicity = seq(5,65,by=2.5)),
+  parameters_fixed |> filter(design == "NS_11", min_positive == 1),
+  parameters_cost |> filter(setting == "Ethiopia"),
+  parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
+  parameters_analysis |> filter(analysis_type=="delta")
+) |>
+  add_mean_and_cv() |>
+  left_join(
+    parameters_thresholds |>
+      filter(framework=="FHT") |>
+      mutate(true_efficacy = efficacy_expected),
+    by = "parasite", relationship="many-to-many"
+  ) ->
+  perf_parameters
+
+perf_parameters |>
+  vary_nim_analysis(performance=0.8, min=100, max=1000, cl=8) ->
+  perfout
+
+##### TO HERE
+
+
+## TODO: add missing padd back in
+
 
 
 ## For Table 3:

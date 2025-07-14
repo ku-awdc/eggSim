@@ -88,6 +88,16 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
     })
   }
 
+  if(quiet){
+    lafun <- lapply
+  }else{
+    if(cl==1){
+      lafun <- function(x, ff) pblapply(x, ff, cl=NULL)
+    }else{
+      lafun <- function(x, ff) pblapply(x, ff, cl=cl)
+    }
+  }
+
   ## Run the parameter/scenario/n_individ combos:
   if(!quiet) cat("Running simulations for ", length(parameters), " parameter sets...\n", sep="")
   st <- Sys.time()
@@ -102,7 +112,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
     }) |>
     do.call("c", args=_) |>
     # Use of cl argument means we always should use pblapply:
-    pblapply(function(x){
+    lafun(function(x){
       # Remove the design and ns from the parameters:
       x |>
         count(design, n_day_screen, n_aliquot_screen, n_day_pre, n_aliquot_pre, n_day_post, n_aliquot_post, min_positive_screen, min_positive_pre) |>
@@ -251,7 +261,7 @@ survey_sim <- function(design = c("NS_11","SS_11","SSR_11"),
       }
 
       return(rv)
-    }, cl=cl) |>
+    }) |>
     bind_rows() ->
     results
 
