@@ -519,7 +519,6 @@ plot_data_ss <- function(res){
 ## Calibrate non-inferiority margins
 ############################################
 
-
 expand_grid(
   parameters_scenario, # |> filter(endemicity==15),
   parameters_fixed |> filter(design == "NS_11", min_positive == 1),
@@ -587,6 +586,83 @@ perfout |>
   geom_line() +
   facet_grid(str_c(drug, " vs. ", parasite) ~ endemicity, scales="free_y") +
   ylim(c(NA,1))
+
+
+
+############################################
+## Endemicity vs non-inferiority margins
+############################################
+
+
+expand_grid(
+  parameters_scenario |> select(parasite) |> expand_grid(endemicity = seq(5,65,by=2.5)),
+  parameters_fixed |> filter(design == "NS_11", min_positive == 1),
+  parameters_cost |> filter(setting == "Ethiopia"),
+  parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
+  parameters_analysis |> filter(analysis_type=="delta")
+) |>
+  add_mean_and_cv() |>
+  left_join(
+    parameters_thresholds |>
+      filter(framework=="FHT") |>
+      mutate(true_efficacy = efficacy_expected),
+    by = "parasite", relationship="many-to-many"
+  ) |>
+  mutate(
+    MinSampleSize = 100,
+    MaxSampleSize = 500,
+    TargetPower = 0.8,
+  ) ->
+  parameters
+
+parameters |>
+  vary_nim_analysis(cl=6) ->
+  endperfout
+#qsave(endperfout, "notebooks/paper_2025/endperfout_res.rqs")
+endperfout <- qread("notebooks/paper_2025/endperfout_res.rqs")
+
+
+perfout |>
+  ggplot(aes(x=SampleSize, y=BestNIM, ymin=MinNIM, ymax=MaxNIM)) +
+  geom_ribbon(alpha=0.25) +
+  geom_line() +
+  geom_point(aes(y=ObsNIM, col=ObsPerf)) +
+  facet_wrap(~ parasite + drug)
+
+perfout |>
+  bind_rows() |>
+  mutate(Lower = efficacy_expected - BestNIM) |>
+  filter(Lower >= 0) |>
+  ggplot(aes(x=SampleSize, y=Lower, col=factor(endemicity))) +
+  geom_hline(aes(yintercept = efficacy_expected), lty="dashed") +
+  geom_hline(yintercept = 1, lty="dotted") +
+  geom_hline(aes(yintercept = 1-(1-efficacy_expected)*c(2)), lty="dotted") +
+  geom_line() +
+  facet_wrap(~ str_c(drug, " vs. ", parasite), scales="free_y") +
+  ylim(c(NA,1))
+ggsave("noninfmargins.pdf")
+
+perfout |>
+  bind_rows() |>
+  filter(endemicity==15 & SampleSize==500 | endemicity==35 & SampleSize==250) |>
+  mutate(lower_efficacy = efficacy_expected - BestNIM) |>
+  select(parasite, drug, endemicity, SampleSize, efficacy_expected, lower_efficacy, NIM=BestNIM) |>
+  arrange(parasite, drug, endemicity) |>
+  writexl::write_xlsx("noninfmargins.xlsx")
+
+perfout |>
+  bind_rows() |>
+  mutate(Lower = efficacy_expected - BestNIM) |>
+  filter(Lower >= 0, endemicity>5) |>
+  ggplot(aes(x=SampleSize, y=Lower)) +
+  geom_hline(aes(yintercept = efficacy_expected), lty="dashed") +
+  geom_hline(yintercept = 1, lty="dotted") +
+  geom_hline(aes(yintercept = 1-(1-efficacy_expected)*2), lty="dotted") +
+  geom_line() +
+  facet_grid(str_c(drug, " vs. ", parasite) ~ endemicity, scales="free_y") +
+  ylim(c(NA,1))
+
+
 
 
 
