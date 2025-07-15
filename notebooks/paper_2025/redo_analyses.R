@@ -1333,6 +1333,7 @@ parameters |>
   filter(design %in% c("SSR_11","SSR_12") | force_inclusion_prob==0) ->
   parameters_subselected
 
+## Takes 15 hours
 parameters_subselected |>
   slice_sample(prop=1) |>
   vary_n_analysis(cl=8L, iters=iterations, performance=c(0.8,0.9), increment=1) ->
