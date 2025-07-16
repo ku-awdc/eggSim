@@ -56,7 +56,7 @@ tibble(
   expand_grid(
     force_inclusion_prob = c(0, 0.05, 0.1, 0.15, 0.2)
   ) |>
-  filter(dropout=="baseline" | force_inclusion_prob==0) ->
+  filter(dropout=="baseline" | force_inclusion_prob==0.1) ->
   parameters_dropadd
 
 ## Parameters for analysis type
@@ -116,7 +116,7 @@ expand_grid(
   parameters_fixed
 
 ## Parameters for drug efficacy with Moderate targets:
-tribble(~parasite, ~drug, ~WHO.efficacy_lower_target, ~WHO.efficacy_expected, ~FHT.efficacy_lower_target, ~FHT.efficacy_expected,
+tribble(~parasite, ~drug, ~rubbish, ~WHO.efficacy_lower_target, ~FHT.efficacy_lower_target, ~efficacy_expected,
         "ascaris", "ALB", 85.0, 95.0, 99.6, 99.9,
         "ascaris", "MEB", 85.0, 95.0, 94.0, 98.0,
         "trichuris", "ALB", 40.0, 50.0, 30.0, 64.5,
@@ -124,7 +124,8 @@ tribble(~parasite, ~drug, ~WHO.efficacy_lower_target, ~WHO.efficacy_expected, ~F
         "hookworm", "ALB", 80.0, 90.0, 91.0, 96.2,
         "hookworm", "MEB", 60.0, 70.0, 56.0, 80.6
 ) |>
-  pivot_longer(cols=c(-parasite, -drug)) |>
+  select(-rubbish) |>
+  pivot_longer(cols=c(-parasite, -drug, -efficacy_expected)) |>
   separate_wider_delim(name, delim=".", names=c("framework", "name")) |>
   pivot_wider(names_from=name, values_from=value) |>
   mutate(efficacy_lower_target = efficacy_lower_target / 100) |>
@@ -741,39 +742,49 @@ cols <- c(gg_colour_hue(3),"grey50")
 names(cols) <- c("Reduced","Adequate","Inconclusive","Failed")
 cols <- c("Reduced" = "#F8766D", "Inconclusive" = "#00BFC4", "Adequate" = "#7CAE00")
 
-expand_grid(
-  n_individ = c(20, 50, 100, 250, 300, 500),
-  min_positive = c(1),
-  endemicity = c(15),
-) ->
+parameters_thresholds |>
+  distinct(parasite, drug) |>
+  left_join(
+    parameters_scenario,
+    by = join_by(parasite),
+    relationship="many-to-many"
+  ) |>
+  # filter(endemicity==15) |>
+  expand_grid(
+    #n_individ = c(20, 50, 100, 250, 300, 500),
+    n_individ = c(100, 250, 500),
+    min_positive = c(1)
+  ) |>
+  # filter(n_individ==250) |>
+  identity() ->
   all
 
-st <- Sys.time()
+#st <- Sys.time()
 all |>
-  filter(min_positive <= n_individ/2) |>
+  arrange(n_individ) |>
   mutate(Row = row_number()) |>
   rowwise() |>
   group_split() |>
-  lapply(function(x){
+  pblapply(function(x){
 
-    cat(x$Row, "of", nrow(all), "-", as.numeric(Sys.time()-st, "mins"), "\n")
-    print(x)
+    #cat(x$Row, "of", nrow(all), "-", as.numeric(Sys.time()-st, "mins"), "\n")
+    #print(x)
 
     expand_grid(
-      parameters_scenario |> filter(parasite=="hookworm", endemicity==x$endemicity),
-      parameters_fixed |> filter(design == "NS_11", min_positive == 1),
+      parameters_fixed |> filter(design == "NS_11", min_positive == x$min_positive),
       parameters_cost |> filter(setting == "Ethiopia"),
-      parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
+      parameters_dropadd |> filter(dropout == "with dropouts", force_inclusion_prob == 0.1),
       parameters_analysis,
       parameters_efficacy
     ) |>
+      bind_cols(x |> select(-min_positive)) |>
       add_mean_and_cv() |>
       left_join(
-        parameters_thresholds |> filter(drug=="ALB"),
-        by = "parasite", relationship="many-to-many"
+        parameters_thresholds,
+        by = join_by(parasite, drug),
+        relationship="many-to-many"
       ) |>
-      mutate(min_positive_pre = x$min_positive) |>
-      fix_n_analysis(iters=iterations, min = x$n_individ, max=x$n_individ, cl=cl) ->
+      fix_n_analysis(iters=iterations, min = x$n_individ, max=x$n_individ, cl=NULL) ->
       fig_1_data
 
     fig_1_data |>
@@ -784,67 +795,30 @@ all |>
         Failed = n_FailZeroPre + n_FailPositiveScreen + n_FailPositivePre + if_else(analysis_type=="delta", n_ClassifyFail, 0)
       ) |>
       mutate(Total = Failed + Adequate + Reduced + Inconclusive) |>
-      select(true_efficacy, efficacy_expected, analysis, Adequate, Reduced, Inconclusive, Failed) |>
+      select(true_efficacy, efficacy_expected, efficacy_lower_target, analysis=analysis_type, framework, Adequate, Reduced, Inconclusive, Failed) |>
       pivot_longer(Adequate:Failed, names_to="classification", values_to="tally") |>
       mutate(analysis = if_else(analysis=="delta", "hypothesis", analysis)) |>
-      bind_cols(x) ->
-      plotdata
+      bind_cols(x)
 
-    plotdata |>
-      mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Failed","Reduced"))) |>
-      group_by(efficacy_expected, analysis, true_efficacy) |>
-      arrange(classification) |>
-      mutate(total = sum(tally), ymax = cumsum(tally/total), ymin = lag(ymax, default=0)) |>
-      ungroup() |>
-      ggplot(aes(x=true_efficacy, ymin=ymin, ymax=ymax, fill=classification)) +
-      geom_ribbon() +
-      facet_grid(efficacy_expected ~ analysis) +
-      theme_bw() +
-      geom_vline(aes(xintercept=efficacy_expected)) +
-      geom_vline(aes(xintercept=efficacy_expected-0.1)) +
-      geom_hline(yintercept=c(0.05,0.95)) +
-      scale_fill_manual(values=cols) +
-      labs(title = str_c("N = ", x$n_individ, ", MP = ", x$min_positive, ", End = ", x$endemicity, "%")) ->
-      plot1
-
-    plotdata |>
-      filter(classification!="Failed") |>
-      mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
-      group_by(efficacy_expected, analysis, true_efficacy) |>
-      arrange(classification) |>
-      mutate(total = sum(tally), ymax = cumsum(tally/total), ymin = lag(ymax, default=0)) |>
-      ungroup() |>
-      ggplot(aes(x=true_efficacy, ymin=ymin, ymax=ymax, fill=classification)) +
-      geom_ribbon() +
-      facet_grid(efficacy_expected ~ analysis) +
-      theme_bw() +
-      geom_vline(aes(xintercept=efficacy_expected)) +
-      geom_vline(aes(xintercept=efficacy_expected-0.1)) +
-      geom_hline(yintercept=c(0.05,0.95)) +
-      scale_fill_manual(values=cols) +
-      labs(title = str_c("N = ", x$n_individ, ", MP = ", x$min_positive, ", End = ", x$endemicity, "% (no failed)")) ->
-      plot2
-
-    list(data=plotdata, p1=plot1, p2=plot2)
-
-  }) ->
+  }, cl=8) ->
   plots
 #qsave(plots, "notebooks/paper_2025/fig1_res.rqs")
 plots <- qread("notebooks/paper_2025/fig1_res.rqs")
 
 ## Figure 1:
 plots |>
-  lapply(\(x) x$data) |>
   bind_rows() |>
-  filter(n_individ==250) |>
+  filter(Row==1) |>
+  #filter(n_individ==250) |>
   filter(classification != "Failed") |>
   mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
-  group_by(efficacy_expected, analysis, true_efficacy, n_individ) |>
+  group_by(efficacy_expected, analysis, framework, efficacy_lower_target, true_efficacy, n_individ) |>
   arrange(classification) |>
   mutate(total = sum(tally), ymax = cumsum(tally/total), ymin = lag(ymax, default=0)) |>
-  mutate(type = str_c(analysis, " - ", efficacy_expected) |> fct()) |>
+  ungroup() |>
+  mutate(type = str_c(analysis, " - ", framework) |> fct()) |>
   mutate(type = factor(type,
-                       levels=c("mean - 0.9", "mean - 0.962", "hypothesis - 0.9", "hypothesis - 0.962"),
+                       levels=c("mean - WHO", "mean - FHT", "hypothesis - WHO", "hypothesis - FHT"),
                        labels=c(
                          expression("A: Point estimate with T"[l] *"="* " 80% T"[u] *"="* " 90%"),
                          expression("C: Point estimate with T"[l] *"="* " 91.0% T"[u] *"="* " 96.2%"),
@@ -852,7 +826,6 @@ plots |>
                          expression("D: Hypothesis testing with T"[l] *"="* " 91.0% T"[u] *"="* " 96.2%")
                         )
   )) |>
-  ungroup() |>
   ggplot(aes(x=true_efficacy*100, ymin=ymin*100, ymax=ymax*100, fill=classification)) +
   geom_ribbon() +
   facet_wrap( ~ type, labeller = label_parsed) +
@@ -860,7 +833,7 @@ plots |>
 #  geom_segment(aes(y=5, x=50, xend=efficacy_expected*100-10), lty="dotted") +
 #  geom_segment(aes(y=95, x=efficacy_expected*100, xend=100), lty="dotted") +
   geom_vline(aes(xintercept=efficacy_expected*100)) +
-  geom_vline(aes(xintercept=efficacy_expected*100-10), lty="dashed") +
+  geom_vline(aes(xintercept=efficacy_lower_target*100), lty="dashed") +
   theme_minimal() +
   scale_fill_manual(values=cols, guide = guide_legend(reverse = TRUE)) +
   labs(x = "True efficacy (%)",
@@ -868,7 +841,8 @@ plots |>
        fill = "Efficacy classification") +
   theme_minimal() +
   # theme(strip.text = element_text(size = 12), legend.title = element_text(size = 12), legend.position = "bottom")
-  theme(strip.text = element_text(size = 12), legend.title = element_blank(), legend.position = "bottom")
+  theme(strip.text = element_text(size = 12), legend.title = element_blank(), legend.position = "bottom") +
+  xlim(90,100)
 ggsave("notebooks/paper_2025/fig1.pdf", height=8, width=10)
 
 expand_grid(
@@ -1362,7 +1336,7 @@ pdf("notebooks/paper_2025/figS7.pdf", width=12, height=9)
 lapply(unique(res$Effort), function(effort){
   get_plot(effort, "cost_rel") +
     geom_hline(yintercept=0, lty="solid", col="white") +
-    ylab(bquote("Absolute difference in mean cost for 80% power (", effort, " effort)"))
+    ylab(str_c("Absolute difference in mean cost for 80% power (", effort, " effort)"))
 })
 dev.off()
 
