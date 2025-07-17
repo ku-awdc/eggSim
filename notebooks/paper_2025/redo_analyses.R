@@ -49,14 +49,14 @@ tribble(~parasite, ~intercept, ~slope, ~day_cv, ~reduction_cv,
 
 ## Parameters for dropout and assessing other parasites:
 tibble(
-  dropout = c("baseline", "with dropouts"),
+  dropout = c("no dropouts", "with dropouts"),
   dropout_screen = c(0,0.1),
   dropout_pre = c(0,0.2),
 ) |>
   expand_grid(
     force_inclusion_prob = c(0, 0.05, 0.1, 0.15, 0.2)
   ) |>
-  filter(dropout=="baseline" | force_inclusion_prob==0.1) ->
+  filter(dropout=="with dropouts" | force_inclusion_prob==0.1) ->
   parameters_dropadd
 
 ## Parameters for analysis type
@@ -571,7 +571,7 @@ plot_data_ss <- function(res){
 ## Calibrate non-inferiority margins
 ############################################
 
-
+## NB: non-inferiority margins are without dropouts!
 expand_grid(
   parameters_scenario |> distinct(parasite) |> expand_grid(endemicity = seq(5,65,by=2.5)),
   parameters_fixed |> filter(design == "NS_11", min_positive == 1),
@@ -759,7 +759,7 @@ parameters_thresholds |>
   identity() ->
   all
 
-#st <- Sys.time()
+## Takes 2 hours:
 all |>
   arrange(n_individ) |>
   mutate(Row = row_number()) |>
@@ -805,10 +805,12 @@ all |>
 #qsave(plots, "notebooks/paper_2025/fig1_res.rqs")
 plots <- qread("notebooks/paper_2025/fig1_res.rqs")
 
+plots |> bind_rows() |> distinct(Row, parasite, drug, n_individ, endemicity)
+
 ## Figure 1:
 plots |>
   bind_rows() |>
-  filter(Row==1) |>
+  filter(parasite=="ascaris", drug=="ALB", n_individ==100, endemicity==15) |>
   #filter(n_individ==250) |>
   filter(classification != "Failed") |>
   mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
@@ -820,10 +822,10 @@ plots |>
   mutate(type = factor(type,
                        levels=c("mean - WHO", "mean - FHT", "hypothesis - WHO", "hypothesis - FHT"),
                        labels=c(
-                         expression("A: Point estimate with T"[l] *"="* " 80% T"[u] *"="* " 90%"),
-                         expression("C: Point estimate with T"[l] *"="* " 91.0% T"[u] *"="* " 96.2%"),
-                         expression("B: Hypothesis testing with T"[l] *"="* " 80% T"[u] *"="* " 90%"),
-                         expression("D: Hypothesis testing with T"[l] *"="* " 91.0% T"[u] *"="* " 96.2%")
+                         expression("A: Point estimate with T"[l] *"="* " 95%"),
+                         expression("C: Point estimate with T"[l] *"="* " 99.6%"),
+                         expression("B: Hypothesis testing with T"[l] *"="* " 95%"),
+                         expression("D: Hypothesis testing with T"[l] *"="* " 99.6%")
                         )
   )) |>
   ggplot(aes(x=true_efficacy*100, ymin=ymin*100, ymax=ymax*100, fill=classification)) +
@@ -842,35 +844,39 @@ plots |>
   theme_minimal() +
   # theme(strip.text = element_text(size = 12), legend.title = element_text(size = 12), legend.position = "bottom")
   theme(strip.text = element_text(size = 12), legend.title = element_blank(), legend.position = "bottom") +
-  xlim(90,100)
+  xlim(94,100)
 ggsave("notebooks/paper_2025/fig1.pdf", height=8, width=10)
 
 expand_grid(
-  parameters_scenario |> filter(parasite=="hookworm", endemicity==15),
+  parameters_scenario,
   parameters_fixed,
   parameters_cost |> filter(setting == "Ethiopia")
 ) |>
   add_mean_and_cv() |>
-  distinct(endemicity, mean_epg)
+  distinct(parasite, endemicity, mean_epg)
 
 ## New figure S1:
 plots |>
-  lapply(\(x) x$data) |>
   bind_rows() |>
-  filter(n_individ!=300, n_individ>=100) |>
+  filter(parasite=="ascaris", drug=="ALB", endemicity==15) |>
+  #filter(n_individ!=300, n_individ>=100) |>
   filter(classification != "Failed") |>
   mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
-  group_by(efficacy_expected, analysis, true_efficacy, n_individ) |>
+  group_by(efficacy_expected, analysis, framework, efficacy_lower_target, true_efficacy, n_individ) |>
   arrange(classification) |>
   mutate(total = sum(tally), ymax = cumsum(tally/total), ymin = lag(ymax, default=0)) |>
-  mutate(type = str_c(analysis, " - ", efficacy_expected) |> fct()) |>
+  mutate(type = str_c(analysis, " - ", framework) |> fct()) |>
   mutate(type = factor(type,
-                       levels=c("mean - 0.9", "hypothesis - 0.9", "mean - 0.962", "hypothesis - 0.962"),
+                       levels=c("mean - WHO", "hypothesis - WHO", "mean - FHT", "hypothesis - FHT"),
                        labels=c(
-                         expression(atop("A: Point estimate with", "T"[l] *"="* " 80% T"[u] *"="* " 90%")),
-                         expression(atop("B: Hypothesis testing with", "T"[l] *"="* " 80% T"[u] *"="* " 90%")),
-                         expression(atop("C: Point estimate with", "T"[l] *"="* " 91.0% T"[u] *"="* " 96.2%")),
-                         expression(atop("D: Hypothesis testing with", "T"[l] *"="* " 91.0% T"[u] *"="* " 96.2%"))
+#                         expression(atop("A: Point estimate with", "T"[l] *"="* " 80% T"[u] *"="* " 90%")),
+#                         expression(atop("B: Hypothesis testing with", "T"[l] *"="* " 80% T"[u] *"="* " 90%")),
+#                         expression(atop("C: Point estimate with", "T"[l] *"="* " 91.0% T"[u] *"="* " 96.2%")),
+#                         expression(atop("D: Hypothesis testing with", "T"[l] *"="* " 91.0% T"[u] *"="* " 96.2%"))
+                         expression("A: Point estimate with T"[l] *"="* " 95%"),
+                         expression("B: Hypothesis testing with T"[l] *"="* " 95%"),
+                         expression("C: Point estimate with T"[l] *"="* " 99.6%"),
+                         expression("D: Hypothesis testing with T"[l] *"="* " 99.6%")
                        )
   )) |>
   mutate(n_individ = factor(n_individ, levels=c(20,50,100,250,500), labels=c(
@@ -880,10 +886,10 @@ plots |>
   ggplot(aes(x=true_efficacy*100, ymin=ymin*100, ymax=ymax*100, fill=classification)) +
   geom_ribbon() +
   facet_grid(n_individ ~ type, labeller = label_parsed) +
-  geom_segment(aes(y=5, x=50, xend=efficacy_expected*100-10), lty="dotted") +
-  geom_segment(aes(y=95, x=efficacy_expected*100, xend=100), lty="dotted") +
+#  geom_segment(aes(y=5, x=50, xend=efficacy_lower_target*100), lty="dotted") +
+#  geom_segment(aes(y=95, x=efficacy_expected*100, xend=100), lty="dotted") +
   geom_vline(aes(xintercept=efficacy_expected*100)) +
-  geom_vline(aes(xintercept=efficacy_expected*100-10), lty="dashed") +
+  geom_vline(aes(xintercept=efficacy_lower_target*100), lty="dashed") +
   theme_minimal() +
   scale_fill_manual(values=cols, guide = guide_legend(reverse = TRUE)) +
   labs(x = "True efficacy (%)",
@@ -891,7 +897,8 @@ plots |>
        fill = "Efficacy classification") +
   theme_minimal() +
   #theme(strip.text = element_text(size = 12), legend.title = element_text(size = 12))
-  theme(strip.text = element_text(size = 12), legend.title = element_blank(), legend.position = "bottom")
+  theme(strip.text = element_text(size = 12), legend.title = element_blank(), legend.position = "bottom") +
+  coord_cartesian(xlim=c(94,100))
 ggsave("notebooks/paper_2025/figS1.pdf", height=8, width=12)
 
 
@@ -900,10 +907,10 @@ ggsave("notebooks/paper_2025/figS1.pdf", height=8, width=12)
 ############################################
 
 expand_grid(
-  parameters_scenario |> filter(parasite=="hookworm", endemicity==15),
+  parameters_scenario |> filter(parasite=="ascaris", endemicity==15),
   parameters_fixed |> filter(min_positive == 1),
   parameters_cost |> filter(setting == "Ethiopia"),
-  parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
+  parameters_dropadd |> filter(dropout == "with dropouts", force_inclusion_prob == 0.1),
   parameters_analysis |> filter(analysis_type=="delta")
 ) |>
   add_mean_and_cv() |>
@@ -933,16 +940,18 @@ fig_S2_data |>
 ps2d |>
   ggplot(aes(x=n_individ, y=value, col=design)) +
   geom_hline(data=tibble(Panel=factor(levels(ps2d$Panel)[1], levels=levels(ps2d$Panel)), yi=80), aes(yintercept=yi), lty="dashed") +
-  geom_hline(data=tibble(Panel=factor(levels(ps2d$Panel)[1], levels=levels(ps2d$Panel)), yi=90), aes(yintercept=yi), lty="dotted") +
+#  geom_hline(data=tibble(Panel=factor(levels(ps2d$Panel)[1], levels=levels(ps2d$Panel)), yi=90), aes(yintercept=yi), lty="dotted") +
   geom_line() +
   facet_wrap(~Panel, scales="free_y", ncol=1, labeller = label_parsed) +
-  coord_cartesian(xlim=c(50,500)) +
+  coord_cartesian(xlim=c(10,1000)) +
+  scale_x_continuous(breaks=c(10,250,500,750,1000)) +
   labs(x="Number of Children", y=NULL) +
   scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
-  guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
+  guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1)) +
+  ggh4x::scale_y_facet(PANEL==1, limits=c(0,100), breaks=seq(0,100,by=25)) +
+  ggh4x::scale_y_facet(PANEL==2, limits=c(0,7.5), breaks=seq(0,8,by=1)) +
+  ggh4x::scale_y_facet(PANEL==3, limits=c(0,0.16), breaks=seq(0,0.2,by=0.05))
 ggsave("notebooks/paper_2025/figS2.pdf", width=7, height=6)
-
-## TODO: other ggplot additions package for different y axis breaks
 
 
 ############################################
@@ -950,16 +959,16 @@ ggsave("notebooks/paper_2025/figS2.pdf", width=7, height=6)
 ############################################
 
 expand_grid(
-  parameters_scenario |> filter(parasite=="hookworm", endemicity==15),
+  parameters_scenario |> filter(parasite=="ascaris", endemicity==15),
   parameters_fixed |> filter(min_positive==1),
   parameters_cost,
   parameters_dropadd,
   parameters_analysis |> filter(analysis_type=="delta")
 ) |>
   filter(
-    (dropout == "baseline" & force_inclusion_prob == 0) | # A/B
-      (setting == "Ethiopia" & force_inclusion_prob == 0 & dropout != "baseline") | # C
-      (setting == "Ethiopia" & dropout == "baseline" & design=="SSR_12") # D
+    (dropout == "with dropouts" & force_inclusion_prob == 0.1) | # A/B
+      (setting == "Ethiopia" & force_inclusion_prob == 0.1 & dropout == "no dropouts") | # C
+      (setting == "Ethiopia" & dropout == "with dropouts" & design=="SSR_12") # D
   ) |>
   add_mean_and_cv() |>
   left_join(
@@ -978,19 +987,19 @@ LETTERS[1:4] |>
   lapply(\(x){
     if(x=="A"){
       res |>
-        filter(setting == "Ethiopia", dropout == "baseline", force_inclusion_prob == 0) |>
+        filter(setting == "Ethiopia", dropout == "with dropouts", force_inclusion_prob == 0.1) |>
         mutate(Panel = "A: Ethiopian cost")
     }else if(x=="B"){
       res |>
-        filter(setting == "Tanzania", dropout == "baseline", force_inclusion_prob == 0) |>
+        filter(setting == "Tanzania", dropout == "with dropouts", force_inclusion_prob == 0.1) |>
         mutate(Panel = "B: Tanzanian cost")
     }else if(x=="C"){
       res |>
-        filter(setting == "Ethiopia", force_inclusion_prob == 0, dropout != "baseline") |>
-        mutate(Panel = "C: Drop-outs")
+        filter(setting == "Ethiopia", force_inclusion_prob == 0.1, dropout == "no dropouts") |>
+        mutate(Panel = "C: No drop-outs")
     }else if(x=="D"){
       res |>
-        filter(setting == "Ethiopia", dropout == "baseline", design=="SSR_12", force_inclusion_prob%in%c(0,0.1,0.2)) |>
+        filter(setting == "Ethiopia", dropout == "with dropouts", design=="SSR_12", force_inclusion_prob%in%c(0,0.1,0.2)) |>
         mutate(Panel = "D: Assessing multiple STH")
     }else{
       stop("ERROR")
@@ -1015,9 +1024,10 @@ LETTERS[1:4] |>
   ggplot(aes(x=MeanCost/1e3, y=value*1e2, col=design, lty=str_c(force_inclusion_prob*100,"%")), parse=TRUE) +
   geom_line() +
   facet_wrap(~Panel, scales="fixed") +
+  scale_linetype_manual(values=c(`0%`="dashed",`10%`="solid",`20%`="dotdash")) +
   geom_hline(yintercept = c(80), lty="dashed") +
-  geom_hline(yintercept = c(90), lty="dotted") +
-  coord_cartesian(ylim = c(50,100), xlim = c(0,6)) +
+#  geom_hline(yintercept = c(90), lty="dotted") +
+  coord_cartesian(ylim = c(50,100), xlim = c(0,7)) +
   labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Performance (%)") +
   scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
   guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
@@ -1029,13 +1039,13 @@ ggsave("notebooks/paper_2025/fig2.pdf", width=7, height=6)
 ############################################
 
 expand_grid(
-  parameters_scenario |> filter(parasite=="hookworm", endemicity!=2),
+  parameters_scenario |> filter(parasite=="ascaris", endemicity!=2),
   parameters_fixed |> filter(min_positive%in%c(1)),
   parameters_cost,
-  parameters_dropadd |> filter(force_inclusion_prob == 0),
+  parameters_dropadd |> filter(force_inclusion_prob == 0.1),
   parameters_analysis |> filter(analysis_type=="delta")
 ) |>
-  filter(dropout=="baseline" | setting=="Ethiopia") |>
+  filter(dropout=="with dropouts" | setting=="Ethiopia") |>
   add_mean_and_cv() |>
   left_join(
     parameters_thresholds |> filter(drug=="ALB", framework=="FHT") |> mutate(true_efficacy = efficacy_expected),
