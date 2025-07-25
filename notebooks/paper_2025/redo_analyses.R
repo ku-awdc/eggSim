@@ -576,7 +576,7 @@ expand_grid(
   parameters_scenario |> distinct(parasite) |> expand_grid(endemicity = seq(5,65,by=2.5)),
   parameters_fixed |> filter(design == "NS_11", min_positive == 1),
   parameters_cost |> filter(setting == "Ethiopia"),
-  parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob == 0),
+  parameters_dropadd |> filter(dropout == "no dropouts", force_inclusion_prob == 0.1) |> mutate(force_inclusion_prob = 0),
   parameters_analysis |> filter(analysis_type=="delta")
 ) |>
   add_mean_and_cv() |>
@@ -629,6 +629,11 @@ perfout |>
 ## Pre-computed/fixed version at the top of this script
 writexl::write_xlsx(parameters_all_thresholds, "notebooks/paper_2025/tableS0_thresholds.xlsx")
 
+parameters_all_thresholds |>
+  select(parasite, drug, Effort, efficacy_expected, Using) |>
+  mutate(Effort = factor(Effort |> as.character(), levels=c("Expected","Extreme","Hard","Moderate","Easy"), labels=c("Expected","Very small","Small","Moderate","Large"))) |>
+  pivot_wider(names_from=Effort, values_from=Using)
+
 
 ### Figures
 perfout |>
@@ -680,6 +685,10 @@ eval(parse(text=str_c(lapply(0:6, \(i){
 ggsave("notebooks/paper_2025/fig_S0A.pdf", height=6, width=10)
 
 
+############################################
+## New figure S1
+############################################
+
 perfout |>
   mutate(Lower = efficacy_expected - BestNIM) |>
   filter(!is.na(Lower)) |>
@@ -695,15 +704,16 @@ pltdt |>
   #  geom_hline(aes(yintercept = 100 * (1-(1-efficacy_expected)*2)), lty="dotted") +
   geom_hline(data=bind_rows(
     parameters_all_thresholds |> select(parasite, drug, Effort, Using),
-    parameters_all_thresholds |> mutate(Effort="Expected") |> select(parasite, drug, Effort, Using=efficacy_expected)
+    #parameters_all_thresholds |> mutate(Effort="Expected") |> select(parasite, drug, Effort, Using=efficacy_expected)
   ) |>
     mutate(panel = str_c(drug, " vs. ", parasite)) |>
-    mutate(Effort = fct(Effort, levels=c("Expected","Extreme","Hard","Moderate","Easy"))),
+    mutate(Effort = factor(Effort |> as.character(), levels=c("Expected","Extreme","Hard","Moderate","Easy"), labels=c("Expected","Very small","Small","Moderate","Large"))),
   aes(yintercept = 100*Using, lty=Effort)) +
+  geom_hline(data=parameters_all_thresholds |> mutate(Effort="Expected") |> select(parasite, drug, Effort, Using=efficacy_expected) |> mutate(panel = str_c(drug, " vs. ", parasite)), aes(yintercept = 100*Using), lty="solid", col="grey50", lwd=2) +
   geom_line() +
   scale_x_continuous(breaks=unique(parameters_scenario[["endemicity"]]), minor_breaks=NULL, limits=c(0,70)) +
   facet_wrap(~ panel, scales="free_y") +
-  scale_linetype_manual(values=c(Expected="solid",Extreme="dotted",Hard="dotdash",Moderate="dashed",Easy="longdash")) ->
+  scale_linetype_manual(values=c(Expected="solid",`Very small`="dotted",Small="dotdash",Moderate="dashed",Large="longdash")) ->
   plt
 eval(parse(text=str_c(lapply(0:6, \(i){
   if(i==0) return("plt")
@@ -725,9 +735,9 @@ eval(parse(text=str_c(lapply(0:6, \(i){
   str_c("ggh4x::scale_y_facet(panel=='", ii[["panel"]], "', limits=c(", ll, ", 100))")
 }), collapse=" + "))) +
   theme(legend.position="right") +
-  guides(linetype = guide_legend(element_blank(), order=1), col = guide_legend("# Children", order=2, reverse=TRUE)) +
-  ylab("Efficacy (%)") + xlab("Endemicity(%)")
-ggsave("notebooks/paper_2025/fig_S0B.pdf", height=6, width=10)
+  guides(linetype = guide_legend("Margin", order=1), col = guide_legend("# Children", order=2, reverse=TRUE)) +
+  ylab("Efficacy (%)") + xlab("Endemicity (%)")
+ggsave("notebooks/paper_2025/figS1.pdf", height=6, width=10)
 
 
 
@@ -1061,7 +1071,7 @@ res <- qread("notebooks/paper_2025/fig3_res.rqs")
 
 res |>
   plot_data_cost() |>
-  filter(name=="Performance", dropout=="baseline", setting=="Ethiopia") |> #, value>0.5, value<0.95) |>
+  filter(name=="Performance", dropout=="with dropouts", setting=="Ethiopia") |> #, value>0.5, value<0.95) |>
   mutate(Panel = str_c(
     factor(endemicity, levels=c(5,15,35,65), labels=LETTERS[1:4]) |> as.character(),
     ": ", round(mean_epg,1), " epg; ", endemicity, "% prev."
@@ -1079,8 +1089,9 @@ res |>
   facet_wrap(~Panel, scales="fixed") +
   ylab("Performance (%)") +
   geom_hline(yintercept = c(80), lty="dashed") +
-  geom_hline(yintercept = c(90), lty="dotted") +
-  coord_cartesian(ylim = c(50,100), xlim = c(0,6)) +
+#  geom_hline(yintercept = c(90), lty="dotted") +
+  scale_x_log10() +
+  coord_cartesian(ylim = c(50,100), xlim = c(1.0,30)) +
   labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Performance (%)") +
   scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
   guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
@@ -1097,35 +1108,36 @@ res |>
       bind_rows(x)
   }}() |>
   mutate(Row = fct(case_when(
-    dropout=="baseline" ~ str_c(setting),
-    TRUE ~ str_c(setting, " w/ drop-outs")
-  ), levels=c("Ethiopia", "Tanzania", "Ethiopia w/ drop-outs"))) |>
+    dropout=="with dropouts" ~ str_c(setting),
+    TRUE ~ str_c(setting, " without drop-outs")
+  ), levels=c("Ethiopia", "Tanzania", "Ethiopia without drop-outs"))) |>
   mutate(Col = fct(str_c(endemicity,"% prev."))) |>
+  #filter(dropout=="with dropouts") |>
   ggplot(aes(x=MeanCost/1e3, y=value*100, col=design)) +
   geom_line() +
   facet_grid(Row~Col, scales="fixed") +
   ylab("Performance (%)") +
   geom_hline(yintercept = c(80), lty="dashed") +
-  geom_hline(yintercept = c(90), lty="dotted") +
-  coord_cartesian(ylim = c(50,100), xlim = c(0,10)) +
+#  geom_hline(yintercept = c(90), lty="dotted") +
+  scale_x_log10() +
+  coord_cartesian(ylim = c(50,100), xlim = c(1.0,30)) +
   labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Performance (%)") +
   scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
-  guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1)) +
-  scale_x_continuous(breaks=seq(0,10,by=2))
+  guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
 ggsave("notebooks/paper_2025/figS3.pdf", width=9, height=7)
 
 
 
 
 ############################################
-## Re-create figure S4
+## NOW REMOVED!!!! Re-create figure S4
 ############################################
 
 expand_grid(
-  parameters_scenario |> filter(parasite=="hookworm", endemicity!=2),
+  parameters_scenario |> filter(parasite=="ascaris", endemicity!=2),
   parameters_fixed |> filter(min_positive%in%c(1), design=="SSR_12"),
   parameters_cost |> filter(setting == "Ethiopia"),
-  parameters_dropadd |> filter(dropout == "baseline"),
+  parameters_dropadd |> filter(dropout == "with dropouts"),
   parameters_analysis |> filter(analysis_type=="delta")
 ) |>
   add_mean_and_cv() |>
@@ -1174,7 +1186,7 @@ expand_grid(
   parameters_scenario |> filter(endemicity==15),
   parameters_fixed |> filter(min_positive%in%c(1)),
   parameters_cost |> filter(setting == "Ethiopia"),
-  parameters_dropadd |> filter(dropout == "baseline", force_inclusion_prob==0),
+  parameters_dropadd |> filter(dropout == "with dropouts", force_inclusion_prob==0.1),
   parameters_analysis |> filter(analysis_type=="delta")
 ) |>
   add_mean_and_cv() |>
@@ -1232,8 +1244,8 @@ expand_grid(
   parameters_scenario,
   parameters_fixed |> filter(min_positive%in%c(1)),
   parameters_cost, # |> filter(setting == "Ethiopia"),
-  parameters_dropadd |> filter(force_inclusion_prob==0) |> select(starts_with("dropout")),
-  parameters_dropadd |> filter(dropout=="baseline") |> select(!starts_with("dropout")),
+  parameters_dropadd |> filter(force_inclusion_prob==0.1) |> select(starts_with("dropout")),
+  parameters_dropadd |> filter(dropout=="with dropouts") |> select(!starts_with("dropout")),
   parameters_analysis |> filter(analysis_type=="delta")
 ) |>
   add_mean_and_cv() |>
@@ -1275,14 +1287,17 @@ res |>
   mutate(n_individ_delta = n_individ-n_individ_min, cost_mean_delta = cost_mean-cost_mean_min) |>
   mutate(n_individ_rel = n_individ-n_individ[design=="NS_11"], cost_mean_rel = cost_mean-cost_mean[design=="NS_11"]) |>
   ungroup() |>
-  select(drug, parasite, setting, endemicity, dropout, force_inclusion_prob, efficacy_expected, efficacy_lower_target, Effort, Target, ndes, design, n_individ, n_individ_min, n_individ_rel, n_individ_delta, cost_mean, cost_mean_rel, cost_mean_min, cost_mean_delta, cost_variance) |>
-  arrange(drug, parasite, setting, endemicity, dropout, force_inclusion_prob, Effort, Target, design) ->
+  filter(Target==0.8) |>
+  select(drug, parasite, setting, endemicity, dropout, force_inclusion_prob, efficacy_expected, efficacy_lower_target, Effort, ndes, design, n_individ, n_individ_min, n_individ_rel, n_individ_delta, cost_mean, cost_mean_rel, cost_mean_min, cost_mean_delta, cost_variance) |>
+  arrange(drug, parasite, setting, endemicity, dropout, force_inclusion_prob, Effort, design) ->
   res
 
-stopifnot(nrow(res)==nrow(parameters)*2, res$ndes==4)
+stopifnot(nrow(res)==nrow(parameters), res$ndes==4)
 
 res |>
-  rename(power=Target) |>
+  mutate(Effort = factor(Effort |> as.character(), levels=c("Expected","Extreme","Hard","Moderate","Easy"), labels=c("Expected","Very small","Small","Moderate","Large"))) |>
+  select(-ndes) |>
+  rename(margin = Effort) |>
   writexl::write_xlsx("notebooks/paper_2025/table_S2.xlsx")
 
 
@@ -1353,6 +1368,7 @@ dev.off()
 
 ## For Table 3:
 
+# Note force_inclusion_prob = 0 is correct
 parameters |>
   filter(endemicity==15, Effort=="Moderate", dropout=="with dropouts", force_inclusion_prob==0, setting=="Ethiopia") ->
   subp
@@ -1380,9 +1396,10 @@ bind_rows(
 
 
 res |>
-  group_by(drug, parasite, design, Effort, Target) |>
+  filter(design %in% c("NS_11","SSR_12"), Target==0.8) |>
+  group_by(drug, parasite, design) |>
   summarise(n_individ = ceiling(mean(n_individ)/5)*5, .groups="drop") |>
-  pivot_wider(names_from="design", values_from="n_individ") |>
+#  pivot_wider(names_from="design", values_from="n_individ") |>
   writexl::write_xlsx("notebooks/paper_2025/table_3.xlsx")
 
 
