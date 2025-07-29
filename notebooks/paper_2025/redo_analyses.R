@@ -12,8 +12,11 @@
 
 ## Create a results folder:
 reswd <- file.path("~/Desktop", paste0("eggsimres_", strftime(Sys.Date(), "%Y-%m-%d")))
-if(dir.exists(reswd)) stop("Path ", reswd, " already exists")
-dir.create(reswd)
+if(dir.exists(reswd)){
+  # stop("Path ", reswd, " already exists")
+}else{
+  dir.create(reswd)
+}
 cwd <- getwd()
 on.exit(setwd(cwd))
 setwd(reswd)
@@ -618,14 +621,19 @@ expand_grid(
   ) ->
   parameters
 
-## Takes 40 mins:
 set.seed(2025-07-28)
-parameters |>
-  vary_nim_analysis(performance=0.8, min=100, max=1000, cl=8) ->
-  perfout
-qsave(perfout, "figS1_res.rqs")
+fn <- "figS1_res.rqs"
+if(file.exists(fn)){
+  perfout <- qread(fn)
+}else{
+  ## Takes 40 mins:
+  parameters |>
+    vary_nim_analysis(performance=0.8, min=100, max=1000, cl=8) ->
+    perfout
+  qsave(perfout, fn)
+}
 
-
+if(FALSE){
 perfout |>
   bind_rows() |>
   select(parasite, drug, endemicity, SampleSize, efficacy_expected, BestNIM) |>
@@ -658,6 +666,7 @@ perfout |>
   parameters_all_thresholds_recalc
 ## Pre-computed/fixed version at the top of this script
 writexl::write_xlsx(parameters_all_thresholds, "tableS1_thresholds.xlsx")
+}
 
 parameters_all_thresholds |>
   select(parasite, drug, Effort, efficacy_expected, Using) |>
