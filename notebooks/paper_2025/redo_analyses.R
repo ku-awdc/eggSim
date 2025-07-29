@@ -1310,6 +1310,30 @@ ggsave("fig4.pdf", width=7, height=6)
 ## Re-create Table 3 and S2
 ############################################
 
+expand_grid(
+  parameters_scenario,
+  parameters_fixed |> filter(min_positive%in%c(1)),
+  parameters_cost, # |> filter(setting == "Ethiopia"),
+  parameters_dropadd |> filter(force_inclusion_prob==0.1) |> select(starts_with("dropout")),
+  parameters_dropadd |> filter(dropout=="with dropouts") |> select(!starts_with("dropout")),
+  parameters_analysis |> filter(analysis_type=="delta")
+) |>
+  add_mean_and_cv() |>
+  #  left_join(
+  #    parameters_thresholds |>
+  #      filter(framework=="FHT") |>
+  #      mutate(true_efficacy = efficacy_expected) |>
+  #      select(parasite, drug, framework, efficacy_expected, true_efficacy),
+  #    by = "parasite", relationship="many-to-many"
+  #  ) |>
+  left_join(
+    parameters_all_thresholds |> select(parasite, drug, Effort, efficacy_expected, efficacy_lower_target=Using),
+    by = join_by(parasite),
+    relationship="many-to-many"
+  ) |>
+  mutate(true_efficacy = efficacy_expected) ->
+  parameters
+
 
 ## For Table 3:
 
@@ -1350,29 +1374,6 @@ res |>
 
 
 #### Table S2
-
-expand_grid(
-  parameters_scenario,
-  parameters_fixed |> filter(min_positive%in%c(1)),
-  parameters_cost, # |> filter(setting == "Ethiopia"),
-  parameters_dropadd |> filter(force_inclusion_prob==0.1) |> select(starts_with("dropout")),
-  parameters_dropadd |> filter(dropout=="with dropouts") |> select(!starts_with("dropout")),
-  parameters_analysis |> filter(analysis_type=="delta")
-) |>
-  add_mean_and_cv() |>
-#  left_join(
-#    parameters_thresholds |>
-#      filter(framework=="FHT") |>
-#      mutate(true_efficacy = efficacy_expected) |>
-#      select(parasite, drug, framework, efficacy_expected, true_efficacy),
-#    by = "parasite", relationship="many-to-many"
-#  ) |>
-  left_join(
-    parameters_all_thresholds |> select(parasite, drug, Effort, efficacy_expected, efficacy_lower_target=Using),
-    by = join_by(parasite),
-    relationship="many-to-many"
-  ) ->
-  parameters
 
 ## Take out p_add for NS then duplicate them later
 parameters |>
