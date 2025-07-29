@@ -808,6 +808,11 @@ parameters_thresholds |>
 
 ## Takes 2 hours:
 set.seed(2025-07-28)
+fn <- "fig1_res.rqs"
+if(file.exists(fn)){
+  plots <- qread(fn)
+}else{
+
 all |>
   arrange(n_individ) |>
   mutate(Row = row_number()) |>
@@ -850,8 +855,9 @@ all |>
 
   }, cl=8) ->
   plots
-qsave(plots, "fig1_res.rqs")
-#plots <- qread("notebooks/paper_2025/fig1_res.rqs")
+qsave(plots, fn)
+}
+
 
 plots |> bind_rows() |> distinct(Row, parasite, drug, n_individ, endemicity)
 
@@ -986,7 +992,7 @@ expand_grid(
     by = "parasite", relationship="many-to-many"
   ) |>
   mutate(min_positive_pre = 1) |>
-  fix_n_analysis(iters=iterations, min = 10, max=1000, cl=cl) ->
+  fix_n_analysis(iters=iterations, min = 10, max=1000, cl=8) ->
   fig_data
 qsave(fig_data, "figS3_res.rqs")
 
