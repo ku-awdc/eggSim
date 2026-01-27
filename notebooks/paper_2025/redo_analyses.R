@@ -12,7 +12,7 @@
 
 ## Create a results folder:
 reswd <- file.path("~/Desktop", paste0("eggsimres_", strftime(Sys.Date(), "%Y-%m-%d")))
-reswd <- file.path("~/Desktop", "eggsimres_2025-07-29")
+reswd <- file.path("~/Documents/Research/Papers/Deo paper", "eggsimres_2025-07-29")
 if(dir.exists(reswd)){
   # stop("Path ", reswd, " already exists")
 }else{
@@ -28,6 +28,10 @@ library("tidyverse")
 theme_set(theme_light())
 library("qs")
 stopifnot(requireNamespace(c("ggh4x","mgcv","writexl")))
+gg_colour_hue <- function(n) {
+  hues = seq(15, 375, length = n + 1)
+  hcl(h = hues, l = 65, c = 100)[1:n]
+}
 
 
 ## The eggSim package currently must be installed from github
@@ -810,6 +814,7 @@ eval(parse(text=str_c(lapply(0:6, \(i){
   guides(linetype = guide_legend("NIM", order=1), col = guide_legend("SAC", order=2, reverse=TRUE)) +
   ylab("Efficacy (%)") + xlab("Endemicity (%)")
 ggsave("figS1.pdf", height=6, width=10)
+ggsave("figS1.eps", height=6, width=10)
 
 
 
@@ -949,7 +954,7 @@ make_type_factor <- function(x, reorder=TRUE){
 ## Figure 1:
 plots |>
   bind_rows() |>
-  filter(parasite=="ascaris", drug=="ALB", n_individ==100, endemicity==15) |>
+  filter(parasite=="ascaris", drug=="ALB", n_individ==500, endemicity==15) |>
   #filter(n_individ==250) |>
   filter(classification != "Failed") |>
   mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
@@ -976,6 +981,7 @@ plots |>
   theme(strip.text = element_text(size = 12), legend.title = element_blank(), legend.position = "bottom") +
   xlim(85,100)
 ggsave("fig1.pdf", height=8, width=10)
+ggsave("fig1.eps", height=8, width=10)
 
 expand_grid(
   parameters_scenario,
@@ -996,7 +1002,9 @@ plots |>
     (parasite=="hookworm" & drug=="ALB" & true_efficacy >= 0.8) |
     (parasite=="ascaris" & drug=="ALB" & true_efficacy >= 0.85) |
     (parasite=="trichuris" & drug=="ALB" & true_efficacy >= 0.3)
-  }) |>
+  }
+  #, true_efficacy >= efficacy_lower_target
+  ) |>
   filter(n_individ %in% c(100, 500)) |>
   filter(classification != "Failed") |>
   mutate(classification = factor(classification, levels=c("Adequate","Inconclusive","Reduced"))) |>
@@ -1035,6 +1043,7 @@ plots |>
   #theme(strip.text = element_text(size = 12), legend.title = element_text(size = 12))
   theme(strip.text = element_text(size = 12), legend.title = element_blank(), legend.position = "bottom")
 ggsave("figS2.pdf", height=10, width=9)
+ggsave("figS2.eps", height=10, width=9)
 
 
 ## Old new figure S2 (not using):
@@ -1123,6 +1132,7 @@ psd |>
   ggh4x::scale_y_facet(PANEL==2, limits=c(0,7.5), breaks=seq(0,8,by=1)) +
   ggh4x::scale_y_facet(PANEL==3, limits=c(0,0.16), breaks=seq(0,0.2,by=0.05))
 ggsave("figS3.pdf", width=7, height=6)
+ggsave("figS3.eps", width=7, height=6)
 
 
 ############################################
@@ -1178,13 +1188,14 @@ LETTERS[1:4] |>
     }
   }) |>
   bind_rows() |>
-  mutate(force_inclusion_prob = case_when(
-    str_detect(design, "NS") ~ 0.0,
-    .default = force_inclusion_prob,
-  )) |>
+  #mutate(force_inclusion_prob = case_when(
+  #  str_detect(design, "NS") ~ 0.0,
+  #  .default = force_inclusion_prob,
+  #)) |>
   plot_data_cost() |>
   filter(name=="Performance") |> #, value>0.5, value<0.95) |>
   {function(x){
+    return(x)
     x |>
       filter(Panel=="A: Ethiopian cost", design == "NS_12") |>
       mutate(Panel = "D: Assessing multiple STH") |>
@@ -1206,8 +1217,13 @@ LETTERS[1:4] |>
   coord_cartesian(ylim = c(50,100), xlim = c(0,7)) +
   labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Power (%)") +
   scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
-  guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
+  guides(lty = guide_legend(
+    title=bquote(P[add]), order=2, position="inside", theme = theme(legend.position.inside = c(0.92, 0.12)), override.aes = list(col = gg_colour_hue(4)[4])
+    ),
+    color = guide_legend(title="Survey design", order=1)
+  )
 ggsave("fig2.pdf", width=7, height=6)
+ggsave("fig2.eps", width=7, height=6)
 
 
 ############################################
@@ -1241,7 +1257,7 @@ res |>
   filter(name=="Performance", dropout=="with dropouts", setting=="Ethiopia") |> #, value>0.5, value<0.95) |>
   mutate(Panel = str_c(
     factor(endemicity, levels=c(5,15,35,65), labels=LETTERS[1:4]) |> as.character(),
-    ": ", round(mean_epg,1), " epg; ", endemicity, "% prev."
+    ": ", endemicity, "% prevalence; ", round(mean_epg,1), " epg"
   )
   ) |>
   {function(x){
@@ -1262,6 +1278,7 @@ res |>
   scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
   guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
 ggsave("fig3.pdf", width=7, height=6)
+ggsave("fig3.eps", width=7, height=6)
 
 
 res |>
@@ -1277,7 +1294,7 @@ res |>
     dropout=="with dropouts" ~ str_c(setting),
     TRUE ~ str_c(setting, " without drop-outs")
   ), levels=c("Ethiopia", "Tanzania", "Ethiopia without drop-outs"))) |>
-  mutate(Col = fct(str_c(endemicity,"% prev."))) |>
+  mutate(Col = fct(str_c(endemicity,"% prevalence"))) |>
   #filter(dropout=="with dropouts") |>
   ggplot(aes(x=MeanCost/1e3, y=value*100, col=design)) +
   geom_line() +
@@ -1290,6 +1307,7 @@ res |>
   scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
   guides(lty = guide_legend(title=bquote(P[add]), order=2), color = guide_legend(title="Survey design", order=1))
 ggsave("figS4.pdf", width=9, height=7)
+ggsave("figS4.eps", width=9, height=7)
 
 
 
@@ -1318,7 +1336,7 @@ parameters |>
   vary_n_analysis(cl=8, iters=iterations, increment=1) ->
   res
 qsave(res, "figOS4_res.rqs")
-#res <- qread("notebooks/paper_2025/figS4_res.rqs")
+#res <- qread("figOS4_res.rqs")
 
 res |>
   plot_data_cost() |>
@@ -1329,7 +1347,7 @@ res |>
       mutate(MeanCost = 70*1e3, value=1) |>
       bind_rows(x)
   }}() |>
-  mutate(Col = fct(str_c(endemicity,"% prev."))) |>
+  mutate(Col = fct(str_c(endemicity,"% prevalence"))) |>
   mutate(Padd = fct(str_c(force_inclusion_prob*100,"%"), levels=str_c(c(0,0.05,0.1,0.15,0.2)*100,"%"))) |>
   ggplot(aes(x=MeanCost/1e3, y=value*100, lty=Padd)) +
   geom_line(col=gg_colour_hue(4)[4]) +
@@ -1387,22 +1405,23 @@ res |>
   }}() |>
   mutate(Col = str_c(drug, " vs. ", parasite)) |>
   mutate(Col = factor(str_c(drug," against ", parasite), levels=c(
-    "ALB against hookworm", "MEB against hookworm", "ALB against ascaris", "ALB against trichuris"
+    "ALB against ascaris", "ALB against hookworm", "MEB against hookworm", "ALB against trichuris"
   ), labels=c(
-     "ALB~vs.~hookworms", "MEB~vs.~hookworms", "ALB~vs~italic(Ascaris)", "ALB~vs.~italic(Trichuris)"
+    "ALB~vs~italic(Ascaris)", "ALB~vs.~hookworms", "MEB~vs.~hookworms", "ALB~vs.~italic(Trichuris)"
   ))) |>
   ggplot(aes(x=MeanCost/1e3, y=value*100, col=design)) +
   geom_line() +
   facet_wrap(~Col, scales="free_x", labeller=label_parsed) +
-  ylab("Performance (%)") +
   geom_hline(yintercept = c(80), lty="dashed") +
   geom_hline(yintercept = c(90), lty="dotted") +
-  coord_cartesian(ylim = c(50,100)) +
+  scale_x_log10() +
+  coord_cartesian(ylim = c(50,100), xlim = c(1.0,30)) +
   #coord_cartesian(ylim = c(50,100), xlim = c(0, 60)) +
-  labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Performance (%)") +
+  labs(x=bquote("Mean cost"[total]~ "(x1000 US$)"), y="Power (%)") +
   scale_colour_discrete(labels=c(bquote(NS["1x1/1x1"]),bquote(NS["1x1/1x2"]),bquote(SSR["1x1/1x1"]),bquote(SSR["1x1/1x2"]))) +
   guides(color = guide_legend(title="Survey design"))
 ggsave("fig4.pdf", width=7, height=6)
+ggsave("fig4.eps", width=7, height=6)
 
 
 
@@ -1579,6 +1598,7 @@ fig5dat |>
   ylab(expression("Mean cost"[total]~ "(x1000 US$) for 80% power")) +
   theme(strip.text.x = element_text(margin = margin(t=1.5, b=1.5)), strip.background = element_rect(fill = "grey70", colour = "grey70"))
 ggsave("fig5.pdf", width=12, height=9)
+ggsave("fig5.eps", width=12, height=9)
 
 
 fig5dat |>
@@ -1602,6 +1622,7 @@ fig5dat |>
   ylab("Required sample size for 80% power") +
   theme(strip.text.x = element_text(margin = margin(t=1.5, b=1.5)), strip.background = element_rect(fill = "grey70", colour = "grey70"))
 ggsave("figS5.pdf", width=12, height=9)
+ggsave("figS5.eps", width=12, height=9)
 
 
 
