@@ -1170,7 +1170,8 @@ LETTERS[1:4] |>
     if(x=="A"){
       res |>
         filter(setting == "Ethiopia", dropout == "with dropouts", force_inclusion_prob == 0.1) |>
-        mutate(Panel = "A: Ethiopian cost")
+        #mutate(Panel = "A: Ethiopian cost")
+        mutate(Panel = "A: Basic scenario")
     }else if(x=="B"){
       res |>
         filter(setting == "Tanzania", dropout == "with dropouts", force_inclusion_prob == 0.1) |>
